@@ -1,7 +1,7 @@
 import { logAudit } from "@/services/auditService";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -17,13 +17,18 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import YoutubePlayer from "react-native-youtube-iframe";
+import YoutubePlayer, { YoutubeIframeRef } from "react-native-youtube-iframe";
 import { useAdmin } from "../../context/AdminContext";
 import {
   addRecordedSession,
   deleteMaterial,
-  getMaterialsByModule,
+  getCompletedCourseMaterialIds,
+  getCourseIdForModule,
+  getMaterialsByCourse,
+  getModulesByCourse,
   LearningMaterial,
+  markMaterialCompleted,
+  markMaterialOpened,
 } from "../../services/materialService";
 import {
   getCompletedMaterialIds,
@@ -31,6 +36,9 @@ import {
 } from "../../services/materialProgressService";
 
 const { width } = Dimensions.get("window");
+
+// Share of the video a student must watch for it to count as completed
+const WATCH_THRESHOLD = 0.8;
 
 const formatDate = (iso: string) =>
   new Date(iso).toLocaleDateString("en-PH", {
@@ -171,20 +179,46 @@ function PlayerModal({
   session,
   onClose,
   onViewed,
+  onCompleted,
 }: {
   session: LearningMaterial | null;
   onClose: () => void;
   onViewed?: (session: LearningMaterial) => void;
+  onCompleted?: (session: LearningMaterial) => void;
 }) {
   const [playing, setPlaying] = useState(false);
   const [logged, setLogged] = useState(false);
+  const playerRef = useRef<YoutubeIframeRef>(null);
+  const completedRef = useRef(false);
 
   useEffect(() => {
     if (session) {
       setPlaying(false);
       setLogged(false);
+      completedRef.current = false;
     }
   }, [session?.material_id]);
+
+  // While playing, check how much of the video has been watched
+  useEffect(() => {
+    if (!playing || !session) return;
+    const timer = setInterval(async () => {
+      if (completedRef.current || !playerRef.current) return;
+      try {
+        const [current, duration] = await Promise.all([
+          playerRef.current.getCurrentTime(),
+          playerRef.current.getDuration(),
+        ]);
+        if (duration > 0 && current / duration >= WATCH_THRESHOLD) {
+          completedRef.current = true;
+          onCompleted?.(session);
+        }
+      } catch {
+        // The player may not be ready yet; try again on the next tick
+      }
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [playing, session, onCompleted]);
 
   if (!session?.youtubeId) return null;
 
@@ -196,7 +230,14 @@ function PlayerModal({
         onViewed(session);
       }
     }
-    if (state === "paused" || state === "ended") setPlaying(false);
+    if (state === "paused") setPlaying(false);
+    if (state === "ended") {
+      setPlaying(false);
+      if (!completedRef.current) {
+        completedRef.current = true;
+        onCompleted?.(session);
+      }
+    }
   };
 
   return (
@@ -213,6 +254,7 @@ function PlayerModal({
 
         <View style={player.videoWrap}>
           <YoutubePlayer
+            ref={playerRef}
             height={width * 0.5625}
             width={width}
             videoId={session.youtubeId}
@@ -242,13 +284,36 @@ function PlayerModal({
 
 export default function RecordedSessionsScreen() {
   const router = useRouter();
-  const { moduleId: moduleIdParam, courseTitle = "Course" } =
-    useLocalSearchParams<{ moduleId: string; courseTitle: string }>();
+  // Opened with courseId (Courses screen) or moduleId (admin screens)
+  const {
+    courseId: courseIdParam,
+    moduleId: moduleIdParam,
+    courseTitle = "Course",
+  } = useLocalSearchParams<{
+    courseId?: string;
+    moduleId?: string;
+    courseTitle: string;
+  }>();
 
-  const moduleId = Number(moduleIdParam);
-  const { isAdmin, currentAdminId, currentStudentId } = useAdmin();
+  const [courseId, setCourseId] = useState<number | null>(
+    courseIdParam ? Number(courseIdParam) : null,
+  );
+
+  // Only a moduleId was given: look up its course
+  useEffect(() => {
+    if (courseId || !moduleIdParam) return;
+    getCourseIdForModule(Number(moduleIdParam)).then((id) => {
+      if (id) setCourseId(id);
+      else setLoading(false);
+    });
+  }, [courseId, moduleIdParam]);
+  const { isAdmin, isStudent, authLoading, currentAdminId, currentStudentId } =
+    useAdmin();
+  // New sessions go to the course's first module
+  const [uploadModuleId, setUploadModuleId] = useState<number | null>(null);
 
   const [sessions, setSessions] = useState<LearningMaterial[]>([]);
+  const [completedIds, setCompletedIds] = useState<Set<number>>(new Set());
   const [loading, setLoading] = useState(true);
   const [addModalVisible, setAddModalVisible] = useState(false);
   const [activeSession, setActiveSession] = useState<LearningMaterial | null>(
@@ -260,25 +325,32 @@ export default function RecordedSessionsScreen() {
   const [savingProgressId, setSavingProgressId] = useState<number | null>(null);
 
   const fetchSessions = useCallback(async () => {
-    setLoading(true);
-    const data = await getMaterialsByModule(moduleId, "recorded_session");
-    setSessions(data);
-    if (!isAdmin && currentStudentId) {
-      try {
-        const completedIds = await getCompletedMaterialIds(
-          currentStudentId,
-          data.map((session) => session.material_id),
-        );
-        setCompletedMaterialIds(completedIds);
-      } catch (error: any) {
-        Alert.alert("Progress unavailable", error.message);
-      }
+    // Wait until the login check knows whether this is an admin or a student
+    if (authLoading) return;
+    if (!courseId) {
+      // Still looking up the course from a moduleId: keep the spinner.
+      // No course and no module at all: stop the spinner.
+      if (!moduleIdParam) setLoading(false);
+      return;
     }
+    setLoading(true);
+    // Load materials, modules, and completion labels at the same time
+    const [data, mods, completed] = await Promise.all([
+      getMaterialsByCourse(courseId, "recorded_session"),
+      getModulesByCourse(courseId),
+      // Completion labels are for students only
+      isStudent
+        ? getCompletedCourseMaterialIds(courseId)
+        : Promise.resolve(new Set<number>()),
+    ]);
+    setSessions(data);
+    setUploadModuleId(mods[0]?.module_id ?? null);
+    setCompletedIds(completed);
     setLoading(false);
-  }, [moduleId, currentStudentId, isAdmin]);
+  }, [courseId, isStudent, authLoading, moduleIdParam]);
 
   useEffect(() => {
-    if (moduleId) fetchSessions();
+    fetchSessions();
   }, [fetchSessions]);
 
   const handleDelete = (item: LearningMaterial) => {
@@ -317,6 +389,7 @@ export default function RecordedSessionsScreen() {
 
   const handleSessionViewed = async (session: LearningMaterial) => {
     if (!isAdmin && currentStudentId) {
+      markMaterialOpened(session.material_id);
       await logAudit({
         actorType: "student",
         actorId: String(currentStudentId),
@@ -324,15 +397,23 @@ export default function RecordedSessionsScreen() {
         targetType: "session",
         targetId: String(session.material_id),
         targetName: session.title,
-        metadata: { courseTitle, moduleId },
+        metadata: { courseTitle, courseId },
       });
     }
   };
 
-  const renderItem = ({ item }: { item: LearningMaterial }) => {
-    const isCompleted = completedMaterialIds.has(item.material_id);
-    return (
-      <View style={styles.sessionCard}>
+  // Watching the last item of a course unlocks the next course
+  const handleSessionCompleted = useCallback(
+    async (session: LearningMaterial) => {
+      if (isAdmin) return;
+      await markMaterialCompleted(session.material_id);
+      setCompletedIds((prev) => new Set(prev).add(session.material_id));
+    },
+    [isAdmin],
+  );
+
+  const renderItem = ({ item }: { item: LearningMaterial }) => (
+    <View style={styles.sessionCard}>
       <TouchableOpacity
         style={styles.thumbnailWrap}
         onPress={() => setActiveSession(item)}
@@ -351,6 +432,25 @@ export default function RecordedSessionsScreen() {
           {item.title}
         </Text>
         <Text style={styles.sessionDate}>{formatDate(item.uploadedAt)}</Text>
+        {!isAdmin && (
+          <View style={styles.doneBadge}>
+            <Ionicons
+              name="checkmark-circle"
+              size={13}
+              color={completedIds.has(item.material_id) ? "#1E9E5A" : "#A0A7B4"}
+            />
+            <Text
+              style={[
+                styles.doneText,
+                !completedIds.has(item.material_id) && styles.notDoneText,
+              ]}
+            >
+              {completedIds.has(item.material_id)
+                ? "Watched"
+                : "Not watched yet"}
+            </Text>
+          </View>
+        )}
 
         <View style={styles.actions}>
           <TouchableOpacity
@@ -423,7 +523,7 @@ export default function RecordedSessionsScreen() {
         <Text style={styles.courseSub}>Recorded Sessions</Text>
       </View>
 
-      {isAdmin && (
+      {isAdmin && uploadModuleId && (
         <TouchableOpacity
           style={styles.addBtn}
           onPress={() => setAddModalVisible(true)}
@@ -467,12 +567,12 @@ export default function RecordedSessionsScreen() {
         </TouchableOpacity>
       </View>
 
-      {isAdmin && currentAdminId && (
+      {isAdmin && currentAdminId && uploadModuleId && (
         <AddSessionModal
           visible={addModalVisible}
           onClose={() => setAddModalVisible(false)}
           onSaved={fetchSessions}
-          moduleId={moduleId}
+          moduleId={uploadModuleId}
           adminId={currentAdminId}
         />
       )}
@@ -481,6 +581,7 @@ export default function RecordedSessionsScreen() {
         session={activeSession}
         onClose={() => setActiveSession(null)}
         onViewed={handleSessionViewed}
+        onCompleted={handleSessionCompleted}
       />
     </SafeAreaView>
   );
@@ -555,6 +656,14 @@ const styles = StyleSheet.create({
   sessionInfo: { flex: 1, padding: 12 },
   sessionTitle: { fontSize: 14, fontWeight: "600", color: "#1A1A2E" },
   sessionDate: { fontSize: 11, color: "#95A5A6", marginTop: 3 },
+  doneBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 4,
+  },
+  doneText: { fontSize: 11, color: "#1E9E5A", fontWeight: "600" },
+  notDoneText: { color: "#A0A7B4" },
   actions: { flexDirection: "row", marginTop: 10, gap: 8, flexWrap: "wrap" },
   actionBtn: {
     flexDirection: "row",
@@ -575,7 +684,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 40,
   },
-  emptyText: { fontSize: 16, color: "#95A5A6", marginTop: 12 },
+  emptyText: {
+    fontSize: 16,
+    color: "#95A5A6",
+    marginTop: 12,
+    textAlign: "center",
+  },
   emptyHint: { fontSize: 13, color: "#BDC3C7", marginTop: 6 },
   bottomNav: {
     flexDirection: "row",
