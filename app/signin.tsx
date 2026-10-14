@@ -45,13 +45,12 @@ export default function SignInScreen() {
 
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
-        email,
+        email: email.trim(),
         password: pass,
       });
 
       if (error) {
         setErrors([error.message]);
-        setGateValidating(false);
         return;
       }
 
@@ -59,45 +58,49 @@ export default function SignInScreen() {
         .from("admin")
         .select("admin_id")
         .eq("admin_id", data.user.id)
-        .single();
+        .maybeSingle();
 
       if (admin) {
-        await supabase.auth.signOut();
+        await supabase.auth.signOut({ scope: "local" });
         setErrors(["Access denied. This account is not a student."]);
         return;
       }
 
-      const { data: student, error: studentError } = await supabase
+      const { data: student } = await supabase
         .from("student")
         .select("id, firstName, lastName")
         .eq("auth_id", data.user.id)
-        .single();
+        .maybeSingle();
 
-      if (studentError || !student) {
-        await supabase.auth.signOut();
+      if (!student) {
+        await supabase.auth.signOut({ scope: "local" });
         setErrors(["No student account found."]);
         return;
       }
       const token = await generateSessionToken();
       await registerSession(student.id, token);
 
-      await logAudit({
-        actorType: "student",
-        actorId: String(student.id),
-        actorName: `${student.firstName} ${student.lastName}`,
-        action: "student_login",
-      });
+      try {
+        await logAudit({
+          actorType: "student",
+          actorId: String(student.id),
+          actorName: `${student.firstName} ${student.lastName}`,
+          action: "student_login",
+        });
+      } catch (auditErr) {}
+      await triggerRoleCheck(data.user.id);
+
       Toast.show({
         type: "success",
         text1: "You have successfully signed in!",
         position: "bottom",
         visibilityTime: 3500,
       });
-      setGateValidating(false);
-      triggerRoleCheck(data.user.id);
     } catch (err: any) {
+      await supabase.auth.signOut({ scope: "local" }).catch(() => {});
       setErrors([err.message ?? "Something went wrong."]);
     } finally {
+      setGateValidating(false);
       setLoading(false);
     }
   };

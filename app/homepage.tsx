@@ -1,4 +1,3 @@
-import { clearSession, validateSession } from "@/lib/session";
 import { supabase } from "@/lib/supabase";
 import {
   FontAwesome5,
@@ -7,7 +6,7 @@ import {
 } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect, useRouter } from "expo-router";
-import React, { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Dimensions,
   Image,
@@ -139,18 +138,6 @@ export default function Homepage() {
       fetchNotifCount();
     }, [fetchNotifCount]),
   );
-
-  useEffect(() => {
-    const interval = setInterval(async () => {
-      const { valid, studentId } = await validateSession();
-      if (!valid) {
-        await supabase.auth.signOut();
-        if (studentId) await clearSession(studentId);
-      }
-    }, 15000);
-
-    return () => clearInterval(interval);
-  }, []);
 
   return (
     <SafeAreaView style={styles.container}>

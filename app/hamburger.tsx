@@ -1,9 +1,9 @@
-import { clearSession, getStoredStudentId } from "@/lib/session";
+import { logoutStudent } from "@/lib/session";
 import { supabase } from "@/lib/supabase";
 import { logAudit } from "@/services/auditService";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Alert,
   Dimensions,
@@ -107,10 +107,7 @@ export default function HamburgerMenu({ onClose }: HamburgerProps) {
               action: "student_logout",
             });
           }
-
-          const studentId = await getStoredStudentId();
-          if (studentId) await clearSession(studentId);
-          await supabase.auth.signOut();
+          await logoutStudent();
 
           Toast.show({
             type: "success",

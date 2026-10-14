@@ -12,7 +12,7 @@ import {
   View,
 } from "react-native";
 import Toast from "react-native-toast-message";
-import { setGateValidating } from "../_layout";
+import { setGateValidating, triggerRoleCheck } from "../_layout";
 
 export default function AdminSignIn() {
   const router = useRouter();
@@ -42,35 +42,34 @@ export default function AdminSignIn() {
 
       if (error) {
         setErrors(["Invalid email or password."]);
-        setLoading(false);
-        setGateValidating(false);
         return;
       }
+
       const { data: adminRow } = await supabase
         .from("admin")
         .select("admin_id")
         .eq("admin_id", data.user.id)
-        .single();
+        .maybeSingle();
 
       if (!adminRow) {
-        await supabase.auth.signOut();
+        await supabase.auth.signOut({ scope: "local" });
         setErrors(["Access denied. This account is not an administrator."]);
-        setLoading(false);
         return;
       }
 
-      setGateValidating(false);
+      await triggerRoleCheck(data.user.id);
+
       Toast.show({
         type: "success",
-        text1: "You have successfuly signed in",
+        text1: "You have successfully signed in",
         position: "bottom",
         visibilityTime: 3500,
       });
-      setGateValidating(false);
-      router.replace("/admin/dashboard");
     } catch (err: any) {
+      await supabase.auth.signOut({ scope: "local" }).catch(() => {});
       setErrors([err.message ?? "Something went wrong."]);
     } finally {
+      setGateValidating(false);
       setLoading(false);
     }
   };
