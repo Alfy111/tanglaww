@@ -39,7 +39,6 @@ interface Course {
   instructor: string | null;
   isActive: boolean;
   modules: Module[];
-  progress: number;
 }
 
 const courseImages: Record<number, any> = {
@@ -206,7 +205,7 @@ export default function CoursesScreen() {
                 ? `Complete ${status.previousCourseName ?? "the previous course"} to unlock`
                 : "This course is currently locked";
             const isExpanded = expandedId === course.course_id;
-            const progress = course.progress;
+            const progress = getProgress(course.course_id);
 
             return (
               <View key={course.course_id} style={styles.cardContainer}>

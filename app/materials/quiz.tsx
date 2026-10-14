@@ -16,7 +16,6 @@ import { useAdmin } from "../../context/AdminContext";
 const EDITOR_ROUTE = "../materials/quiz-editor";
 const DETAILS_ROUTE = "../materials/quiz-details";
 
-// One shape for both admin and student rows
 interface QuizRow {
   assessment_id: number;
   module_id: number;
@@ -24,7 +23,6 @@ interface QuizRow {
   deadline: string | null;
   status: "Draft" | "Open" | "Closed";
   subtitle: string;
-  // Student only
   maxScore?: number;
   latestScore?: number | null;
 }
@@ -111,7 +109,6 @@ export default function QuizScreen() {
 
   const fetchQuizzes = useCallback(async () => {
     setLoading(true);
-    // Wait until the role is known, then load the list for that role only
     if (authLoading) return;
     const rows = isAdmin
       ? await fetchAdminQuizzes()
@@ -120,10 +117,8 @@ export default function QuizScreen() {
         : [];
     setQuizzes(rows);
     setLoading(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [courseId, isAdmin, isStudent, authLoading]);
 
-  // Refresh whenever the screen comes back into view
   useFocusEffect(
     useCallback(() => {
       if (courseId) fetchQuizzes();
