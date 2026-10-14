@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  AppState,
   Dimensions,
   FlatList,
   Linking,
@@ -20,25 +21,34 @@ import {
 import YoutubePlayer, { YoutubeIframeRef } from "react-native-youtube-iframe";
 import { useAdmin } from "../../context/AdminContext";
 import {
+  getCompletedMaterialIds,
+  getWatchedSegments,
+  markMaterialCompleted,
+  recordMaterialView,
+  SEGMENT_SECONDS,
+  VIDEO_COMPLETION_THRESHOLD,
+  videoCoverage,
+} from "../../services/materialProgressService";
+import {
   addRecordedSession,
   deleteMaterial,
-  getCompletedCourseMaterialIds,
   getCourseIdForModule,
   getMaterialsByCourse,
   getModulesByCourse,
   LearningMaterial,
-  markMaterialCompleted,
-  markMaterialOpened,
 } from "../../services/materialService";
-import {
-  getCompletedMaterialIds,
-  setMaterialCompleted,
-} from "../../services/materialProgressService";
 
 const { width } = Dimensions.get("window");
 
-// Share of the video a student must watch for it to count as completed
-const WATCH_THRESHOLD = 0.8;
+const POLL_MS = 3000;
+const MAX_CONTINUOUS_JUMP_SECONDS = (POLL_MS / 1000) * 2.5;
+
+type WatchSessionResult = {
+  startedAt: Date;
+  activeSeconds: number;
+  watchedSegments: number[];
+  mediaDurationSeconds: number;
+};
 
 const formatDate = (iso: string) =>
   new Date(iso).toLocaleDateString("en-PH", {
@@ -130,7 +140,7 @@ function AddSessionModal({
           </View>
 
           <ScrollView keyboardShouldPersistTaps="handled">
-            <Text style={modal.label}>Session Title *</Text>
+            <Text style={modal.label}>Session Title: *</Text>
             <TextInput
               style={modal.input}
               placeholder="e.g. Week 1 – Introduction"
@@ -138,7 +148,7 @@ function AddSessionModal({
               value={title}
               onChangeText={setTitle}
             />
-            <Text style={modal.label}>YouTube URL *</Text>
+            <Text style={modal.label}>YouTube URL: *</Text>
             <TextInput
               style={[modal.input, urlError ? modal.inputError : null]}
               placeholder="https://youtu.be/VIDEO_ID"
@@ -175,116 +185,214 @@ function AddSessionModal({
   );
 }
 
-function PlayerModal({
+function SessionPlayer({
   session,
   onClose,
   onViewed,
-  onCompleted,
+  onSessionEnd,
+  trackProgress,
+  alreadyCompleted,
 }: {
-  session: LearningMaterial | null;
+  session: LearningMaterial;
   onClose: () => void;
   onViewed?: (session: LearningMaterial) => void;
-  onCompleted?: (session: LearningMaterial) => void;
+  onSessionEnd?: (result: WatchSessionResult) => void;
+  trackProgress: boolean;
+  alreadyCompleted: boolean;
 }) {
   const [playing, setPlaying] = useState(false);
-  const [logged, setLogged] = useState(false);
   const playerRef = useRef<YoutubeIframeRef>(null);
-  const completedRef = useRef(false);
+  const viewedLogged = useRef(false);
 
-  useEffect(() => {
-    if (session) {
-      setPlaying(false);
-      setLogged(false);
-      completedRef.current = false;
-    }
-  }, [session?.material_id]);
+  const watched = useRef(new Set<number>());
+  const lastPos = useRef<number | null>(null);
+  const mediaDuration = useRef(0);
 
-  // While playing, check how much of the video has been watched
-  useEffect(() => {
-    if (!playing || !session) return;
-    const timer = setInterval(async () => {
-      if (completedRef.current || !playerRef.current) return;
-      try {
-        const [current, duration] = await Promise.all([
-          playerRef.current.getCurrentTime(),
-          playerRef.current.getDuration(),
-        ]);
-        if (duration > 0 && current / duration >= WATCH_THRESHOLD) {
-          completedRef.current = true;
-          onCompleted?.(session);
-        }
-      } catch {
-        // The player may not be ready yet; try again on the next tick
+  const playMs = useRef(0);
+  const resumedAt = useRef<number | null>(null);
+  const startedAt = useRef<Date | null>(null);
+  const isPlayingNow = useRef(false);
+  const onSessionEndRef = useRef(onSessionEnd);
+  onSessionEndRef.current = onSessionEnd;
+
+  const startClock = () => {
+    if (!trackProgress || resumedAt.current !== null) return;
+    resumedAt.current = Date.now();
+    if (!startedAt.current) startedAt.current = new Date();
+  };
+
+  const pauseClock = () => {
+    if (resumedAt.current === null) return;
+    playMs.current += Date.now() - resumedAt.current;
+    resumedAt.current = null;
+  };
+
+  const samplePosition = async () => {
+    const p = playerRef.current;
+    if (!trackProgress || !p) return;
+    try {
+      const [current, duration] = await Promise.all([
+        p.getCurrentTime(),
+        p.getDuration(),
+      ]);
+      if (duration > 0) mediaDuration.current = duration;
+      const last = lastPos.current;
+      if (
+        last !== null &&
+        current >= last &&
+        current - last <= MAX_CONTINUOUS_JUMP_SECONDS
+      ) {
+        const from = Math.floor(last / SEGMENT_SECONDS);
+        const to = Math.floor(current / SEGMENT_SECONDS);
+        for (let s = from; s <= to; s++) watched.current.add(s);
       }
-    }, 5000);
-    return () => clearInterval(timer);
-  }, [playing, session, onCompleted]);
+      lastPos.current = current;
+    } catch {}
+  };
 
-  if (!session?.youtubeId) return null;
+  useEffect(() => {
+    if (!playing) return;
+    samplePosition();
+    const timer = setInterval(samplePosition, POLL_MS);
+    return () => clearInterval(timer);
+  }, [playing]);
+
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "active") {
+        if (isPlayingNow.current) startClock();
+      } else {
+        pauseClock();
+      }
+    });
+    return () => {
+      sub.remove();
+      pauseClock();
+      if (startedAt.current) {
+        onSessionEndRef.current?.({
+          startedAt: startedAt.current,
+          activeSeconds: Math.round(playMs.current / 1000),
+          watchedSegments: Array.from(watched.current).sort((a, b) => a - b),
+          mediaDurationSeconds: Math.round(mediaDuration.current),
+        });
+      }
+    };
+  }, []);
 
   const handleStateChange = (state: string) => {
     if (state === "playing") {
+      isPlayingNow.current = true;
       setPlaying(true);
-      if (!logged && onViewed) {
-        setLogged(true);
-        onViewed(session);
+      if (AppState.currentState === "active") startClock();
+      if (!viewedLogged.current) {
+        viewedLogged.current = true;
+        onViewed?.(session);
       }
-    }
-    if (state === "paused") setPlaying(false);
-    if (state === "ended") {
+    } else if (state === "buffering") {
+      isPlayingNow.current = false;
+      pauseClock();
+    } else if (state === "paused" || state === "ended") {
+      isPlayingNow.current = false;
+      samplePosition();
+      pauseClock();
       setPlaying(false);
-      if (!completedRef.current) {
-        completedRef.current = true;
-        onCompleted?.(session);
-      }
     }
   };
 
+  const percent = Math.round(VIDEO_COMPLETION_THRESHOLD * 100);
+
   return (
-    <Modal visible animationType="slide">
-      <SafeAreaView style={player.container}>
-        <View style={player.header}>
-          <TouchableOpacity onPress={onClose} style={{ padding: 4 }}>
-            <Ionicons name="arrow-back" size={22} color="white" />
-          </TouchableOpacity>
+    <SafeAreaView style={player.container}>
+      <View style={player.header}>
+        <TouchableOpacity onPress={onClose} style={{ padding: 4 }}>
+          <Ionicons name="arrow-back" size={22} color="white" />
+        </TouchableOpacity>
+        <View style={{ flex: 1 }}>
           <Text style={player.headerTitle} numberOfLines={1}>
             {session.title}
           </Text>
+          {trackProgress && (
+            <Text style={player.headerHint} numberOfLines={1}>
+              {alreadyCompleted
+                ? "Watched"
+                : `Watch at least ${percent}% to complete`}
+            </Text>
+          )}
         </View>
+      </View>
 
-        <View style={player.videoWrap}>
-          <YoutubePlayer
-            ref={playerRef}
-            height={width * 0.5625}
-            width={width}
-            videoId={session.youtubeId}
-            play={playing}
-            onChangeState={handleStateChange}
-          />
-        </View>
+      <View style={player.videoWrap}>
+        <YoutubePlayer
+          ref={playerRef}
+          height={width * 0.5625}
+          width={width}
+          videoId={session.youtubeId!}
+          play={playing}
+          onChangeState={handleStateChange}
+        />
+      </View>
 
-        <View style={player.info}>
-          <Text style={player.sessionTitle}>{session.title}</Text>
-          <Text style={player.sessionDate}>
-            Added {formatDate(session.uploadedAt)}
-          </Text>
-        </View>
+      <View style={player.info}>
+        <Text style={player.sessionTitle}>{session.title}</Text>
+        <Text style={player.sessionDate}>
+          Added {formatDate(session.uploadedAt)}
+        </Text>
+      </View>
 
-        <TouchableOpacity
-          style={player.ytBtn}
-          onPress={() => Linking.openURL(session.fileUrl)}
-        >
-          <Ionicons name="logo-youtube" size={20} color="#E74C3C" />
-          <Text style={player.ytBtnText}>Open in YouTube</Text>
-        </TouchableOpacity>
-      </SafeAreaView>
+      <TouchableOpacity
+        style={player.ytBtn}
+        onPress={() => Linking.openURL(session.fileUrl)}
+      >
+        <Ionicons name="logo-youtube" size={20} color="#E74C3C" />
+        <Text style={player.ytBtnText}>Open in YouTube</Text>
+      </TouchableOpacity>
+      {trackProgress && (
+        <Text style={player.ytNote}>
+          Watching in the YouTube app doesn't count toward your progress.
+        </Text>
+      )}
+    </SafeAreaView>
+  );
+}
+
+function PlayerModal(props: {
+  session: LearningMaterial | null;
+  onClose: () => void;
+  onViewed?: (session: LearningMaterial) => void;
+  onSessionEnd?: (
+    session: LearningMaterial,
+    result: WatchSessionResult,
+  ) => void;
+  trackProgress: boolean;
+  completedIds: Set<number>;
+}) {
+  const {
+    session,
+    onClose,
+    onViewed,
+    onSessionEnd,
+    trackProgress,
+    completedIds,
+  } = props;
+  if (!session?.youtubeId) return null;
+
+  return (
+    <Modal visible animationType="slide" onRequestClose={onClose}>
+      <SessionPlayer
+        key={session.material_id}
+        session={session}
+        onClose={onClose}
+        onViewed={onViewed}
+        onSessionEnd={(result) => onSessionEnd?.(session, result)}
+        trackProgress={trackProgress}
+        alreadyCompleted={completedIds.has(session.material_id)}
+      />
     </Modal>
   );
 }
 
 export default function RecordedSessionsScreen() {
   const router = useRouter();
-  // Opened with courseId (Courses screen) or moduleId (admin screens)
   const {
     courseId: courseIdParam,
     moduleId: moduleIdParam,
@@ -295,11 +403,23 @@ export default function RecordedSessionsScreen() {
     courseTitle: string;
   }>();
 
+  const { isAdmin, isStudent, authLoading, currentAdminId, currentStudentId } =
+    useAdmin();
+
   const [courseId, setCourseId] = useState<number | null>(
     courseIdParam ? Number(courseIdParam) : null,
   );
+  const [uploadModuleId, setUploadModuleId] = useState<number | null>(null);
+  const [sessions, setSessions] = useState<LearningMaterial[]>([]);
+  const [completedMaterialIds, setCompletedMaterialIds] = useState<Set<number>>(
+    new Set(),
+  );
+  const [loading, setLoading] = useState(true);
+  const [addModalVisible, setAddModalVisible] = useState(false);
+  const [activeSession, setActiveSession] = useState<LearningMaterial | null>(
+    null,
+  );
 
-  // Only a moduleId was given: look up its course
   useEffect(() => {
     if (courseId || !moduleIdParam) return;
     getCourseIdForModule(Number(moduleIdParam)).then((id) => {
@@ -307,47 +427,39 @@ export default function RecordedSessionsScreen() {
       else setLoading(false);
     });
   }, [courseId, moduleIdParam]);
-  const { isAdmin, isStudent, authLoading, currentAdminId, currentStudentId } =
-    useAdmin();
-  // New sessions go to the course's first module
-  const [uploadModuleId, setUploadModuleId] = useState<number | null>(null);
-
-  const [sessions, setSessions] = useState<LearningMaterial[]>([]);
-  const [completedIds, setCompletedIds] = useState<Set<number>>(new Set());
-  const [loading, setLoading] = useState(true);
-  const [addModalVisible, setAddModalVisible] = useState(false);
-  const [activeSession, setActiveSession] = useState<LearningMaterial | null>(
-    null,
-  );
-  const [completedMaterialIds, setCompletedMaterialIds] = useState<Set<number>>(
-    new Set(),
-  );
-  const [savingProgressId, setSavingProgressId] = useState<number | null>(null);
 
   const fetchSessions = useCallback(async () => {
-    // Wait until the login check knows whether this is an admin or a student
     if (authLoading) return;
     if (!courseId) {
-      // Still looking up the course from a moduleId: keep the spinner.
-      // No course and no module at all: stop the spinner.
       if (!moduleIdParam) setLoading(false);
       return;
     }
     setLoading(true);
-    // Load materials, modules, and completion labels at the same time
-    const [data, mods, completed] = await Promise.all([
-      getMaterialsByCourse(courseId, "recorded_session"),
-      getModulesByCourse(courseId),
-      // Completion labels are for students only
-      isStudent
-        ? getCompletedCourseMaterialIds(courseId)
-        : Promise.resolve(new Set<number>()),
-    ]);
-    setSessions(data);
-    setUploadModuleId(mods[0]?.module_id ?? null);
-    setCompletedIds(completed);
-    setLoading(false);
-  }, [courseId, isStudent, authLoading, moduleIdParam]);
+    try {
+      const [data, mods] = await Promise.all([
+        getMaterialsByCourse(courseId, "recorded_session"),
+        getModulesByCourse(courseId),
+      ]);
+      setSessions(data);
+      setUploadModuleId(mods[0]?.module_id ?? null);
+
+      if (isStudent && currentStudentId) {
+        try {
+          const completed = await getCompletedMaterialIds(
+            currentStudentId,
+            data.map((session) => session.material_id),
+          );
+          setCompletedMaterialIds(completed);
+        } catch (error: any) {
+          Alert.alert("Progress unavailable", error.message);
+        }
+      } else {
+        setCompletedMaterialIds(new Set());
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [courseId, isStudent, authLoading, moduleIdParam, currentStudentId]);
 
   useEffect(() => {
     fetchSessions();
@@ -368,28 +480,9 @@ export default function RecordedSessionsScreen() {
     ]);
   };
 
-  const handleToggleCompletion = async (item: LearningMaterial) => {
-    if (!currentStudentId) return;
-    const isCompleted = completedMaterialIds.has(item.material_id);
-    setSavingProgressId(item.material_id);
-    try {
-      await setMaterialCompleted(currentStudentId, item.material_id, !isCompleted);
-      setCompletedMaterialIds((current) => {
-        const next = new Set(current);
-        if (isCompleted) next.delete(item.material_id);
-        else next.add(item.material_id);
-        return next;
-      });
-    } catch (error: any) {
-      Alert.alert("Unable to update progress", error.message);
-    } finally {
-      setSavingProgressId(null);
-    }
-  };
-
   const handleSessionViewed = async (session: LearningMaterial) => {
-    if (!isAdmin && currentStudentId) {
-      markMaterialOpened(session.material_id);
+    if (isAdmin || !currentStudentId) return;
+    try {
       await logAudit({
         actorType: "student",
         actorId: String(currentStudentId),
@@ -397,117 +490,126 @@ export default function RecordedSessionsScreen() {
         targetType: "session",
         targetId: String(session.material_id),
         targetName: session.title,
-        metadata: { courseTitle, courseId },
+        metadata: {
+          courseTitle,
+          courseId,
+          moduleId: moduleIdParam ? Number(moduleIdParam) : null,
+        },
       });
+    } catch (err) {
+      console.warn("[sessions] audit log failed", err);
     }
   };
 
-  // Watching the last item of a course unlocks the next course
-  const handleSessionCompleted = useCallback(
-    async (session: LearningMaterial) => {
-      if (isAdmin) return;
-      await markMaterialCompleted(session.material_id);
-      setCompletedIds((prev) => new Set(prev).add(session.material_id));
-    },
-    [isAdmin],
-  );
+  const handleSessionEnd = async (
+    session: LearningMaterial,
+    result: WatchSessionResult,
+  ) => {
+    if (!isStudent || !currentStudentId) return;
+    try {
+      const totalSeconds = await recordMaterialView(
+        currentStudentId,
+        session.material_id,
+        result.startedAt,
+        result.activeSeconds,
+        {
+          watchedSegments: result.watchedSegments,
+          mediaDurationSeconds: result.mediaDurationSeconds,
+        },
+      );
+      if (result.mediaDurationSeconds <= 0) return;
 
-  const renderItem = ({ item }: { item: LearningMaterial }) => (
-    <View style={styles.sessionCard}>
-      <TouchableOpacity
-        style={styles.thumbnailWrap}
-        onPress={() => setActiveSession(item)}
-        activeOpacity={0.85}
-      >
-        <View style={styles.thumbnailPlaceholder}>
-          <Ionicons name="logo-youtube" size={36} color="#E74C3C" />
-          <View style={styles.playBadge}>
-            <Ionicons name="play" size={12} color="white" />
+      const allSegments = await getWatchedSegments(
+        currentStudentId,
+        session.material_id,
+      );
+      const coverage = videoCoverage(allSegments, result.mediaDurationSeconds);
+      if (coverage >= VIDEO_COMPLETION_THRESHOLD) {
+        await markMaterialCompleted(
+          currentStudentId,
+          session.material_id,
+          "video_watched",
+          totalSeconds,
+        );
+        setCompletedMaterialIds((prev) =>
+          new Set(prev).add(session.material_id),
+        );
+      }
+    } catch (err) {
+      console.warn("[sessions] saving watch progress failed", err);
+    }
+  };
+
+  const renderItem = ({ item }: { item: LearningMaterial }) => {
+    const isCompleted = completedMaterialIds.has(item.material_id);
+    return (
+      <View style={styles.sessionCard}>
+        <TouchableOpacity
+          style={styles.thumbnailWrap}
+          onPress={() => setActiveSession(item)}
+          activeOpacity={0.85}
+        >
+          <View style={styles.thumbnailPlaceholder}>
+            <Ionicons name="logo-youtube" size={36} color="#E74C3C" />
+            <View style={styles.playBadge}>
+              <Ionicons name="play" size={12} color="white" />
+            </View>
           </View>
-        </View>
-      </TouchableOpacity>
+        </TouchableOpacity>
 
-      <View style={styles.sessionInfo}>
-        <Text style={styles.sessionTitle} numberOfLines={2}>
-          {item.title}
-        </Text>
-        <Text style={styles.sessionDate}>{formatDate(item.uploadedAt)}</Text>
-        {!isAdmin && (
-          <View style={styles.doneBadge}>
-            <Ionicons
-              name="checkmark-circle"
-              size={13}
-              color={completedIds.has(item.material_id) ? "#1E9E5A" : "#A0A7B4"}
-            />
-            <Text
-              style={[
-                styles.doneText,
-                !completedIds.has(item.material_id) && styles.notDoneText,
-              ]}
-            >
-              {completedIds.has(item.material_id)
-                ? "Watched"
-                : "Not watched yet"}
-            </Text>
-          </View>
-        )}
+        <View style={styles.sessionInfo}>
+          <Text style={styles.sessionTitle} numberOfLines={2}>
+            {item.title}
+          </Text>
+          <Text style={styles.sessionDate}>{formatDate(item.uploadedAt)}</Text>
+          {isStudent && (
+            <View style={styles.doneBadge}>
+              <Ionicons
+                name={isCompleted ? "checkmark-circle" : "time-outline"}
+                size={13}
+                color={isCompleted ? "#1E9E5A" : "#A0A7B4"}
+              />
+              <Text
+                style={[styles.doneText, !isCompleted && styles.notDoneText]}
+              >
+                {isCompleted ? "Watched" : "Not watched yet"}
+              </Text>
+            </View>
+          )}
 
-        <View style={styles.actions}>
-          <TouchableOpacity
-            style={styles.actionBtn}
-            onPress={() => setActiveSession(item)}
-          >
-            <Ionicons name="play-circle-outline" size={15} color="#2F459B" />
-            <Text style={styles.actionBtnText}>Play</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.actionBtn}
-            onPress={() => Linking.openURL(item.fileUrl)}
-          >
-            <Ionicons name="open-outline" size={15} color="#2F459B" />
-            <Text style={styles.actionBtnText}>YouTube</Text>
-          </TouchableOpacity>
-
-          {!isAdmin && currentStudentId && (
+          <View style={styles.actions}>
             <TouchableOpacity
               style={styles.actionBtn}
-              onPress={() => handleToggleCompletion(item)}
-              disabled={savingProgressId === item.material_id}
+              onPress={() => setActiveSession(item)}
             >
-              {savingProgressId === item.material_id ? (
-                <ActivityIndicator size="small" color="#2F459B" />
-              ) : (
-                <>
-                  <Ionicons
-                    name={isCompleted ? "checkmark-circle" : "ellipse-outline"}
-                    size={15}
-                    color={isCompleted ? "#27834a" : "#2F459B"}
-                  />
-                  <Text style={[styles.actionBtnText, isCompleted && { color: "#27834a" }]}>
-                    {isCompleted ? "Completed" : "Mark complete"}
-                  </Text>
-                </>
-              )}
+              <Ionicons name="play-circle-outline" size={15} color="#2F459B" />
+              <Text style={styles.actionBtnText}>Play</Text>
             </TouchableOpacity>
-          )}
 
-          {isAdmin && (
             <TouchableOpacity
-              style={[styles.actionBtn, styles.deleteBtn]}
-              onPress={() => handleDelete(item)}
+              style={styles.actionBtn}
+              onPress={() => Linking.openURL(item.fileUrl)}
             >
-              <Ionicons name="trash-outline" size={15} color="#E74C3C" />
-              <Text style={[styles.actionBtnText, { color: "#E74C3C" }]}>
-                Delete
-              </Text>
+              <Ionicons name="open-outline" size={15} color="#2F459B" />
+              <Text style={styles.actionBtnText}>YouTube</Text>
             </TouchableOpacity>
-          )}
+
+            {isAdmin && (
+              <TouchableOpacity
+                style={[styles.actionBtn, styles.deleteBtn]}
+                onPress={() => handleDelete(item)}
+              >
+                <Ionicons name="trash-outline" size={15} color="#E74C3C" />
+                <Text style={[styles.actionBtnText, { color: "#E74C3C" }]}>
+                  Delete
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
       </View>
-    </View>
     );
-    };
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -581,7 +683,9 @@ export default function RecordedSessionsScreen() {
         session={activeSession}
         onClose={() => setActiveSession(null)}
         onViewed={handleSessionViewed}
-        onCompleted={handleSessionCompleted}
+        onSessionEnd={handleSessionEnd}
+        trackProgress={!!(isStudent && currentStudentId)}
+        completedIds={completedMaterialIds}
       />
     </SafeAreaView>
   );
@@ -758,7 +862,8 @@ const player = StyleSheet.create({
     paddingVertical: 14,
     gap: 12,
   },
-  headerTitle: { flex: 1, fontSize: 16, fontWeight: "bold", color: "white" },
+  headerTitle: { fontSize: 16, fontWeight: "bold", color: "white" },
+  headerHint: { fontSize: 11, color: "#C9D2F5", marginTop: 2 },
   videoWrap: { backgroundColor: "black" },
   info: { padding: 20 },
   sessionTitle: { fontSize: 17, fontWeight: "bold", color: "white" },
@@ -775,4 +880,11 @@ const player = StyleSheet.create({
     gap: 8,
   },
   ytBtnText: { color: "#E74C3C", fontWeight: "bold", fontSize: 14 },
+  ytNote: {
+    color: "#777",
+    fontSize: 11,
+    textAlign: "center",
+    marginTop: 8,
+    paddingHorizontal: 20,
+  },
 });
