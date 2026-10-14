@@ -2,7 +2,7 @@ import { supabase } from "@/lib/supabase";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect, useRouter } from "expo-router";
-import React, { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import {
   Image,
   RefreshControl,
@@ -50,14 +50,14 @@ export default function AdminDashboard() {
 
   const fetchAdmin = async () => {
     const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return;
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session?.user) return;
 
     const { data } = await supabase
       .from("admin")
       .select("firstName, lastName")
-      .eq("admin_id", user.id)
+      .eq("admin_id", session.user.id)
       .single();
 
     if (data)
@@ -126,17 +126,14 @@ export default function AdminDashboard() {
     setNotifCount(pendingCount + (eventCount ?? 0));
   }, []);
 
-  useEffect(() => {
-    fetchAdmin();
-    fetchAnnouncements();
-    fetchAffirmations();
-    fetchPending();
-  }, [fetchAnnouncements]);
-
   useFocusEffect(
     useCallback(() => {
+      fetchAdmin();
+      fetchAnnouncements();
+      fetchAffirmations();
+      fetchPending();
       fetchNotifCount();
-    }, [fetchNotifCount]),
+    }, [fetchAnnouncements, fetchAffirmations, fetchNotifCount]),
   );
 
   const onRefresh = useCallback(async () => {

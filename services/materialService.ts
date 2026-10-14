@@ -1,5 +1,5 @@
 import * as DocumentPicker from "expo-document-picker";
-import { File, Paths } from "expo-file-system/next";
+import { File, Paths } from "expo-file-system";
 import { supabase } from "../lib/supabase";
 
 export type MaterialType = "handout" | "recorded_session";
@@ -31,6 +31,25 @@ export async function getMaterialsByModule(
     .order("uploadedAt", { ascending: false });
 
   if (error) {
+    return [];
+  }
+  return (data ?? []) as LearningMaterial[];
+}
+
+// All materials of one type across every module of a course
+export async function getMaterialsByCourse(
+  courseId: number,
+  type: MaterialType,
+): Promise<LearningMaterial[]> {
+  const { data, error } = await supabase
+    .from("learning_material")
+    .select("*, module!inner(course_id)")
+    .eq("module.course_id", courseId)
+    .eq("materialType", type)
+    .order("uploadedAt", { ascending: false });
+
+  if (error) {
+    console.error("getMaterialsByCourse:", error.message);
     return [];
   }
   return (data ?? []) as LearningMaterial[];
@@ -185,6 +204,22 @@ export async function downloadMaterial(
   }
 }
 
+// The course a module belongs to (for screens opened with only a moduleId)
+export async function getCourseIdForModule(
+  moduleId: number,
+): Promise<number | null> {
+  const { data, error } = await supabase
+    .from("module")
+    .select("course_id")
+    .eq("module_id", moduleId)
+    .single();
+  if (error) {
+    console.error("getCourseIdForModule:", error.message);
+    return null;
+  }
+  return data?.course_id ?? null;
+}
+
 export async function getModulesByCourse(courseId: number) {
   const { data, error } = await supabase
     .from("module")
@@ -196,4 +231,95 @@ export async function getModulesByCourse(courseId: number) {
     return [];
   }
   return data ?? [];
+}
+
+// ------------------------------------------------------------------
+// Completion tracking (students only; the database ignores admins)
+// ------------------------------------------------------------------
+
+export async function markMaterialOpened(materialId: number): Promise<void> {
+  const { error } = await supabase.rpc("mark_material_opened", {
+    p_material_id: materialId,
+  });
+  if (error) console.error("markMaterialOpened:", error.message);
+}
+
+export async function markMaterialCompleted(materialId: number): Promise<void> {
+  const { error } = await supabase.rpc("mark_material_completed", {
+    p_material_id: materialId,
+  });
+  if (error) console.error("markMaterialCompleted:", error.message);
+}
+
+export async function getCompletedMaterialIds(
+  moduleId: number,
+): Promise<Set<number>> {
+  const { data, error } = await supabase.rpc("get_my_completed_materials", {
+    p_module_id: moduleId,
+  });
+  if (error) {
+    console.error("getCompletedMaterialIds:", error.message);
+    return new Set();
+  }
+  return new Set(((data as number[]) ?? []).map(Number));
+}
+
+export async function getCompletedCourseMaterialIds(
+  courseId: number,
+): Promise<Set<number>> {
+  const { data, error } = await supabase.rpc(
+    "get_my_completed_course_materials",
+    {
+      p_course_id: courseId,
+    },
+  );
+  if (error) {
+    console.error("getCompletedCourseMaterialIds:", error.message);
+    return new Set();
+  }
+  return new Set(((data as number[]) ?? []).map(Number));
+}
+
+export interface SectionProgress {
+  done: number;
+  total: number;
+}
+
+export interface CourseProgress {
+  percent: number;
+  // null = unlocked; "access" = no enrollment/access; "previous" = earlier course not finished
+  lockReason: "access" | "previous" | null;
+  previousCourseName: string | null;
+  handouts: SectionProgress;
+  sessions: SectionProgress;
+  quizzes: SectionProgress;
+}
+
+export async function getMyCourseProgress(): Promise<
+  Map<number, CourseProgress>
+> {
+  const { data, error } = await supabase.rpc("get_my_course_progress");
+  if (error) {
+    console.error("getMyCourseProgress:", error.message);
+    return new Map();
+  }
+  return new Map(
+    ((data as any[]) ?? []).map((r) => [
+      Number(r.course_id),
+      {
+        percent: Number(r.percent),
+        lockReason: r.lockReason ?? null,
+        previousCourseName: r.previousCourseName ?? null,
+        handouts: {
+          done: Number(r.handoutsDone),
+          total: Number(r.handoutsTotal),
+        },
+        sessions: {
+          done: Number(r.sessionsDone),
+          total: Number(r.sessionsTotal),
+        },
+        quizzes: { done: Number(r.quizzesDone), total: Number(r.quizzesTotal) },
+      },
+    ]),
+  );
 }

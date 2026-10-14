@@ -7,8 +7,8 @@ export default function Index() {
   const [target, setTarget] = useState<string | null>(null);
 
   useEffect(() => {
-    AsyncStorage.clear().then(() => {
-      setTarget("/welcome");
+    AsyncStorage.getItem("hasSeenWelcome").then((seen) => {
+      setTarget(seen === "true" ? "/login" : "/welcome");
     });
   }, []);
 

@@ -3,8 +3,8 @@ import {
   Ionicons,
   MaterialCommunityIcons,
 } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import React, { useCallback, useEffect, useState } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -20,8 +20,12 @@ import {
 } from "react-native";
 import { useAdmin } from "../context/AdminContext";
 import { supabase } from "../lib/supabase";
-import { getModulesByCourse } from "../services/materialService";
-import { getCompletedMaterialIds } from "../services/materialProgressService";
+import {
+  CourseProgress,
+  getModulesByCourse,
+  getMyCourseProgress,
+  SectionProgress,
+} from "../services/materialService";
 import HamburgerMenu from "./hamburger";
 
 interface Module {
@@ -56,12 +60,21 @@ export default function CoursesScreen() {
   const [accessibleCourseIds, setAccessibleCourseIds] = useState<Set<number>>(
     new Set(),
   );
+  const [progressMap, setProgressMap] = useState<Map<number, CourseProgress>>(
+    new Map(),
+  );
   const [loading, setLoading] = useState(true);
   const [refresh, setRefresh] = useState(false);
 
   useEffect(() => {
     fetchCourses();
   }, [currentStudentId]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (currentStudentId) getMyCourseProgress().then(setProgressMap);
+    }, [currentStudentId]),
+  );
 
   const fetchCourses = async () => {
     if (!currentStudentId) return;
@@ -91,49 +104,8 @@ export default function CoursesScreen() {
       }),
     );
 
-    const moduleIds = coursesWithModules.flatMap((course) =>
-      course.modules.map((module) => module.module_id),
-    );
-    let materials: { material_id: number; module_id: number }[] = [];
-    if (moduleIds.length > 0) {
-      const { data: materialRows, error: materialError } = await supabase
-        .from("learning_material")
-        .select("material_id, module_id")
-        .in("module_id", moduleIds);
-
-      if (materialError) {
-        console.error("fetchCourseMaterials:", materialError.message);
-      } else {
-        materials = materialRows ?? [];
-      }
-    }
-
-    let completedMaterialIds = new Set<number>();
-    try {
-      completedMaterialIds = await getCompletedMaterialIds(
-        currentStudentId,
-        materials.map((material) => material.material_id),
-      );
-    } catch (progressError) {
-      console.error("fetchMaterialProgress:", progressError);
-    }
-
-    setCourses(coursesWithModules.map((course) => {
-      const courseModuleIds = new Set(course.modules.map((module) => module.module_id));
-      const courseMaterials = materials.filter((material) =>
-        courseModuleIds.has(material.module_id),
-      );
-      const completedCount = courseMaterials.filter((material) =>
-        completedMaterialIds.has(material.material_id),
-      ).length;
-
-      return {
-        ...course,
-        progress: courseMaterials.length
-          ? Math.round((completedCount / courseMaterials.length) * 100)
-          : 0,
-      };
-    }));
+    setCourses(coursesWithModules);
+    setProgressMap(await getMyCourseProgress());
     setLoading(false);
   };
 
@@ -151,25 +123,29 @@ export default function CoursesScreen() {
     screen: "handout" | "recorded-sessions" | "quiz" | "session-links",
     course: Course,
   ) => {
-    if (screen === "handout" || screen === "recorded-sessions") {
-      const primaryModule = course.modules[0] ?? null;
-      if (!primaryModule) return;
-      router.push({
-        pathname: `/materials/${screen}` as any,
-        params: {
-          moduleId: String(primaryModule.module_id),
-          courseTitle: course.courseName,
-        },
-      });
-    } else {
-      router.push({
-        pathname: `/materials/${screen}` as any,
-        params: {
-          courseId: String(course.course_id),
-          courseTitle: course.courseName,
-        },
-      });
-    }
+    router.push({
+      pathname: `/materials/${screen}` as any,
+      params: {
+        courseId: String(course.course_id),
+        courseTitle: course.courseName,
+      },
+    });
+  };
+
+  const getProgress = (courseId: number) =>
+    progressMap.get(courseId)?.percent ?? 0;
+
+  const SectionCheck = ({ section }: { section?: SectionProgress }) => {
+    if (!section || section.total === 0) return null;
+    const done = section.done >= section.total;
+    return (
+      <Ionicons
+        name="checkmark-circle"
+        size={20}
+        color={done ? "#1E9E5A" : "#C4C9D2"}
+        style={styles.sectionCheck}
+      />
+    );
   };
 
   return (
@@ -196,7 +172,6 @@ export default function CoursesScreen() {
           <Text style={styles.headerTitle}>Courses</Text>
         </View>
 
-        {/* NAVIGATES DIRECTLY TO THE RECENTLY CREATED DATA ANALYTICS ROUTE */}
         <TouchableOpacity
           onPress={() => router.push("/analytics")}
           activeOpacity={0.7}
@@ -222,8 +197,14 @@ export default function CoursesScreen() {
           contentContainerStyle={styles.scrollContent}
         >
           {courses.map((course) => {
-            const isLocked =
-              !course.isActive && !accessibleCourseIds.has(course.course_id);
+            const status = progressMap.get(course.course_id);
+            const isLocked = status
+              ? status.lockReason !== null
+              : !course.isActive && !accessibleCourseIds.has(course.course_id);
+            const lockMessage =
+              status?.lockReason === "previous"
+                ? `Complete ${status.previousCourseName ?? "the previous course"} to unlock`
+                : "This course is currently locked";
             const isExpanded = expandedId === course.course_id;
             const progress = course.progress;
 
@@ -273,9 +254,7 @@ export default function CoursesScreen() {
                         {course.instructor ?? "—"}
                       </Text>
                       {isLocked && (
-                        <Text style={styles.lockedNote}>
-                          This course is currently locked
-                        </Text>
+                        <Text style={styles.lockedNote}>{lockMessage}</Text>
                       )}
                     </View>
                     {!isLocked && (
@@ -300,6 +279,9 @@ export default function CoursesScreen() {
                         color="#2F459B"
                       />
                       <Text style={styles.dropText}>Handouts</Text>
+                      <SectionCheck
+                        section={progressMap.get(course.course_id)?.handouts}
+                      />
                     </TouchableOpacity>
 
                     <TouchableOpacity
@@ -312,6 +294,9 @@ export default function CoursesScreen() {
                         color="#2F459B"
                       />
                       <Text style={styles.dropText}>Recorded Sessions</Text>
+                      <SectionCheck
+                        section={progressMap.get(course.course_id)?.sessions}
+                      />
                     </TouchableOpacity>
 
                     <TouchableOpacity
@@ -320,6 +305,9 @@ export default function CoursesScreen() {
                     >
                       <Ionicons name="bulb-outline" size={20} color="#2F459B" />
                       <Text style={styles.dropText}>Quiz</Text>
+                      <SectionCheck
+                        section={progressMap.get(course.course_id)?.quizzes}
+                      />
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={styles.dropItem}
@@ -467,6 +455,7 @@ const styles = StyleSheet.create({
     marginLeft: 15,
     textDecorationLine: "underline",
   },
+  sectionCheck: { marginLeft: "auto", marginRight: 4 },
   bottomNav: {
     position: "absolute",
     bottom: 0,
@@ -482,7 +471,11 @@ const styles = StyleSheet.create({
   navItem: { alignItems: "center" },
   navText: { fontSize: 12, marginTop: 4, color: "#2F459B" },
   lockOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     backgroundColor: "rgba(0,0,0,0.25)",
     justifyContent: "center",
     alignItems: "center",
