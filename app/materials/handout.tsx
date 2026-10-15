@@ -2,11 +2,10 @@ import { logAudit } from "@/services/auditService";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as Sharing from "expo-sharing";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  AppState,
   FlatList,
   SafeAreaView,
   StyleSheet,
@@ -20,7 +19,6 @@ import {
   getCompletedMaterialIds,
   markMaterialCompleted,
   recordMaterialView,
-  requiredViewSeconds,
 } from "../../services/materialProgressService";
 import {
   deleteMaterial,
@@ -58,68 +56,46 @@ const fileIconColor = (type: string) => {
   return "#95A5A6";
 };
 
+const DETECT_BOTTOM_JS = `
+  (function () {
+    var sent = false;
+    document.addEventListener("scroll", function (e) {
+      var el = e.target === document ? document.scrollingElement : e.target;
+      if (!sent && el && el.scrollTop + el.clientHeight >= el.scrollHeight - 40) {
+        sent = true;
+        window.ReactNativeWebView.postMessage("reached_bottom");
+      }
+    }, true);
+  })();
+  true;
+`;
+
 function InAppViewer({
   material,
   onClose,
-  onSessionEnd,
-  trackTime,
-  requiredSeconds,
+  onReachedBottom,
+  trackProgress,
   alreadyCompleted,
 }: {
   material: LearningMaterial;
   onClose: () => void;
-  onSessionEnd?: (activeSeconds: number, startedAt: Date) => void;
-  trackTime: boolean;
-  requiredSeconds: number;
+  onReachedBottom?: () => void;
+  trackProgress: boolean;
   alreadyCompleted: boolean;
 }) {
   const [webLoading, setWebLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
+  const [completed, setCompleted] = useState(alreadyCompleted);
   const viewerUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(
     material.fileUrl,
   )}&embedded=true`;
 
-  const activeMs = useRef(0);
-  const resumedAt = useRef<number | null>(null);
-  const startedAt = useRef<Date | null>(null);
-  const docLoaded = useRef(false);
-
-  const onSessionEndRef = useRef(onSessionEnd);
-  onSessionEndRef.current = onSessionEnd;
-
-  const startClock = () => {
-    if (!trackTime || resumedAt.current !== null) return;
-    resumedAt.current = Date.now();
-    if (!startedAt.current) startedAt.current = new Date();
+  const handleMessage = (event: { nativeEvent: { data: string } }) => {
+    if (event.nativeEvent.data !== "reached_bottom") return;
+    if (!trackProgress || completed) return;
+    setCompleted(true);
+    onReachedBottom?.();
   };
-
-  const pauseClock = () => {
-    if (resumedAt.current === null) return;
-    activeMs.current += Date.now() - resumedAt.current;
-    resumedAt.current = null;
-  };
-
-  useEffect(() => {
-    const sub = AppState.addEventListener("change", (state) => {
-      if (state === "active") {
-        if (docLoaded.current) startClock();
-      } else {
-        pauseClock();
-      }
-    });
-    return () => {
-      sub.remove();
-      pauseClock();
-      if (startedAt.current) {
-        onSessionEndRef.current?.(
-          Math.round(activeMs.current / 1000),
-          startedAt.current,
-        );
-      }
-    };
-  }, []);
-
-  const minutes = Math.max(1, Math.round(requiredSeconds / 60));
 
   return (
     <SafeAreaView style={viewer.container}>
@@ -131,11 +107,9 @@ function InAppViewer({
           <Text style={viewer.headerTitle} numberOfLines={1}>
             {material.title}
           </Text>
-          {trackTime && (
+          {trackProgress && (
             <Text style={viewer.headerHint} numberOfLines={1}>
-              {alreadyCompleted
-                ? "Completed"
-                : `Read for about ${minutes} min to complete`}
+              {completed ? "Completed" : "Scroll to the end to complete"}
             </Text>
           )}
         </View>
@@ -168,15 +142,13 @@ function InAppViewer({
         onLoad={() => {
           setWebLoading(false);
           setLoadFailed(false);
-          docLoaded.current = true;
-          if (AppState.currentState === "active") startClock();
         }}
         onError={() => {
           setWebLoading(false);
           setLoadFailed(true);
-          docLoaded.current = false;
-          pauseClock();
         }}
+        injectedJavaScript={DETECT_BOTTOM_JS}
+        onMessage={handleMessage}
         javaScriptEnabled
         domStorageEnabled
       />
@@ -285,44 +257,32 @@ export default function HandoutScreen() {
   const markCompletedLocally = (materialId: number) =>
     setCompletedMaterialIds((current) => new Set(current).add(materialId));
 
-  const handleViewerSessionEnd = async (
-    item: LearningMaterial,
-    activeSeconds: number,
-    startedAt: Date,
-  ) => {
+  const recordOpened = async (item: LearningMaterial) => {
     if (!isStudent || !currentStudentId) return;
     try {
-      const totalSeconds = await recordMaterialView(
+      await recordMaterialView(
         currentStudentId,
         item.material_id,
-        startedAt,
-        activeSeconds,
+        new Date(),
+        0,
       );
-      if (totalSeconds >= requiredViewSeconds(item.fileSize)) {
-        await markMaterialCompleted(
-          currentStudentId,
-          item.material_id,
-          "view_time",
-          totalSeconds,
-        );
-        markCompletedLocally(item.material_id);
-      }
     } catch (err) {
-      console.warn("[handout] saving reading progress failed", err);
+      console.warn("[module] saving view failed", err);
     }
   };
 
-  const completeOnDownload = async (item: LearningMaterial) => {
+  const completeOnReachedBottom = async (item: LearningMaterial) => {
     if (!isStudent || !currentStudentId) return;
+    if (completedMaterialIds.has(item.material_id)) return;
     try {
       await markMaterialCompleted(
         currentStudentId,
         item.material_id,
-        "download",
+        "scrolled_to_end",
       );
       markCompletedLocally(item.material_id);
     } catch (err) {
-      console.warn("[handout] saving download completion failed", err);
+      console.warn("[module] saving completion failed", err);
     }
   };
 
@@ -337,7 +297,7 @@ export default function HandoutScreen() {
 
   const handleDelete = (item: LearningMaterial) => {
     Alert.alert(
-      "Delete Handout",
+      "Delete Learning Module",
       `Delete "${item.title}"? This cannot be undone.`,
       [
         { text: "Cancel", style: "cancel" },
@@ -357,6 +317,7 @@ export default function HandoutScreen() {
   const handleView = (item: LearningMaterial) => {
     setViewingMaterial(item);
     logStudentEvent("student_viewed_material", item);
+    recordOpened(item);
   };
 
   const handleDownload = async (item: LearningMaterial) => {
@@ -370,7 +331,6 @@ export default function HandoutScreen() {
     }
 
     logStudentEvent("student_downloaded_material", item);
-    completeOnDownload(item);
 
     try {
       const isAvailable = await Sharing.isAvailableAsync();
@@ -397,17 +357,13 @@ export default function HandoutScreen() {
 
   if (viewingMaterial) {
     const item = viewingMaterial;
-    const trackTime = !!(isStudent && currentStudentId);
     return (
       <InAppViewer
         material={item}
         onClose={() => setViewingMaterial(null)}
-        trackTime={trackTime}
-        requiredSeconds={requiredViewSeconds(item.fileSize)}
+        trackProgress={!!(isStudent && currentStudentId)}
         alreadyCompleted={completedMaterialIds.has(item.material_id)}
-        onSessionEnd={(activeSeconds, startedAt) =>
-          handleViewerSessionEnd(item, activeSeconds, startedAt)
-        }
+        onReachedBottom={() => completeOnReachedBottom(item)}
       />
     );
   }
@@ -498,12 +454,12 @@ export default function HandoutScreen() {
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color="white" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Handouts</Text>
+        <Text style={styles.headerTitle}>Learning Modules</Text>
       </View>
 
       <View style={styles.courseLabelWrap}>
         <Text style={styles.courseLabel}>{courseTitle}</Text>
-        <Text style={styles.courseSub}>Handouts</Text>
+        <Text style={styles.courseSub}>Learning Modules</Text>
       </View>
 
       {isAdmin && uploadModuleId && (
@@ -517,7 +473,7 @@ export default function HandoutScreen() {
           ) : (
             <>
               <Ionicons name="cloud-upload-outline" size={20} color="white" />
-              <Text style={styles.uploadBtnText}>Upload Handout</Text>
+              <Text style={styles.uploadBtnText}>Upload Learning Module</Text>
             </>
           )}
         </TouchableOpacity>
@@ -534,10 +490,10 @@ export default function HandoutScreen() {
             size={60}
             color="#BDC3C7"
           />
-          <Text style={styles.emptyText}>No handouts yet.</Text>
+          <Text style={styles.emptyText}>No learning modules yet.</Text>
           {isAdmin && (
             <Text style={styles.emptyHint}>
-              Tap "Upload Handout" to add files.
+              Tap "Upload Learning Module" to add files.
             </Text>
           )}
         </View>
@@ -555,7 +511,7 @@ export default function HandoutScreen() {
         <TouchableOpacity disabled>
           <Ionicons name="chevron-back" size={24} color="#DCDFE3" />
         </TouchableOpacity>
-        <Text style={styles.navLabel}>Handouts</Text>
+        <Text style={styles.navLabel}>Learning Modules</Text>
         <TouchableOpacity disabled>
           <Ionicons name="chevron-forward" size={24} color="#DCDFE3" />
         </TouchableOpacity>
