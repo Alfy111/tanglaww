@@ -24,6 +24,10 @@
   box-sizing: border-box;
 }
 
+.sidebar-mobile-toggle {
+  display: none;
+}
+
 .sidebar-logo {
   width: 140px;
   margin: 0 auto 20px;
@@ -206,6 +210,50 @@
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.user-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 60px;
+  padding: 0 32px;
+  background-color: #1a1a6e;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  box-sizing: border-box;
+}
+
+.user-topbar-title {
+  margin: 0;
+  color: #fff;
+  font-size: 20px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.user-topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.user-topbar-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 250px;
+  padding: 7px 14px;
+  border-radius: 8px;
+  background-color: rgba(255, 255, 255, 0.15);
+  box-sizing: border-box;
+}
+
+.user-topbar-search-input {
+  width: 100%;
+  min-width: 0;
 }
 
 /* CONTENT */
@@ -547,6 +595,65 @@
   margin-bottom: 4px;
 }
 
+.profile-content {
+  flex: 1;
+  min-width: 0;
+  padding: 32px 40px;
+  box-sizing: border-box;
+}
+
+.profile-banner-wrap {
+  position: relative;
+  margin-bottom: 72px;
+}
+
+.profile-banner-image {
+  height: 220px;
+  border-radius: 16px;
+  overflow: hidden;
+  cursor: pointer;
+  position: relative;
+}
+
+.profile-page-avatar {
+  position: absolute;
+  bottom: -56px;
+  left: 40px;
+  width: 112px;
+  height: 112px;
+  border: 4px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+  cursor: pointer;
+  overflow: hidden;
+  background-color: #e8eaf6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+.profile-identity {
+  margin-bottom: 24px;
+  padding: 0 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.profile-form-card {
+  min-width: 0;
+  padding: 32px 40px;
+  border-radius: 16px;
+  background-color: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  position: relative;
+  box-sizing: border-box;
+}
+
 /* ANALYTICS & REVIEW PROGRESS */
 .analytics-card {
   display: flex;
@@ -656,6 +763,210 @@
   text-decoration: underline;
   cursor: pointer;
   font-weight: 500;
+}
+
+@media (max-width: 1024px) {
+  .dashboard-layout:not(.admin-layout) .dashboard-content {
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .dashboard-layout:not(.admin-layout) .dashboard-right {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+}
+
+@media (max-width: 760px) {
+  .dashboard-layout:not(.admin-layout) .sidebar {
+    width: min(280px, calc(100vw - 56px));
+    transform: translateX(-100%);
+    transition: transform 0.2s ease;
+  }
+
+  .dashboard-layout:not(.admin-layout) .sidebar.sidebar-open {
+    transform: translateX(0);
+  }
+
+  .sidebar-mobile-toggle {
+    position: fixed;
+    top: 9px;
+    left: 12px;
+    z-index: 120;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    height: 42px;
+    padding: 0;
+    color: #fff;
+    background: rgba(255, 255, 255, 0.14);
+    border: 1px solid rgba(255, 255, 255, 0.32);
+    border-radius: 6px;
+    cursor: pointer;
+  }
+
+  .sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 90;
+    padding: 0;
+    background: rgba(13, 22, 48, 0.45);
+    border: 0;
+  }
+
+  .dashboard-layout:not(.admin-layout) .dashboard-main {
+    width: 100%;
+    min-width: 0;
+    margin-left: 0;
+  }
+
+  .user-topbar {
+    padding: 0 14px 0 64px;
+  }
+
+  .user-topbar-title {
+    font-size: 18px;
+  }
+
+  .user-topbar-actions {
+    gap: 8px;
+  }
+
+  .user-topbar-search {
+    width: min(34vw, 150px);
+    padding: 7px 9px;
+    gap: 6px;
+  }
+
+  .topbar {
+    gap: 10px;
+    padding: 10px 14px 10px 64px;
+  }
+
+  .topbar-search {
+    flex: 1;
+    width: auto;
+    min-width: 0;
+    padding: 8px 10px;
+  }
+
+  .topbar-search input {
+    min-width: 0;
+  }
+
+  .dashboard-layout:not(.admin-layout) .dashboard-content {
+    gap: 16px;
+    padding: 18px 20px;
+  }
+
+  .dashboard-layout:not(.admin-layout) .dashboard-left,
+  .dashboard-layout:not(.admin-layout) .dashboard-right {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .profile-content {
+    padding: 22px 20px;
+  }
+
+  .profile-banner-wrap {
+    margin-bottom: 64px;
+  }
+
+  .profile-banner-image {
+    height: 180px;
+    border-radius: 14px;
+  }
+
+  .profile-page-avatar {
+    bottom: -48px;
+    left: 20px;
+    width: 96px;
+    height: 96px;
+  }
+
+  .profile-identity {
+    padding: 0 20px;
+  }
+
+  .profile-form-card {
+    padding: 24px 22px;
+  }
+}
+
+@media (max-width: 600px) {
+  .dashboard-layout:not(.admin-layout) .dashboard-right {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .dashboard-layout:not(.admin-layout) .courses-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .dashboard-layout:not(.admin-layout) .card {
+    min-width: 0;
+    padding: 18px;
+    box-sizing: border-box;
+  }
+
+  .dashboard-layout:not(.admin-layout) .dashboard-content {
+    padding: 14px;
+  }
+
+  .dashboard-layout:not(.admin-layout) .readiness-tag {
+    max-width: 100%;
+    box-sizing: border-box;
+    text-align: center;
+  }
+
+  .profile-content {
+    padding: 16px;
+  }
+
+  .profile-banner-wrap {
+    margin-bottom: 58px;
+  }
+
+  .profile-banner-image {
+    height: 160px;
+  }
+
+  .profile-page-avatar {
+    bottom: -42px;
+    left: 14px;
+    width: 84px;
+    height: 84px;
+  }
+
+  .profile-identity {
+    padding: 0 14px;
+  }
+
+  .profile-identity p:first-child {
+    font-size: 18px !important;
+  }
+
+  .profile-identity p:last-child {
+    overflow-wrap: anywhere;
+  }
+
+  .profile-form-card {
+    padding: 20px 16px;
+    gap: 16px;
+  }
+}
+
+@media (max-width: 360px) {
+  .user-topbar-title {
+    font-size: 16px;
+  }
+
+  .user-topbar-search {
+    display: none;
+  }
 }
 
 /* Ensure all page content fills full width */

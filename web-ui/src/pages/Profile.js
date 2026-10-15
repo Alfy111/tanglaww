@@ -127,18 +127,15 @@ export default function Profile() {
         </div>
 
         {/* Page Content */}
-        <div style={{ padding: "32px 40px", flex: 1 }}>
+        <div className="profile-content">
 
           {/* Banner + Avatar */}
-          <div style={{ position: "relative", marginBottom: "72px" }}>
+          <div className="profile-banner-wrap">
 
             {/* Banner */}
             <div
+              className="profile-banner-image"
               onClick={() => bannerRef.current.click()}
-              style={{
-                height: "220px", borderRadius: "16px",
-                overflow: "hidden", cursor: "pointer", position: "relative",
-              }}
             >
               <img
                 src={typeof bannerImg === "string" ? bannerImg : profileBanner}
@@ -169,15 +166,8 @@ export default function Profile() {
 
             {/* Avatar */}
             <div
+              className="profile-page-avatar"
               onClick={() => avatarRef.current.click()}
-              style={{
-                position: "absolute", bottom: "-56px", left: "40px",
-                width: "112px", height: "112px", borderRadius: "50%",
-                border: "4px solid #fff", boxShadow: "0 2px 12px rgba(0,0,0,0.15)",
-                cursor: "pointer", overflow: "hidden",
-                backgroundColor: "#e8eaf6",
-                display: "flex", alignItems: "center", justifyContent: "center",
-              }}
             >
               {avatarImg
                 ? <img src={avatarImg} alt="Avatar" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
@@ -196,20 +186,16 @@ export default function Profile() {
           </div>
 
           {/* Name under avatar */}
-          <div style={{ marginBottom: "24px", paddingLeft: "40px", paddingRight: "40px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div className="profile-identity">
             <div>
-              <p style={{ fontSize: "20px", fontWeight: "700", color: "#1a1a2e", margin: 0 }}>{fullName}</p>
+              <p style={{ fontWeight: "700", color: "#1a1a2e", margin: 0 }}>{fullName}</p>
               <p style={{ fontSize: "13px", color: "#888", margin: "4px 0 0" }}>{curriculum}</p>
               <p style={{ fontSize: "12px", color: "#aaa", margin: "2px 0 0" }}>{student?.email}</p>
             </div>
           </div>
 
           {/* Form Card */}
-          <div style={{
-            backgroundColor: "#fff", borderRadius: "16px",
-            padding: "32px 40px", boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
-            display: "flex", flexDirection: "column", gap: "20px", position: "relative",
-          }}>
+          <div className="profile-form-card">
             {!editMode && (
               <button onClick={() => setEditMode(true)} style={{
                 position: "absolute", top: "20px", right: "24px",
