@@ -1,4 +1,5 @@
 ﻿import { useState } from "react";
+import { Menu, X } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import logo from "../assets/dashboardlogo.png";
 
@@ -19,17 +20,40 @@ const bottomItems = [
 export default function Sidebar() {
   const navigate = useNavigate();
   const location = useLocation();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
 
   return (
-    <aside className="sidebar">
+    <>
+      <button
+        type="button"
+        className="sidebar-mobile-toggle"
+        aria-label={mobileMenuOpen ? "Close navigation menu" : "Open navigation menu"}
+        aria-expanded={mobileMenuOpen}
+        aria-controls="dashboard-sidebar"
+        onClick={() => setMobileMenuOpen((isOpen) => !isOpen)}
+      >
+        {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
+      </button>
+      {mobileMenuOpen && (
+        <button
+          type="button"
+          className="sidebar-backdrop"
+          aria-label="Close navigation menu"
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
+      <aside id="dashboard-sidebar" className={`sidebar${mobileMenuOpen ? " sidebar-open" : ""}`}>
       <img src={logo} alt="Tanglaw" className="sidebar-logo" />
       <span className="sidebar-section-label">Overview</span>
       {navItems.map((item) => (
         <div
           key={item.path}
           className={`sidebar-link ${location.pathname === item.path ? "active" : ""}`}
-          onClick={() => navigate(item.path)}
+          onClick={() => {
+            setMobileMenuOpen(false);
+            navigate(item.path);
+          }}
         >
           {item.label}
         </div>
@@ -39,18 +63,25 @@ export default function Sidebar() {
           <div
             key={item.path}
             className={`sidebar-link ${location.pathname === item.path ? "active" : ""}`}
-            onClick={() => navigate(item.path)}
+            onClick={() => {
+              setMobileMenuOpen(false);
+              navigate(item.path);
+            }}
           >
             {item.label}
           </div>
         ))}
         <div
           className="sidebar-link signout"
-          onClick={() => setShowSignOutConfirm(true)}
+          onClick={() => {
+            setMobileMenuOpen(false);
+            setShowSignOutConfirm(true);
+          }}
         >
           Sign Out
         </div>
       </div>
+      </aside>
       {showSignOutConfirm && (
         <div
           className="signout-modal-backdrop"
@@ -84,6 +115,6 @@ export default function Sidebar() {
           </section>
         </div>
       )}
-    </aside>
+    </>
   );
 }

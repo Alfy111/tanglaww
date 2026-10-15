@@ -4,6 +4,8 @@
   padding: 16px 40px;
   background: #fff;
   border-bottom: 1px solid #eee;
+  position: relative;
+  z-index: 2;
 }
 
 .nav-logo {
@@ -21,6 +23,20 @@
   padding: 0;
   font-family: Poppins, sans-serif;
   font-size: 15px;
+}
+
+.nav-menu-toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  color: #1a1a6e;
+  background: transparent;
+  border: 1px solid #d9d9e3;
+  border-radius: 6px;
+  cursor: pointer;
 }
 
 .nav-link {
@@ -44,4 +60,45 @@
   font-family: Poppins, sans-serif;
   font-weight: 600;
   cursor: pointer;
+}
+
+@media (max-width: 760px) {
+  .navbar {
+    flex-wrap: wrap;
+    gap: 0 12px;
+    padding: 10px 16px;
+  }
+
+  .nav-logo {
+    width: 44px;
+    height: 44px;
+  }
+
+  .nav-menu-toggle {
+    display: inline-flex;
+    margin-left: auto;
+  }
+
+  .btn-signin {
+    padding: 9px 16px;
+  }
+
+  .nav-links {
+    display: none;
+    flex: 0 0 100%;
+    flex-direction: column;
+    gap: 0;
+    order: 3;
+    margin: 8px 0 0;
+    padding: 8px 0 2px;
+    border-top: 1px solid #eee;
+  }
+
+  .nav-links-open {
+    display: flex;
+  }
+
+  .nav-links .nav-link {
+    padding: 11px 4px;
+  }
 }
