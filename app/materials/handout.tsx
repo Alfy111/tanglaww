@@ -2,10 +2,11 @@ import { logAudit } from "@/services/auditService";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as Sharing from "expo-sharing";
-import React, { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  AppState,
   FlatList,
   SafeAreaView,
   StyleSheet,
@@ -17,12 +18,16 @@ import { WebView } from "react-native-webview";
 import { useAdmin } from "../../context/AdminContext";
 import {
   getCompletedMaterialIds,
-  setMaterialCompleted,
+  markMaterialCompleted,
+  recordMaterialView,
+  requiredViewSeconds,
 } from "../../services/materialProgressService";
 import {
   deleteMaterial,
   downloadMaterial,
-  getMaterialsByModule,
+  getCourseIdForModule,
+  getMaterialsByCourse,
+  getModulesByCourse,
   LearningMaterial,
   uploadHandout,
 } from "../../services/materialService";
@@ -56,14 +61,65 @@ const fileIconColor = (type: string) => {
 function InAppViewer({
   material,
   onClose,
+  onSessionEnd,
+  trackTime,
+  requiredSeconds,
+  alreadyCompleted,
 }: {
   material: LearningMaterial;
   onClose: () => void;
+  onSessionEnd?: (activeSeconds: number, startedAt: Date) => void;
+  trackTime: boolean;
+  requiredSeconds: number;
+  alreadyCompleted: boolean;
 }) {
   const [webLoading, setWebLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
   const viewerUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(
     material.fileUrl,
   )}&embedded=true`;
+
+  const activeMs = useRef(0);
+  const resumedAt = useRef<number | null>(null);
+  const startedAt = useRef<Date | null>(null);
+  const docLoaded = useRef(false);
+
+  const onSessionEndRef = useRef(onSessionEnd);
+  onSessionEndRef.current = onSessionEnd;
+
+  const startClock = () => {
+    if (!trackTime || resumedAt.current !== null) return;
+    resumedAt.current = Date.now();
+    if (!startedAt.current) startedAt.current = new Date();
+  };
+
+  const pauseClock = () => {
+    if (resumedAt.current === null) return;
+    activeMs.current += Date.now() - resumedAt.current;
+    resumedAt.current = null;
+  };
+
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "active") {
+        if (docLoaded.current) startClock();
+      } else {
+        pauseClock();
+      }
+    });
+    return () => {
+      sub.remove();
+      pauseClock();
+      if (startedAt.current) {
+        onSessionEndRef.current?.(
+          Math.round(activeMs.current / 1000),
+          startedAt.current,
+        );
+      }
+    };
+  }, []);
+
+  const minutes = Math.max(1, Math.round(requiredSeconds / 60));
 
   return (
     <SafeAreaView style={viewer.container}>
@@ -71,15 +127,37 @@ function InAppViewer({
         <TouchableOpacity onPress={onClose} style={{ padding: 4 }}>
           <Ionicons name="arrow-back" size={22} color="white" />
         </TouchableOpacity>
-        <Text style={viewer.headerTitle} numberOfLines={1}>
-          {material.title}
-        </Text>
+        <View style={{ flex: 1 }}>
+          <Text style={viewer.headerTitle} numberOfLines={1}>
+            {material.title}
+          </Text>
+          {trackTime && (
+            <Text style={viewer.headerHint} numberOfLines={1}>
+              {alreadyCompleted
+                ? "Completed"
+                : `Read for about ${minutes} min to complete`}
+            </Text>
+          )}
+        </View>
       </View>
 
-      {webLoading && (
+      {webLoading && !loadFailed && (
         <View style={viewer.loadingOverlay}>
           <ActivityIndicator size="large" color="#2F459B" />
           <Text style={viewer.loadingText}>Loading document…</Text>
+        </View>
+      )}
+
+      {loadFailed && (
+        <View style={viewer.loadingOverlay}>
+          <MaterialCommunityIcons
+            name="file-alert-outline"
+            size={48}
+            color="#BDC3C7"
+          />
+          <Text style={viewer.loadingText}>
+            Couldn't load this document. Try again or download it instead.
+          </Text>
         </View>
       )}
 
@@ -87,7 +165,18 @@ function InAppViewer({
         source={{ uri: viewerUrl }}
         style={{ flex: 1 }}
         onLoadStart={() => setWebLoading(true)}
-        onLoadEnd={() => setWebLoading(false)}
+        onLoad={() => {
+          setWebLoading(false);
+          setLoadFailed(false);
+          docLoaded.current = true;
+          if (AppState.currentState === "active") startClock();
+        }}
+        onError={() => {
+          setWebLoading(false);
+          setLoadFailed(true);
+          docLoaded.current = false;
+          pauseClock();
+        }}
         javaScriptEnabled
         domStorageEnabled
       />
@@ -97,12 +186,23 @@ function InAppViewer({
 
 export default function HandoutScreen() {
   const router = useRouter();
-  const { moduleId: moduleIdParam, courseTitle = "Course" } =
-    useLocalSearchParams<{ moduleId: string; courseTitle: string }>();
+  const {
+    courseId: courseIdParam,
+    moduleId: moduleIdParam,
+    courseTitle = "Course",
+  } = useLocalSearchParams<{
+    courseId?: string;
+    moduleId?: string;
+    courseTitle: string;
+  }>();
 
-  const moduleId = Number(moduleIdParam);
-  const { isAdmin, currentAdminId, currentStudentId } = useAdmin();
+  const { isAdmin, isStudent, authLoading, currentAdminId, currentStudentId } =
+    useAdmin();
 
+  const [courseId, setCourseId] = useState<number | null>(
+    courseIdParam ? Number(courseIdParam) : null,
+  );
+  const [uploadModuleId, setUploadModuleId] = useState<number | null>(null);
   const [handouts, setHandouts] = useState<LearningMaterial[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -112,34 +212,124 @@ export default function HandoutScreen() {
   const [completedMaterialIds, setCompletedMaterialIds] = useState<Set<number>>(
     new Set(),
   );
-  const [savingProgressId, setSavingProgressId] = useState<number | null>(null);
-
-  const fetchHandouts = useCallback(async () => {
-    setLoading(true);
-    const data = await getMaterialsByModule(moduleId, "handout");
-    setHandouts(data);
-    if (!isAdmin && currentStudentId) {
-      try {
-        const completedIds = await getCompletedMaterialIds(
-          currentStudentId,
-          data.map((material) => material.material_id),
-        );
-        setCompletedMaterialIds(completedIds);
-      } catch (error: any) {
-        Alert.alert("Progress unavailable", error.message);
-      }
-    }
-    setLoading(false);
-  }, [moduleId, currentStudentId, isAdmin]);
 
   useEffect(() => {
-    if (moduleId) fetchHandouts();
+    if (courseId || !moduleIdParam) return;
+    getCourseIdForModule(Number(moduleIdParam)).then((id) => {
+      if (id) setCourseId(id);
+      else setLoading(false);
+    });
+  }, [courseId, moduleIdParam]);
+
+  const fetchHandouts = useCallback(async () => {
+    if (authLoading) return;
+    if (!courseId) {
+      if (!moduleIdParam) setLoading(false);
+      return;
+    }
+    setLoading(true);
+    try {
+      const [data, mods] = await Promise.all([
+        getMaterialsByCourse(courseId, "handout"),
+        getModulesByCourse(courseId),
+      ]);
+      setHandouts(data);
+      setUploadModuleId(mods[0]?.module_id ?? null);
+
+      if (isStudent && currentStudentId) {
+        try {
+          const completed = await getCompletedMaterialIds(
+            currentStudentId,
+            data.map((material) => material.material_id),
+          );
+          setCompletedMaterialIds(completed);
+        } catch (error: any) {
+          Alert.alert("Progress unavailable", error.message);
+        }
+      } else {
+        setCompletedMaterialIds(new Set());
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [courseId, isStudent, authLoading, moduleIdParam, currentStudentId]);
+
+  useEffect(() => {
+    fetchHandouts();
   }, [fetchHandouts]);
 
+  const logStudentEvent = async (
+    action: "student_viewed_material" | "student_downloaded_material",
+    item: LearningMaterial,
+  ) => {
+    if (isAdmin || !currentStudentId) return;
+    try {
+      await logAudit({
+        actorType: "student",
+        actorId: String(currentStudentId),
+        action,
+        targetType: "material",
+        targetId: String(item.material_id),
+        targetName: item.title,
+        metadata: {
+          courseTitle,
+          courseId,
+          moduleId: moduleIdParam ? Number(moduleIdParam) : null,
+        },
+      });
+    } catch (err) {
+      console.warn("[handout] audit log failed", err);
+    }
+  };
+
+  const markCompletedLocally = (materialId: number) =>
+    setCompletedMaterialIds((current) => new Set(current).add(materialId));
+
+  const handleViewerSessionEnd = async (
+    item: LearningMaterial,
+    activeSeconds: number,
+    startedAt: Date,
+  ) => {
+    if (!isStudent || !currentStudentId) return;
+    try {
+      const totalSeconds = await recordMaterialView(
+        currentStudentId,
+        item.material_id,
+        startedAt,
+        activeSeconds,
+      );
+      if (totalSeconds >= requiredViewSeconds(item.fileSize)) {
+        await markMaterialCompleted(
+          currentStudentId,
+          item.material_id,
+          "view_time",
+          totalSeconds,
+        );
+        markCompletedLocally(item.material_id);
+      }
+    } catch (err) {
+      console.warn("[handout] saving reading progress failed", err);
+    }
+  };
+
+  const completeOnDownload = async (item: LearningMaterial) => {
+    if (!isStudent || !currentStudentId) return;
+    try {
+      await markMaterialCompleted(
+        currentStudentId,
+        item.material_id,
+        "download",
+      );
+      markCompletedLocally(item.material_id);
+    } catch (err) {
+      console.warn("[handout] saving download completion failed", err);
+    }
+  };
+
   const handleUpload = async () => {
-    if (!currentAdminId) return;
+    if (!currentAdminId || !uploadModuleId) return;
     setUploading(true);
-    const result = await uploadHandout(moduleId, currentAdminId);
+    const result = await uploadHandout(uploadModuleId, currentAdminId);
     setUploading(false);
     if (result.success) fetchHandouts();
     else if (result.error) Alert.alert("Upload Failed", result.error);
@@ -164,38 +354,9 @@ export default function HandoutScreen() {
     );
   };
 
-  const handleToggleCompletion = async (item: LearningMaterial) => {
-    if (!currentStudentId) return;
-    const isCompleted = completedMaterialIds.has(item.material_id);
-    setSavingProgressId(item.material_id);
-    try {
-      await setMaterialCompleted(currentStudentId, item.material_id, !isCompleted);
-      setCompletedMaterialIds((current) => {
-        const next = new Set(current);
-        if (isCompleted) next.delete(item.material_id);
-        else next.add(item.material_id);
-        return next;
-      });
-    } catch (error: any) {
-      Alert.alert("Unable to update progress", error.message);
-    } finally {
-      setSavingProgressId(null);
-    }
-  };
-
-  const handleView = async (item: LearningMaterial) => {
+  const handleView = (item: LearningMaterial) => {
     setViewingMaterial(item);
-    if (!isAdmin && currentStudentId) {
-      await logAudit({
-        actorType: "student",
-        actorId: String(currentStudentId),
-        action: "student_viewed_material",
-        targetType: "material",
-        targetId: String(item.material_id),
-        targetName: item.title,
-        metadata: { courseTitle, moduleId },
-      });
-    }
+    logStudentEvent("student_viewed_material", item);
   };
 
   const handleDownload = async (item: LearningMaterial) => {
@@ -208,17 +369,8 @@ export default function HandoutScreen() {
       return;
     }
 
-    if (!isAdmin && currentStudentId) {
-      await logAudit({
-        actorType: "student",
-        actorId: String(currentStudentId),
-        action: "student_downloaded_material",
-        targetType: "material",
-        targetId: String(item.material_id),
-        targetName: item.title,
-        metadata: { courseTitle, moduleId },
-      });
-    }
+    logStudentEvent("student_downloaded_material", item);
+    completeOnDownload(item);
 
     try {
       const isAvailable = await Sharing.isAvailableAsync();
@@ -244,10 +396,18 @@ export default function HandoutScreen() {
   };
 
   if (viewingMaterial) {
+    const item = viewingMaterial;
+    const trackTime = !!(isStudent && currentStudentId);
     return (
       <InAppViewer
-        material={viewingMaterial}
+        material={item}
         onClose={() => setViewingMaterial(null)}
+        trackTime={trackTime}
+        requiredSeconds={requiredViewSeconds(item.fileSize)}
+        alreadyCompleted={completedMaterialIds.has(item.material_id)}
+        onSessionEnd={(activeSeconds, startedAt) =>
+          handleViewerSessionEnd(item, activeSeconds, startedAt)
+        }
       />
     );
   }
@@ -271,6 +431,20 @@ export default function HandoutScreen() {
           <Text style={styles.fileSub}>
             {formatBytes(item.fileSize)} · {formatDate(item.uploadedAt)}
           </Text>
+          {isStudent && (
+            <View style={styles.doneBadge}>
+              <Ionicons
+                name={isCompleted ? "checkmark-circle" : "time-outline"}
+                size={13}
+                color={isCompleted ? "#1E9E5A" : "#A0A7B4"}
+              />
+              <Text
+                style={[styles.doneText, !isCompleted && styles.notDoneText]}
+              >
+                {isCompleted ? "Completed" : "Not completed yet"}
+              </Text>
+            </View>
+          )}
           <View style={styles.actions}>
             <TouchableOpacity
               style={styles.actionBtn}
@@ -296,29 +470,6 @@ export default function HandoutScreen() {
                       color="#2F459B"
                     />
                     <Text style={styles.actionBtnText}>Download</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            )}
-
-            {!isAdmin && currentStudentId && (
-              <TouchableOpacity
-                style={styles.actionBtn}
-                onPress={() => handleToggleCompletion(item)}
-                disabled={savingProgressId === item.material_id}
-              >
-                {savingProgressId === item.material_id ? (
-                  <ActivityIndicator size="small" color="#2F459B" />
-                ) : (
-                  <>
-                    <Ionicons
-                      name={isCompleted ? "checkmark-circle" : "ellipse-outline"}
-                      size={15}
-                      color={isCompleted ? "#27834a" : "#2F459B"}
-                    />
-                    <Text style={[styles.actionBtnText, isCompleted && { color: "#27834a" }]}>
-                      {isCompleted ? "Completed" : "Mark complete"}
-                    </Text>
                   </>
                 )}
               </TouchableOpacity>
@@ -355,7 +506,7 @@ export default function HandoutScreen() {
         <Text style={styles.courseSub}>Handouts</Text>
       </View>
 
-      {isAdmin && (
+      {isAdmin && uploadModuleId && (
         <TouchableOpacity
           style={[styles.uploadBtn, uploading && { opacity: 0.7 }]}
           onPress={handleUpload}
@@ -488,6 +639,14 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   actionBtnText: { fontSize: 12, color: "#2F459B", fontWeight: "600" },
+  doneBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 4,
+  },
+  doneText: { fontSize: 11, color: "#1E9E5A", fontWeight: "600" },
+  notDoneText: { color: "#A0A7B4" },
   deleteBtn: { borderColor: "#E74C3C" },
   centered: {
     flex: 1,
@@ -495,7 +654,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 40,
   },
-  emptyText: { fontSize: 16, color: "#95A5A6", marginTop: 12 },
+  emptyText: {
+    fontSize: 16,
+    color: "#95A5A6",
+    marginTop: 12,
+    textAlign: "center",
+  },
   emptyHint: { fontSize: 13, color: "#BDC3C7", marginTop: 6 },
   bottomNav: {
     flexDirection: "row",
@@ -519,7 +683,8 @@ const viewer = StyleSheet.create({
     paddingVertical: 14,
     gap: 12,
   },
-  headerTitle: { flex: 1, fontSize: 16, fontWeight: "bold", color: "white" },
+  headerTitle: { fontSize: 16, fontWeight: "bold", color: "white" },
+  headerHint: { fontSize: 11, color: "#C9D2F5", marginTop: 2 },
   loadingOverlay: {
     position: "absolute",
     top: 60,
@@ -531,5 +696,11 @@ const viewer = StyleSheet.create({
     backgroundColor: "white",
     zIndex: 10,
   },
-  loadingText: { marginTop: 10, color: "#777", fontSize: 14 },
+  loadingText: {
+    marginTop: 10,
+    color: "#777",
+    fontSize: 14,
+    textAlign: "center",
+    paddingHorizontal: 32,
+  },
 });

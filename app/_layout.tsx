@@ -1,50 +1,110 @@
 import { AdminProvider } from "@/context/AdminContext";
 import {
-  clearSession,
+  clearLocalSession,
   generateSessionToken,
   registerSession,
   validateSession,
 } from "@/lib/session";
 import { supabase } from "@/lib/supabase";
+import type { Session } from "@supabase/supabase-js";
 import { Stack, usePathname, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Alert, AppState, View } from "react-native";
-import Toast from "react-native-toast-message";
+import { ActivityIndicator, AppState, View } from "react-native";
+import Toast, { BaseToast, ToastConfig } from "react-native-toast-message";
+
+const toastConfig: ToastConfig = {
+  warning: (props) => (
+    <BaseToast {...props} style={{ borderLeftColor: "#FFB800" }} />
+  ),
+};
+
+type Role = "student" | "admin" | null;
 
 export let setGateValidating: (v: boolean) => void = () => {};
-export let triggerRoleCheck: (userId: string) => void = () => {};
+export let triggerRoleCheck: (userId: string) => Promise<void> = async () => {};
+
+const AUTH_ROUTES = [
+  "/login",
+  "/signin",
+  "/enroll",
+  "/code",
+  "/profilesetup",
+  "/welcome",
+  "/admin/signin",
+  "/succes",
+  "/resetpass",
+  "/forgotpass",
+];
+
+const SESSION_CHECK_MS = 15_000;
 
 function AuthGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const [session, setSession] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+
+  const [session, setSession] = useState<Session | null>(null);
+  const [role, setRole] = useState<Role>(null);
+  const [initializing, setInitializing] = useState(true);
+  const [resolvingRole, setResolvingRole] = useState(false);
   const [validating, setValidating] = useState(false);
-  const [role, setRole] = useState<"student" | "admin" | null>(null);
-  const fetchingRole = useRef(false);
+
+  const roleRef = useRef<Role>(null);
   const validatingRef = useRef(false);
+  const fetchingRole = useRef(false);
+  const kickingRef = useRef(false);
+
+  const applyRole = (r: Role) => {
+    roleRef.current = r;
+    setRole(r);
+  };
 
   const setValidatingBoth = (v: boolean) => {
     validatingRef.current = v;
     setValidating(v);
   };
 
-  const fetchRole = async (userId: string) => {
-    if (fetchingRole.current) {
-      return;
+  const kickStudent = async () => {
+    if (kickingRef.current) return;
+    kickingRef.current = true;
+    try {
+      await clearLocalSession();
+      await supabase.auth.signOut({ scope: "local" });
+    } finally {
+      setSession(null);
+      applyRole(null);
+      kickingRef.current = false;
+      Toast.show({
+        type: "warning",
+        text1: "You've been signed out",
+        text2: "Your account was signed in on another device.",
+        position: "bottom",
+        visibilityTime: 6000,
+      });
     }
+  };
+
+  const checkStudentSession = async () => {
+    if (roleRef.current !== "student") return;
+    try {
+      const { valid, studentId } = await validateSession();
+      if (studentId !== null && !valid) await kickStudent();
+    } catch (err) {}
+  };
+
+  const fetchRole = async (userId: string) => {
+    if (fetchingRole.current) return;
     fetchingRole.current = true;
-    setLoading(true);
+    setResolvingRole(true);
 
     try {
       const { data: admin } = await supabase
         .from("admin")
         .select("admin_id")
         .eq("admin_id", userId)
-        .single();
+        .maybeSingle();
 
       if (admin) {
-        setRole("admin");
+        applyRole("admin");
         return;
       }
 
@@ -52,110 +112,82 @@ function AuthGate({ children }: { children: React.ReactNode }) {
         .from("student")
         .select("id")
         .eq("auth_id", userId)
-        .single();
+        .maybeSingle();
 
-      if (student) {
-        const { valid, studentId } = await validateSession();
-
-        if (studentId === null) {
-          const token = await generateSessionToken();
-          await registerSession(student.id, token);
-          setRole("student");
-          return;
-        }
-
-        if (!valid) {
-          await supabase.auth.signOut();
-          if (studentId) await clearSession(studentId);
-          setRole(null);
-          Alert.alert(
-            "Session Expired",
-            "Your account has been logged in from another device. Please sign in again.",
-            [{ text: "OK" }],
-          );
-          return;
-        }
-        setRole("student");
+      if (!student) {
+        applyRole(null);
         return;
       }
 
-      setRole(null);
+      let result: { valid: boolean; studentId: number | null };
+      try {
+        result = await validateSession(student.id);
+      } catch (err) {
+        applyRole("student");
+        return;
+      }
+
+      if (result.studentId === null) {
+        const token = await generateSessionToken();
+        await registerSession(student.id, token);
+        applyRole("student");
+        return;
+      }
+
+      if (!result.valid) {
+        await kickStudent();
+        return;
+      }
+
+      applyRole("student");
+    } catch (err) {
     } finally {
       fetchingRole.current = false;
-      setLoading(false);
+      setResolvingRole(false);
     }
   };
 
   useEffect(() => {
     setGateValidating = setValidatingBoth;
     triggerRoleCheck = (userId: string) => fetchRole(userId);
-    async function loadSession() {
-      try {
-        const { data, error } = await supabase.auth.getSession();
-        if (error) {
-          setLoading(false);
-          return;
-        }
-        const session = data.session;
-        setSession(session);
-        if (session?.user?.id) {
-          await fetchRole(session.user.id);
-        } else {
-          setLoading(false);
-        }
-      } catch (err) {
-        setLoading(false);
-      }
-    }
 
-    loadSession();
+    (async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        setSession(data.session);
+        if (data.session?.user?.id) await fetchRole(data.session.user.id);
+      } catch (err) {
+      } finally {
+        setInitializing(false);
+      }
+    })();
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (_event === "SIGNED_OUT") {
-        if (validatingRef.current) {
-          validatingRef.current = false;
-          setValidating(false);
+    } = supabase.auth.onAuthStateChange((event, newSession) => {
+      setTimeout(() => {
+        if (event === "SIGNED_OUT") {
+          setSession(null);
+          applyRole(null);
           fetchingRole.current = false;
+          if (validatingRef.current) setValidatingBoth(false);
           return;
         }
-        setSession(null);
-        setRole(null);
-        setLoading(false);
-        fetchingRole.current = false;
-      }
-      if (_event === "SIGNED_IN" && session) {
-        setSession(session);
-        if (validatingRef.current) {
-          return;
+        if (newSession) setSession(newSession);
+        if (
+          event === "SIGNED_IN" &&
+          newSession &&
+          !validatingRef.current &&
+          roleRef.current === null
+        ) {
+          fetchRole(newSession.user.id);
         }
-        if (!fetchingRole.current) {
-          fetchRole(session.user.id);
-        }
-        return;
-      }
+      }, 0);
     });
 
-    const appStateSubscription = AppState.addEventListener(
-      "change",
-      async (nextState) => {
-        if (nextState === "active" && role === "student") {
-          const { valid, studentId } = await validateSession();
-          if (!valid) {
-            await supabase.auth.signOut();
-            if (studentId) await clearSession(studentId);
-            setSession(null);
-            setRole(null);
-            Alert.alert(
-              "Session Expired",
-              "Your account has been logged in from another device.",
-              [{ text: "OK" }],
-            );
-          }
-        }
-      },
-    );
+    const appStateSubscription = AppState.addEventListener("change", (s) => {
+      if (s === "active") checkStudentSession();
+    });
 
     return () => {
       subscription.unsubscribe();
@@ -164,46 +196,35 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (loading) return;
-    if (validating) return;
-    if (!session && role !== null) return;
-    const inAuthGroup = [
-      "/login",
-      "/signin",
-      "/enroll",
-      "/code",
-      "/profilesetup",
-      "/welcome",
-      "/admin/signin",
-      "/succes",
-      "/resetpass",
-      "/forgotpass",
-    ].includes(pathname);
+    if (role !== "student") return;
+    const id = setInterval(checkStudentSession, SESSION_CHECK_MS);
+    return () => clearInterval(id);
+  }, [role]);
 
+  useEffect(() => {
+    if (initializing || resolvingRole || validating) return;
+
+    const inAuthGroup = AUTH_ROUTES.includes(pathname);
     const inAdminGroup =
-      pathname.startsWith("/admin") && !pathname.startsWith("/admin/signin");
+      pathname.startsWith("/admin") && pathname !== "/admin/signin";
     const inMaterialsGroup = pathname.startsWith("/materials");
+    const inRegistrant = pathname.startsWith("/registrant");
 
     if (!session) {
-      if (
-        !inAuthGroup &&
-        !inAdminGroup &&
-        !inMaterialsGroup &&
-        !pathname.startsWith("/registrant")
-      )
-        router.replace("/login");
-    } else if (role === "student") {
-      if (inAdminGroup) router.replace("/homepage");
-      else if (inAuthGroup && pathname !== "/succes")
-        router.push("/homepage" as any);
-    } else if (role === "admin") {
-      if (!inAdminGroup && !inAuthGroup && !inMaterialsGroup)
-        router.replace("/admin/dashboard" as any);
-      else if (inAuthGroup) router.replace("/admin/dashboard" as any);
+      if (!inAuthGroup && !inRegistrant) router.replace("/login" as any);
+      return;
     }
-  }, [session, role, loading, pathname, validating]);
 
-  if (loading) {
+    if (role === "student") {
+      if (inAdminGroup || (inAuthGroup && pathname !== "/succes"))
+        router.replace("/homepage" as any);
+    } else if (role === "admin") {
+      if (!inAdminGroup && !inMaterialsGroup)
+        router.replace("/admin/dashboard" as any);
+    }
+  }, [session, role, initializing, resolvingRole, validating, pathname]);
+
+  if (initializing) {
     return (
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
         <ActivityIndicator size="large" color="#0D2A94" />
@@ -235,7 +256,7 @@ export default function RootLayout() {
           <Stack.Screen name="forgotpass" />
         </Stack>
       </AuthGate>
-      <Toast />
+      <Toast config={toastConfig} />
     </AdminProvider>
   );
 }
