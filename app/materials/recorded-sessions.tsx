@@ -8,7 +8,6 @@ import {
   AppState,
   Dimensions,
   FlatList,
-  Linking,
   Modal,
   SafeAreaView,
   ScrollView,
@@ -338,19 +337,6 @@ function SessionPlayer({
           Added {formatDate(session.uploadedAt)}
         </Text>
       </View>
-
-      <TouchableOpacity
-        style={player.ytBtn}
-        onPress={() => Linking.openURL(session.fileUrl)}
-      >
-        <Ionicons name="logo-youtube" size={20} color="#E74C3C" />
-        <Text style={player.ytBtnText}>Open in YouTube</Text>
-      </TouchableOpacity>
-      {trackProgress && (
-        <Text style={player.ytNote}>
-          Watching in the YouTube app doesn't count toward your progress.
-        </Text>
-      )}
     </SafeAreaView>
   );
 }
@@ -584,14 +570,6 @@ export default function RecordedSessionsScreen() {
             >
               <Ionicons name="play-circle-outline" size={15} color="#2F459B" />
               <Text style={styles.actionBtnText}>Play</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.actionBtn}
-              onPress={() => Linking.openURL(item.fileUrl)}
-            >
-              <Ionicons name="open-outline" size={15} color="#2F459B" />
-              <Text style={styles.actionBtnText}>YouTube</Text>
             </TouchableOpacity>
 
             {isAdmin && (
@@ -868,23 +846,4 @@ const player = StyleSheet.create({
   info: { padding: 20 },
   sessionTitle: { fontSize: 17, fontWeight: "bold", color: "white" },
   sessionDate: { fontSize: 12, color: "#666", marginTop: 4 },
-  ytBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    marginHorizontal: 20,
-    paddingVertical: 13,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "#E74C3C",
-    gap: 8,
-  },
-  ytBtnText: { color: "#E74C3C", fontWeight: "bold", fontSize: 14 },
-  ytNote: {
-    color: "#777",
-    fontSize: 11,
-    textAlign: "center",
-    marginTop: 8,
-    paddingHorizontal: 20,
-  },
 });

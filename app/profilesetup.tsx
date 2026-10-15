@@ -2,7 +2,7 @@ import { supabase } from "@/lib/supabase";
 import { Feather, Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -189,17 +189,13 @@ export default function ProfileSetupScreen() {
       if (updateError)
         throw new Error("Failed to link account: " + updateError.message);
 
-      const token = await generateSessionToken();
-      await registerSession(Number(studentId), token);
+      try {
+        const token = await generateSessionToken();
+        await registerSession(Number(studentId), token);
+      } catch (sessionErr) {
+        console.warn("[profilesetup] session registration failed", sessionErr);
+      }
       setStudentDirectly(Number(studentId));
-
-      const { error: accessError } = await supabase
-        .from("course_access")
-        .insert({
-          student_id: Number(studentId),
-          course_id: 1,
-          unlockedBy: null,
-        });
 
       if (activationCodeId) {
         const { error: codeError } = await supabase

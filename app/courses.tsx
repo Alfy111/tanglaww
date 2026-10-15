@@ -37,7 +37,6 @@ interface Course {
   course_id: number;
   courseName: string;
   instructor: string | null;
-  isActive: boolean;
   modules: Module[];
 }
 
@@ -56,9 +55,6 @@ export default function CoursesScreen() {
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [isMenuVisible, setIsMenuVisible] = useState(false);
   const [courses, setCourses] = useState<Course[]>([]);
-  const [accessibleCourseIds, setAccessibleCourseIds] = useState<Set<number>>(
-    new Set(),
-  );
   const [progressMap, setProgressMap] = useState<Map<number, CourseProgress>>(
     new Map(),
   );
@@ -80,7 +76,7 @@ export default function CoursesScreen() {
 
     const { data, error } = await supabase
       .from("course")
-      .select("course_id, courseName, isActive, instructor")
+      .select("course_id, courseName, instructor")
       .order("course_id");
 
     if (error) {
@@ -88,13 +84,6 @@ export default function CoursesScreen() {
       setLoading(false);
       return;
     }
-
-    const { data: accessRows } = await supabase
-      .from("course_access")
-      .select("course_id")
-      .eq("student_id", currentStudentId);
-
-    setAccessibleCourseIds(new Set((accessRows ?? []).map((r) => r.course_id)));
 
     const coursesWithModules = await Promise.all(
       (data ?? []).map(async (c) => {
@@ -197,13 +186,10 @@ export default function CoursesScreen() {
         >
           {courses.map((course) => {
             const status = progressMap.get(course.course_id);
-            const isLocked = status
-              ? status.lockReason !== null
-              : !course.isActive && !accessibleCourseIds.has(course.course_id);
-            const lockMessage =
-              status?.lockReason === "previous"
-                ? `Complete ${status.previousCourseName ?? "the previous course"} to unlock`
-                : "This course is currently locked";
+            const isLocked = !!status?.lockReason;
+            const lockMessage = `Complete ${
+              status?.previousCourseName ?? "the previous course"
+            } to unlock`;
             const isExpanded = expandedId === course.course_id;
             const progress = getProgress(course.course_id);
 
@@ -277,7 +263,7 @@ export default function CoursesScreen() {
                         size={20}
                         color="#2F459B"
                       />
-                      <Text style={styles.dropText}>Handouts</Text>
+                      <Text style={styles.dropText}>Learning Modules</Text>
                       <SectionCheck
                         section={progressMap.get(course.course_id)?.handouts}
                       />

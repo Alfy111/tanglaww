@@ -2,7 +2,11 @@ import { supabase } from "../lib/supabase";
 
 const PROGRESS_TABLE = "material_progress";
 
-export type CompletionSource = "view_time" | "download" | "video_watched";
+export type CompletionSource =
+  | "view_time"
+  | "download"
+  | "video_watched"
+  | "scrolled_to_end";
 export const SEGMENT_SECONDS = 5;
 export const VIDEO_COMPLETION_THRESHOLD = 0.8;
 
