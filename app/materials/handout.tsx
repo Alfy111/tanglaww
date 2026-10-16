@@ -58,14 +58,78 @@ const fileIconColor = (type: string) => {
 
 const DETECT_BOTTOM_JS = `
   (function () {
+    if (window.__tanglawTracker) return;
+    window.__tanglawTracker = true;
+
     var sent = false;
-    document.addEventListener("scroll", function (e) {
-      var el = e.target === document ? document.scrollingElement : e.target;
-      if (!sent && el && el.scrollTop + el.clientHeight >= el.scrollHeight - 40) {
-        sent = true;
-        window.ReactNativeWebView.postMessage("reached_bottom");
+    var fitChecks = 0;
+    var started = Date.now();
+    var timer = null;
+
+    function send() {
+      if (sent) return;
+      sent = true;
+      if (timer) clearInterval(timer);
+      window.ReactNativeWebView.postMessage("reached_bottom");
+    }
+
+    function contentReady() {
+      var imgs = document.images;
+      for (var i = 0; i < imgs.length; i++) {
+        if (imgs[i].complete && imgs[i].naturalHeight > 200) return true;
       }
-    }, true);
+      var text = (document.body && document.body.innerText) || "";
+      return text.length > 200;
+    }
+
+    function mainScroller() {
+      var doc = document.scrollingElement || document.documentElement;
+      var best = doc;
+      var all = document.querySelectorAll("*");
+      for (var i = 0; i < all.length; i++) {
+        var el = all[i];
+        if (el.clientHeight > 100 && el.scrollHeight > el.clientHeight + 4 &&
+            el.scrollHeight > best.scrollHeight) {
+          var oy = getComputedStyle(el).overflowY;
+          if (oy === "auto" || oy === "scroll") best = el;
+        }
+      }
+      return best;
+    }
+
+    function check() {
+      if (sent || !contentReady()) return;
+
+      var doc = document.scrollingElement || document.documentElement;
+      var el = mainScroller();
+      var margin = Math.max(40, el.scrollHeight * 0.03);
+      var overflow = el.scrollHeight - el.clientHeight;
+
+      if (overflow <= margin) {
+        fitChecks += 1;
+        if (fitChecks >= 4 && Date.now() - started > 3000) send();
+        return;
+      }
+      fitChecks = 0;
+
+      if (el.scrollTop + el.clientHeight >= el.scrollHeight - margin) {
+        send();
+        return;
+      }
+
+      var vv = window.visualViewport;
+      if (vv && el === doc && vv.scale > 1.01 &&
+          vv.pageTop + vv.height >= doc.scrollHeight - margin) {
+        send();
+      }
+    }
+
+    document.addEventListener("scroll", check, true);
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener("scroll", check);
+      window.visualViewport.addEventListener("resize", check);
+    }
+    timer = setInterval(check, 800);
   })();
   true;
 `;
@@ -109,7 +173,7 @@ function InAppViewer({
           </Text>
           {trackProgress && (
             <Text style={viewer.headerHint} numberOfLines={1}>
-              {completed ? "Completed" : "Scroll to the end to complete"}
+              {completed ? "Completed" : "Read to the end to complete"}
             </Text>
           )}
         </View>
@@ -472,8 +536,8 @@ export default function HandoutScreen() {
             <ActivityIndicator color="white" />
           ) : (
             <>
-              <Ionicons name="cloud-upload-outline" size={20} color="white" />
-              <Text style={styles.uploadBtnText}>Upload Learning Module</Text>
+              <Ionicons name="add-circle-outline" size={20} color="white" />
+              <Text style={styles.uploadBtnText}>Upload Module</Text>
             </>
           )}
         </TouchableOpacity>

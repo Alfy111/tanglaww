@@ -312,9 +312,7 @@ function SessionPlayer({
           </Text>
           {trackProgress && (
             <Text style={player.headerHint} numberOfLines={1}>
-              {alreadyCompleted
-                ? "Watched"
-                : `Watch at least ${percent}% to complete`}
+              {alreadyCompleted ? "Watched" : `Watch until the end to complete`}
             </Text>
           )}
         </View>
@@ -609,7 +607,7 @@ export default function RecordedSessionsScreen() {
           onPress={() => setAddModalVisible(true)}
         >
           <Ionicons name="add-circle-outline" size={20} color="white" />
-          <Text style={styles.addBtnText}>Add Session</Text>
+          <Text style={styles.addBtnText}>Upload Session</Text>
         </TouchableOpacity>
       )}
 
