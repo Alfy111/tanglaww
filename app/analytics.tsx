@@ -1,629 +1,385 @@
-import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { useFocusEffect, useRouter } from "expo-router";
+import { useCallback, useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Dimensions,
+  RefreshControl,
   SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from "react-native";
+import {
+  BarRow,
+  C,
+  Card,
+  Chips,
+  ColumnChart,
+  EmptyNote,
+  Header,
+  pct,
+  ScoreStat,
+  shortDate,
+  Tabs,
+} from "../components/analytics-ui";
+import { useAdmin } from "../context/AdminContext";
+import { getMyAnalytics, StudentReport } from "../services/analyticsService";
 
-const { width } = Dimensions.get("window");
-// Detect standard tablet breakpoints safely
-const isTablet = width >= 600;
+const isTablet = Dimensions.get("window").width >= 600;
 
-const PERFORMANCE_DATA = {
-  overallProgress: 0.35,
-  averageScore: 85,
-  completedCourses: 2,
-  totalCourses: 6,
-  weeklyFrequency: 4,
-  courses: [
-    {
-      id: "1",
-      name: "LET On Boarding",
-      progress: 0.92,
-      status: "Excellent",
-      color: "#4CD964",
-      scores: [25, 50, 100],
-      weakTopics: [
-        { topic: "Ethics", rate: 21 },
-        { topic: "Understanding...", rate: 45 },
-      ],
-    },
-    {
-      id: "2",
-      name: "LET Express",
-      progress: 0.58,
-      status: "Average",
-      color: "#FFB800",
-      scores: [40, 75, 60],
-      weakTopics: [{ topic: "History", rate: 53 }],
-    },
-    {
-      id: "3",
-      name: "LET Advance",
-      progress: 0.25,
-      status: "Needs Focus",
-      color: "#FF4D4D",
-      scores: [10, 30, 25],
-      weakTopics: [{ topic: "General Science", rate: 12 }],
-    },
-  ],
-  recentQuizzes: [
-    {
-      id: "q1",
-      course: "LET On Boarding",
-      title: "Quiz # 3",
-      grade: "100%",
-      date: "Apr. 1, 2026",
-    },
-    {
-      id: "q2",
-      course: "LET Express",
-      title: "Quiz # 2",
-      grade: "100%",
-      date: "Mar. 29, 2026",
-    },
-    {
-      id: "q3",
-      course: "LET Advance",
-      title: "Quiz # 1",
-      grade: "100%",
-      date: "Mar. 20, 2026",
-    },
-    {
-      id: "q4",
-      course: "LET Express",
-      title: "Quiz # 1",
-      grade: "100%",
-      date: "Mar. 13, 2026",
-    },
-  ],
-};
-
-export default function PerformanceAnalytics() {
+export default function StudentAnalytics() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<"overview" | "course">("overview");
-  const [selectedCourseId, setSelectedCourseId] = useState<string>("1");
+  const { isAdmin, authLoading } = useAdmin();
+  const [tab, setTab] = useState<"overview" | "course">("overview");
+  const [data, setData] = useState<StudentReport | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [courseId, setCourseId] = useState<number | null>(null);
 
-  const selectedCourse =
-    PERFORMANCE_DATA.courses.find((c) => c.id === selectedCourseId) ||
-    PERFORMANCE_DATA.courses[0];
+  useEffect(() => {
+    if (!authLoading && isAdmin) router.replace("/admin-analytics" as any);
+  }, [authLoading, isAdmin, router]);
+
+  const load = useCallback(async () => {
+    if (authLoading || isAdmin) return;
+    try {
+      const report = await getMyAnalytics();
+      setData(report);
+      setError(null);
+      setCourseId((prev) => prev ?? report.courses[0]?.course_id ?? null);
+    } catch (e: any) {
+      setError(e.message);
+    }
+  }, [authLoading, isAdmin]);
+
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load]),
+  );
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+  };
+
+  const course = data?.courses.find((c) => c.course_id === courseId) ?? null;
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* HEADER NAVBAR */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
-          <Ionicons name="arrow-back" size={24} color="white" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>My Performance</Text>
-        <View style={{ width: 24 }} />
-      </View>
+      <Header title="My Performance" onBack={() => router.back()} />
+      <Tabs
+        tabs={[
+          { key: "overview", label: "Overview" },
+          { key: "course", label: "By Course" },
+        ]}
+        active={tab}
+        onChange={setTab}
+      />
 
-      {/* SEGMENTED TABS */}
-      <View style={styles.tabContainer}>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === "overview" && styles.activeTab]}
-          onPress={() => setActiveTab("overview")}
+      {!data && !error ? (
+        <View style={styles.centered}>
+          <ActivityIndicator size="large" color={C.primary} />
+        </View>
+      ) : error ? (
+        <View style={styles.centered}>
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
+      ) : data ? (
+        <ScrollView
+          contentContainerStyle={styles.scroll}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={[C.primary]}
+            />
+          }
         >
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === "overview" && styles.activeTabText,
-            ]}
-          >
-            Overview
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === "course" && styles.activeTab]}
-          onPress={() => setActiveTab("course")}
-        >
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === "course" && styles.activeTabText,
-            ]}
-          >
-            By Course
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
-        {/* ================= OVERVIEW TAB ================= */}
-        {activeTab === "overview" && (
-          <View style={isTablet ? styles.tabletMainWrapper : null}>
-            {/* LEFT ROW CONTENT COLUMN (Tablet optimized) */}
-            <View style={isTablet ? styles.tabletColumnLeft : null}>
-              {/* LPT PASSING PROGRESS MILESTONE */}
-              <View style={styles.card}>
-                <View style={styles.milestoneHeader}>
-                  <Text style={styles.cardTitle}>Road to LPT Passer</Text>
+          {tab === "overview" && (
+            <View>
+              <Card
+                title="Road to LPT Passer"
+                subtitle="Your progress across all courses"
+                right={
                   <MaterialCommunityIcons
                     name="medal-outline"
                     size={24}
-                    color="#FFB800"
+                    color={C.yellow}
                   />
-                </View>
-                <Text style={styles.subtitleText}>
-                  Your overall path readiness metric
-                </Text>
-
-                <View style={styles.progressTrackContainer}>
-                  <View style={styles.progressBarWrapper}>
+                }
+              >
+                <View style={styles.progressRow}>
+                  <View style={styles.progressTrack}>
                     <View
                       style={[
-                        styles.progressBarFilled,
-                        { width: `${PERFORMANCE_DATA.overallProgress * 100}%` },
+                        styles.progressFill,
+                        { width: `${data.summary.completion ?? 0}%` },
                       ]}
                     />
                   </View>
-                  <Text style={styles.progressPercentText}>
-                    {PERFORMANCE_DATA.overallProgress * 100}%
+                  <Text style={styles.progressText}>
+                    {pct(data.summary.completion ?? 0)}
                   </Text>
                 </View>
-              </View>
+              </Card>
 
-              {/* METRICS GRID - ADJUSTS HEIGHT ON TABLET */}
-              <View style={styles.gridContainer}>
-                <View
-                  style={[
-                    styles.card,
-                    styles.gridHalf,
-                    { alignItems: "center", justifyContent: "center" },
-                  ]}
-                >
-                  <Text style={styles.metricLabel}>Average Score</Text>
-                  <View style={styles.radialPlaceholder}>
-                    <Text style={styles.radialValue}>
-                      {PERFORMANCE_DATA.averageScore}%
-                    </Text>
-                  </View>
-                </View>
-
-                <View style={styles.gridHalfColumn}>
-                  <View style={[styles.card, styles.miniMetricCard]}>
+              <View style={styles.grid}>
+                <Card style={[styles.gridHalf, styles.centerCard]}>
+                  <ScoreStat
+                    label="Average Score"
+                    value={data.summary.avgScore}
+                    note={`${data.summary.quizzesTaken} ${data.summary.quizzesTaken === 1 ? "quiz" : "quizzes"}`}
+                  />
+                </Card>
+                <View style={styles.gridHalf}>
+                  <Card style={styles.miniCard}>
                     <Text style={styles.metricLabel}>Completed Courses</Text>
-                    <Text style={styles.bigMetricValue}>
-                      {PERFORMANCE_DATA.completedCourses} /{" "}
-                      {PERFORMANCE_DATA.totalCourses}
+                    <Text style={styles.bigValue}>
+                      {data.summary.completedCourses} /{" "}
+                      {data.summary.totalCourses}
                     </Text>
-                  </View>
-                  <View style={[styles.card, styles.miniMetricCard]}>
+                  </Card>
+                  <Card style={styles.miniCard}>
                     <Text style={styles.metricLabel}>Review Frequency</Text>
-                    <Text style={styles.frequencySubText}>
+                    <Text style={styles.freqText}>
                       Active{" "}
-                      <Text style={{ color: "#0D2A94", fontWeight: "bold" }}>
-                        {PERFORMANCE_DATA.weeklyFrequency} times
+                      <Text style={{ color: C.primary, fontWeight: "bold" }}>
+                        {data.summary.activeDays}{" "}
+                        {data.summary.activeDays === 1 ? "day" : "days"}
                       </Text>{" "}
                       this week
                     </Text>
-                  </View>
+                  </Card>
                 </View>
               </View>
-            </View>
 
-            {/* RIGHT ROW CONTENT COLUMN (Tablet optimized) */}
-            <View style={isTablet ? styles.tabletColumnRight : null}>
-              {/* PERFORMANCE BREAKDOWN BY COURSE */}
-              <View style={styles.card}>
-                <Text style={styles.cardTitle}>
-                  Overall Performance by Course
-                </Text>
-                {PERFORMANCE_DATA.courses.map((course) => (
-                  <View key={course.id} style={styles.courseProgressRow}>
-                    <Text style={styles.courseRowName} numberOfLines={1}>
-                      {course.name}
-                    </Text>
-                    <View style={styles.rowBarContainer}>
-                      <View style={styles.rowBarBackground}>
-                        <View
-                          style={[
-                            styles.rowBarFilled,
-                            {
-                              width: `${course.progress * 100}%`,
-                              backgroundColor: course.color,
-                            },
-                          ]}
-                        />
-                      </View>
-                    </View>
-                    <Text style={styles.rowPercentText}>
-                      {Math.round(course.progress * 100)}%
-                    </Text>
-                  </View>
+              <Card title="Overall Performance by Course">
+                {data.courses.map((c) => (
+                  <BarRow
+                    key={c.course_id}
+                    label={c.courseName}
+                    value={c.percent}
+                  />
                 ))}
-              </View>
+              </Card>
 
-              {/* RECENT ACTIVITY TABLE */}
-              <View style={styles.card}>
-                <Text style={styles.cardTitle}>Recent Quiz Results</Text>
-                <View style={styles.tableHeaderRow}>
-                  <Text style={[styles.thText, { flex: 2 }]}>Course</Text>
-                  <Text style={[styles.thText, { flex: 1.5 }]}>Quiz Title</Text>
-                  <Text
-                    style={[styles.thText, { flex: 1, textAlign: "center" }]}
-                  >
-                    Grade
-                  </Text>
-                  <Text
-                    style={[styles.thText, { flex: 1.5, textAlign: "right" }]}
-                  >
-                    Date Taken
-                  </Text>
-                </View>
-                {PERFORMANCE_DATA.recentQuizzes.map((quiz) => (
-                  <View key={quiz.id} style={styles.tableBodyRow}>
-                    <Text
-                      style={[styles.tdText, { flex: 2, color: "#0D2A94" }]}
-                      numberOfLines={1}
-                    >
-                      {quiz.course}
-                    </Text>
-                    <Text
-                      style={[styles.tdText, { flex: 1.5 }]}
-                      numberOfLines={1}
-                    >
-                      {quiz.title}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.tdText,
-                        {
-                          flex: 1,
-                          textAlign: "center",
-                          fontWeight: "bold",
-                          color: "#4CD964",
-                        },
-                      ]}
-                    >
-                      {quiz.grade}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.tdText,
-                        { flex: 1.5, textAlign: "right", color: "#7F8C8D" },
-                      ]}
-                    >
-                      {quiz.date}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            </View>
-          </View>
-        )}
-
-        {/* ================= BY COURSE TAB ================= */}
-        {activeTab === "course" && (
-          <View style={isTablet ? styles.tabletMainWrapper : null}>
-            <View style={{ width: "100%", marginBottom: 12 }}>
-              {/* COURSE SELECTOR CHIPS */}
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                style={styles.selectorScroll}
-              >
-                {PERFORMANCE_DATA.courses.map((c) => (
-                  <TouchableOpacity
-                    key={c.id}
-                    style={[
-                      styles.selectorChip,
-                      selectedCourseId === c.id && styles.selectorChipActive,
-                    ]}
-                    onPress={() => setSelectedCourseId(c.id)}
-                  >
-                    <Text
-                      style={[
-                        styles.selectorChipText,
-                        selectedCourseId === c.id &&
-                          styles.selectorChipTextActive,
-                      ]}
-                    >
-                      {c.name}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
-
-            <View style={isTablet ? styles.tabletColumnLeft : null}>
-              {/* SCORE TREND CHART */}
-              <View style={styles.card}>
-                <Text style={styles.cardTitle}>
-                  {selectedCourse.name} Performance Trend
-                </Text>
-                <View style={styles.chartContainer}>
-                  {selectedCourse.scores.map((score, idx) => (
-                    <View key={idx} style={styles.chartColumnWrapper}>
-                      <View style={styles.chartBarTrack}>
-                        <View
-                          style={[
-                            styles.chartBarFilled,
-                            { height: `${score}%` },
-                          ]}
-                        />
-                      </View>
-                      <Text style={styles.chartLabelText}>Q{idx + 1}</Text>
-                    </View>
-                  ))}
-                </View>
-              </View>
-            </View>
-
-            <View style={isTablet ? styles.tabletColumnRight : null}>
-              {/* WEAK TOPICS SECTION */}
-              <View style={styles.card}>
-                <Text style={styles.cardTitle}>Topics Needing Review</Text>
-                <Text style={styles.subtitleText}>
-                  Prioritize studying these core target areas
-                </Text>
-                {selectedCourse.weakTopics.map((topic, index) => (
-                  <View key={index} style={styles.weakTopicRow}>
-                    <Text style={styles.weakTopicName}>{topic.topic}</Text>
-                    <View style={styles.weakProgressWrapper}>
-                      <View style={styles.weakProgressBg}>
-                        <View
-                          style={[
-                            styles.weakProgressFilled,
-                            { width: `${topic.rate}%` },
-                          ]}
-                        />
-                      </View>
-                      <Text style={styles.weakPercentText}>
-                        {topic.rate}% Proficiency
+              <Card title="Recent Quiz Results">
+                {data.recent.length === 0 ? (
+                  <EmptyNote text="No quizzes taken yet." />
+                ) : (
+                  <>
+                    <View style={styles.thRow}>
+                      <Text style={[styles.th, { flex: 2 }]}>Course</Text>
+                      <Text style={[styles.th, { flex: 1.8 }]}>Quiz Title</Text>
+                      <Text
+                        style={[styles.th, { flex: 1, textAlign: "center" }]}
+                      >
+                        Grade
+                      </Text>
+                      <Text
+                        style={[styles.th, { flex: 1.4, textAlign: "right" }]}
+                      >
+                        Date Taken
                       </Text>
                     </View>
-                  </View>
-                ))}
-              </View>
+                    {data.recent.map((q, i) => (
+                      <View key={i} style={styles.tdRow}>
+                        <Text
+                          style={[styles.td, { flex: 2, color: C.primary }]}
+                          numberOfLines={1}
+                        >
+                          {q.courseName}
+                        </Text>
+                        <Text
+                          style={[styles.td, { flex: 1.8 }]}
+                          numberOfLines={1}
+                        >
+                          {q.title}
+                        </Text>
+                        <Text
+                          style={[
+                            styles.td,
+                            {
+                              flex: 1,
+                              textAlign: "center",
+                              fontWeight: "bold",
+                              color: C.primary,
+                            },
+                          ]}
+                        >
+                          {pct(q.pct)}
+                        </Text>
+                        <Text
+                          style={[
+                            styles.td,
+                            { flex: 1.4, textAlign: "right", color: C.sub },
+                          ]}
+                        >
+                          {shortDate(q.date)}
+                        </Text>
+                      </View>
+                    ))}
+                  </>
+                )}
+              </Card>
+
+              <Card title="Focus Next" subtitle="Your weakest topics so far">
+                {data.focus.length === 0 ? (
+                  <EmptyNote
+                    text={
+                      data.topics.length === 0
+                        ? "Take a quiz to see your strengths and weak areas."
+                        : "Great work! No topic is below 75%."
+                    }
+                  />
+                ) : (
+                  data.focus.map((t) => (
+                    <BarRow
+                      key={t.topicName}
+                      label={t.topicName}
+                      value={t.mastery}
+                      note={t.majorName ?? undefined}
+                    />
+                  ))
+                )}
+              </Card>
             </View>
-          </View>
-        )}
-      </ScrollView>
+          )}
+
+          {tab === "course" && (
+            <View>
+              <Chips
+                items={data.courses.map((c) => ({
+                  id: c.course_id,
+                  label: c.courseName,
+                }))}
+                selected={courseId}
+                onSelect={setCourseId}
+              />
+
+              {course && (
+                <View style={isTablet ? styles.tabletWrap : null}>
+                  <View style={isTablet ? styles.tabletCol : null}>
+                    <Card
+                      title={`${course.courseName} Performance Trend`}
+                      subtitle="Your latest score per quiz"
+                    >
+                      {course.quizzes.length === 0 ? (
+                        <EmptyNote text="No quizzes taken in this course yet." />
+                      ) : (
+                        <>
+                          <ColumnChart
+                            values={course.quizzes.map((q) => q.pct)}
+                            labels={course.quizzes.map((_, i) => `Q${i + 1}`)}
+                          />
+                          {course.quizzes.map((q, i) => (
+                            <Text
+                              key={i}
+                              style={styles.legend}
+                              numberOfLines={1}
+                            >
+                              Q{i + 1} · {q.title}
+                              {q.attempts > 1
+                                ? `  (${q.attempts} attempts)`
+                                : ""}
+                            </Text>
+                          ))}
+                        </>
+                      )}
+                    </Card>
+                  </View>
+
+                  <View style={isTablet ? styles.tabletCol : null}>
+                    <Card
+                      title="Topics Needing Review"
+                      subtitle="Lowest scores first"
+                    >
+                      {course.topics.length === 0 ? (
+                        <EmptyNote text="Topic results appear after your first quiz in this course." />
+                      ) : (
+                        course.topics.map((t) => (
+                          <BarRow
+                            key={t.topicName}
+                            label={t.topicName}
+                            value={t.mastery}
+                          />
+                        ))
+                      )}
+                    </Card>
+                  </View>
+                </View>
+              )}
+            </View>
+          )}
+        </ScrollView>
+      ) : null}
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F8F9FA" },
-  header: {
-    backgroundColor: "#0D2A94",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 18,
-  },
-  backButton: { padding: 4 },
-  headerTitle: {
-    color: "white",
-    fontSize: 18,
-    fontWeight: "700",
-    letterSpacing: 0.5,
-  },
-  tabContainer: {
-    flexDirection: "row",
-    backgroundColor: "#0D2A94",
-    paddingBottom: 2,
-  },
-  tab: {
+  container: { flex: 1, backgroundColor: C.bg },
+  centered: {
     flex: 1,
+    justifyContent: "center",
     alignItems: "center",
-    paddingVertical: 14,
-    borderBottomWidth: 3,
-    borderBottomColor: "transparent",
+    padding: 30,
   },
-  activeTab: { borderBottomColor: "#FFB800" },
-  tabText: { color: "rgba(255,255,255,0.6)", fontSize: 14, fontWeight: "600" },
-  activeTabText: { color: "white", fontWeight: "700" },
-  scrollContent: { padding: isTablet ? 24 : 16, paddingBottom: 40 },
+  errorText: { color: C.red, textAlign: "center" },
+  scroll: { padding: isTablet ? 24 : 16, paddingBottom: 40 },
+  tabletWrap: { flexDirection: "row", justifyContent: "space-between" },
+  tabletCol: { width: "49%" },
 
-  // Responsive Columns Layout Strategy
-  tabletMainWrapper: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-between",
-  },
-  tabletColumnLeft: { width: "49%" },
-  tabletColumnRight: { width: "49%" },
-
-  card: {
-    backgroundColor: "white",
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    elevation: 2,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-  },
-  cardTitle: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: "#2C3E50",
-    marginBottom: 12,
-  },
-  subtitleText: {
-    fontSize: 12,
-    color: "#7F8C8D",
-    marginTop: -8,
-    marginBottom: 12,
-  },
-  milestoneHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  progressTrackContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 8,
-  },
-  progressBarWrapper: {
+  progressRow: { flexDirection: "row", alignItems: "center", marginTop: 8 },
+  progressTrack: {
     flex: 1,
     height: 10,
     backgroundColor: "#E0E0E0",
     borderRadius: 5,
     overflow: "hidden",
   },
-  progressBarFilled: {
-    height: "100%",
-    backgroundColor: "#0D2A94",
-    borderRadius: 5,
-  },
-  progressPercentText: {
+  progressFill: { height: "100%", backgroundColor: C.primary, borderRadius: 5 },
+  progressText: {
     marginLeft: 12,
     fontSize: 14,
     fontWeight: "700",
-    color: "#0D2A94",
+    color: C.primary,
   },
-  gridContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 4,
-  },
-  gridHalf: { width: "48%", height: isTablet ? 164 : "auto" },
-  gridHalfColumn: { width: "48%", justifyContent: "space-between" },
-  miniMetricCard: {
-    height: isTablet ? 74 : "46%",
-    justifyContent: "center",
-    marginBottom: isTablet ? 0 : 12,
-    paddingVertical: 10,
-  },
+
+  grid: { flexDirection: "row", justifyContent: "space-between" },
+  gridHalf: { width: "48%" },
+  centerCard: { alignItems: "center", justifyContent: "center" },
+  miniCard: { justifyContent: "center", paddingVertical: 10, marginBottom: 12 },
   metricLabel: {
     fontSize: 12,
     fontWeight: "600",
-    color: "#7F8C8D",
+    color: C.sub,
     marginBottom: 4,
   },
-  radialPlaceholder: {
-    width: 75,
-    height: 75,
-    borderRadius: 38,
-    borderWidth: 6,
-    borderColor: "#4CD964",
-    justifyContent: "center",
-    alignItems: "center",
-    marginTop: 5,
-  },
-  radialValue: { fontSize: 16, fontWeight: "700", color: "#2C3E50" },
-  bigMetricValue: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#0D2A94",
-    marginTop: 2,
-  },
-  frequencySubText: { fontSize: 12, color: "#7F8C8D" },
-  courseProgressRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginVertical: 10,
-  },
-  courseRowName: { flex: 3, fontSize: 13, color: "#34495E", fontWeight: "500" },
-  rowBarContainer: { flex: 4, paddingHorizontal: 8 },
-  rowBarBackground: {
-    height: 8,
-    backgroundColor: "#ECF0F1",
-    borderRadius: 4,
-    overflow: "hidden",
-  },
-  rowBarFilled: { height: "100%", borderRadius: 4 },
-  rowPercentText: {
-    flex: 1.2,
-    textAlign: "right",
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#2C3E50",
-  },
-  tableHeaderRow: {
+  bigValue: { fontSize: 20, fontWeight: "700", color: C.primary, marginTop: 2 },
+  freqText: { fontSize: 12, color: C.sub },
+  smallNote: { fontSize: 11, color: C.sub, marginTop: 6 },
+
+  thRow: {
     flexDirection: "row",
     borderBottomWidth: 1,
-    borderBottomColor: "#ECF0F1",
+    borderBottomColor: C.track,
     paddingBottom: 8,
     marginBottom: 8,
   },
-  thText: { fontSize: 11, fontWeight: "700", color: "#95A5A6" },
-  tableBodyRow: {
+  th: { fontSize: 11, fontWeight: "700", color: "#95A5A6" },
+  tdRow: {
     flexDirection: "row",
     paddingVertical: 11,
     borderBottomWidth: 1,
-    borderBottomColor: "#F8F9FA",
+    borderBottomColor: C.bg,
     alignItems: "center",
   },
-  tdText: { fontSize: 12, color: "#34495E" },
-  selectorScroll: { marginBottom: 4 },
-  selectorChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: "#E0E6F8",
-    marginRight: 8,
-    borderWidth: 1,
-    borderColor: "#CBD5E1",
-  },
-  selectorChipActive: { backgroundColor: "#0D2A94" },
-  selectorChipText: { fontSize: 13, color: "#0D2A94", fontWeight: "600" },
-  selectorChipTextActive: { color: "white" },
-  chartContainer: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    height: 160,
-    alignItems: "flex-end",
-    paddingTop: 20,
-  },
-  chartColumnWrapper: { alignItems: "center", width: 40 },
-  chartBarTrack: {
-    height: 120,
-    width: 24,
-    backgroundColor: "#F1F3F9",
-    borderRadius: 6,
-    justifyContent: "flex-end",
-    overflow: "hidden",
-  },
-  chartBarFilled: {
-    width: "100%",
-    backgroundColor: "#3498DB",
-    borderRadius: 6,
-  },
-  chartLabelText: {
-    marginTop: 8,
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#7F8C8D",
-  },
-  weakTopicRow: { marginVertical: 10 },
-  weakTopicName: { fontSize: 14, fontWeight: "600", color: "#2C3E50" },
-  weakProgressWrapper: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 4,
-  },
-  weakProgressBg: {
-    flex: 1,
-    height: 6,
-    backgroundColor: "#ECF0F1",
-    borderRadius: 3,
-    overflow: "hidden",
-  },
-  weakProgressFilled: { height: "100%", backgroundColor: "#FF4D4D" },
-  weakPercentText: {
-    marginLeft: 10,
-    fontSize: 11,
-    fontWeight: "600",
-    color: "#E74C3C",
-  },
+  td: { fontSize: 12, color: "#34495E" },
+
+  legend: { fontSize: 11, color: C.sub, marginTop: 4 },
 });

@@ -1,4 +1,4 @@
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import {
@@ -207,10 +207,20 @@ export default function AdminCourses() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => setMenuVisible(true)}>
-          <Ionicons name="menu" size={28} color="black" />
+        <View style={styles.headerLeft}>
+          <TouchableOpacity onPress={() => setMenuVisible(true)}>
+            <Ionicons name="menu" size={28} color="black" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Courses</Text>
+        </View>
+
+        <TouchableOpacity
+          onPress={() => router.push("/admin/analytics" as any)}
+          activeOpacity={0.7}
+          style={styles.analyticsButton}
+        >
+          <MaterialCommunityIcons name="chart-bar" size={26} color="black" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Courses</Text>
       </View>
 
       <AdminHamburger
@@ -283,9 +293,12 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFD75E",
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 20,
     paddingVertical: 15,
   },
+  headerLeft: { flexDirection: "row", alignItems: "center" },
+  analyticsButton: { padding: 6, borderRadius: 8 },
   headerTitle: {
     fontSize: 22,
     fontWeight: "bold",

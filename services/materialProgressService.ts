@@ -2,11 +2,7 @@ import { supabase } from "../lib/supabase";
 
 const PROGRESS_TABLE = "material_progress";
 
-export type CompletionSource =
-  | "view_time"
-  | "download"
-  | "video_watched"
-  | "scrolled_to_end";
+export type CompletionSource = "video_watched" | "scrolled_to_end";
 export const SEGMENT_SECONDS = 5;
 export const VIDEO_COMPLETION_THRESHOLD = 0.8;
 
@@ -52,29 +48,13 @@ export async function getCompletedMaterialIds(
 }
 
 export async function touchLastAccessed(
-  studentId: number,
+  _studentId: number,
   materialId: number,
 ): Promise<void> {
-  const now = new Date().toISOString();
-  const { data, error } = await supabase
-    .from(PROGRESS_TABLE)
-    .update({ lastAccessedAt: now })
-    .eq("student_id", studentId)
-    .eq("material_id", materialId)
-    .select("progress_id");
+  const { error } = await supabase.rpc("mark_material_opened", {
+    p_material_id: materialId,
+  });
   if (error) throw new Error(error.message);
-  if (data && data.length > 0) return;
-
-  const { error: insertError } = await supabase.from(PROGRESS_TABLE).upsert(
-    {
-      student_id: studentId,
-      material_id: materialId,
-      isCompleted: false,
-      lastAccessedAt: now,
-    },
-    { onConflict: "student_id,material_id", ignoreDuplicates: true },
-  );
-  if (insertError) throw new Error(insertError.message);
 }
 
 export async function getTotalViewSeconds(
@@ -151,34 +131,15 @@ export async function getWatchedSegments(
 }
 
 export async function markMaterialCompleted(
-  studentId: number,
+  _studentId: number,
   materialId: number,
   source: CompletionSource,
   viewSeconds?: number,
 ): Promise<void> {
-  const { data: existing, error: readError } = await supabase
-    .from(PROGRESS_TABLE)
-    .select("isCompleted")
-    .eq("student_id", studentId)
-    .eq("material_id", materialId)
-    .maybeSingle();
-  if (readError) throw new Error(readError.message);
-
-  if (existing?.isCompleted) return;
-
-  const now = new Date().toISOString();
-  const { error } = await supabase.from(PROGRESS_TABLE).upsert(
-    {
-      student_id: studentId,
-      material_id: materialId,
-      isCompleted: true,
-      completedAt: now,
-      lastAccessedAt: now,
-      completion_source: source,
-      view_seconds_at_completion: viewSeconds ?? null,
-    },
-    { onConflict: "student_id,material_id" },
-  );
-
+  const { error } = await supabase.rpc("mark_material_completed", {
+    p_material_id: materialId,
+    p_source: source,
+    p_view_seconds: viewSeconds ?? null,
+  });
   if (error) throw new Error(error.message);
 }

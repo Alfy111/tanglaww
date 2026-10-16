@@ -36,7 +36,6 @@ export async function getMaterialsByModule(
   return (data ?? []) as LearningMaterial[];
 }
 
-// All materials of one type across every module of a course
 export async function getMaterialsByCourse(
   courseId: number,
   type: MaterialType,
@@ -75,14 +74,7 @@ export async function uploadHandout(
     const ext = file.name.split(".").pop()?.toLowerCase() ?? "pdf";
     const storagePath = `module_${moduleId}/${Date.now()}_${file.name}`;
 
-    const fileObj = new File(file.uri);
-    const base64 = await fileObj.base64();
-
-    const binaryString = atob(base64);
-    const bytes = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
-    }
+    const bytes = await fetch(file.uri).then((r) => r.arrayBuffer());
 
     const { error: storageError } = await supabase.storage
       .from("learning-materials")
@@ -204,7 +196,6 @@ export async function downloadMaterial(
   }
 }
 
-// The course a module belongs to (for screens opened with only a moduleId)
 export async function getCourseIdForModule(
   moduleId: number,
 ): Promise<number | null> {
@@ -232,10 +223,6 @@ export async function getModulesByCourse(courseId: number) {
   }
   return data ?? [];
 }
-
-// ------------------------------------------------------------------
-// Completion tracking (students only; the database ignores admins)
-// ------------------------------------------------------------------
 
 export async function markMaterialOpened(materialId: number): Promise<void> {
   const { error } = await supabase.rpc("mark_material_opened", {
@@ -287,7 +274,6 @@ export interface SectionProgress {
 
 export interface CourseProgress {
   percent: number;
-  // null = unlocked; "access" = no enrollment/access; "previous" = earlier course not finished
   lockReason: "access" | "previous" | null;
   previousCourseName: string | null;
   handouts: SectionProgress;
