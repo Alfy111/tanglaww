@@ -4,7 +4,6 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 import {
-  Image,
   RefreshControl,
   SafeAreaView,
   ScrollView,
@@ -13,9 +12,8 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import DashboardCarousel from "../../components/dashboard-carousel";
 import AdminHamburger from "./hamburger";
-
-const dashboardImage = require("../../assets/images/dashboard-image.png");
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -29,6 +27,7 @@ export default function AdminDashboard() {
     lastName: "",
   });
   const [refresh, setRefresh] = useState(false);
+  const [carouselKey, setCarouselKey] = useState(0);
 
   const fetchAnnouncements = useCallback(async () => {
     const { data } = await supabase
@@ -138,6 +137,7 @@ export default function AdminDashboard() {
 
   const onRefresh = useCallback(async () => {
     setRefresh(true);
+    setCarouselKey((k) => k + 1);
     await fetchAffirmations();
     await fetchAnnouncements();
     await fetchAdmin();
@@ -192,24 +192,12 @@ export default function AdminDashboard() {
         </Text>
 
         <View style={styles.heroCard}>
-          <Image
-            source={dashboardImage}
-            style={{
-              width: "100%",
-              height: 200,
-              resizeMode: "cover",
-              borderRadius: 12,
-            }}
+          <DashboardCarousel
+            reloadKey={carouselKey}
+            onEdit={() => router.push("/admin/carousel" as any)}
+            dotColor="#CCC"
+            activeDotColor="#2F459B"
           />
-          <TouchableOpacity style={styles.editIconHero}>
-            <Ionicons name="pencil-outline" size={16} color="black" />
-          </TouchableOpacity>
-          <View style={styles.paginationDots}>
-            <View style={[styles.dot, styles.activeDot]} />
-            <View style={styles.dot} />
-            <View style={styles.dot} />
-            <View style={styles.dot} />
-          </View>
         </View>
 
         <View style={styles.infoCard}>
@@ -409,7 +397,6 @@ const styles = StyleSheet.create({
     padding: 15,
     borderWidth: 1,
     borderColor: "#EEE",
-    alignItems: "center",
     marginBottom: 20,
   },
   imagePlaceholder: {
