@@ -151,6 +151,16 @@ export default function AdminSignIn() {
             )}
           </TouchableOpacity>
         </View>
+
+        <TouchableOpacity
+          style={styles.activateLink}
+          onPress={() => router.push("/admin/activate" as any)}
+        >
+          <Text style={styles.activateText}>
+            Got an admin invite?{" "}
+            <Text style={styles.activateTextBold}>Activate admin account</Text>
+          </Text>
+        </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
@@ -216,4 +226,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   errorText: { color: "#c0392b", fontSize: 13 },
+  activateLink: { marginTop: 22, padding: 6 },
+  activateText: { fontSize: 14, color: "#666", textAlign: "center" },
+  activateTextBold: { color: "#0D2A94", fontWeight: "bold" },
 });

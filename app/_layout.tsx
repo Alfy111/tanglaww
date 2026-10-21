@@ -31,6 +31,7 @@ const AUTH_ROUTES = [
   "/profilesetup",
   "/welcome",
   "/admin/signin",
+  "/admin/activate",
   "/succes",
   "/resetpass",
   "/forgotpass",
@@ -206,7 +207,9 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 
     const inAuthGroup = AUTH_ROUTES.includes(pathname);
     const inAdminGroup =
-      pathname.startsWith("/admin") && pathname !== "/admin/signin";
+      pathname.startsWith("/admin") &&
+      pathname !== "/admin/signin" &&
+      pathname !== "/admin/activate";
     const inMaterialsGroup = pathname.startsWith("/materials");
     const inRegistrant = pathname.startsWith("/registrant");
 

@@ -16,6 +16,8 @@ export default function RootLayout() {
       <Stack.Screen name="notification" />
       <Stack.Screen name="announcements" />
       <Stack.Screen name="affirmations" />
+      <Stack.Screen name="carousel" />
+      <Stack.Screen name="activate" />
     </Stack>
   );
 }
