@@ -13,8 +13,8 @@ import {
 } from "react-native";
 import { useAdmin } from "../../context/AdminContext";
 
-const EDITOR_ROUTE = "../materials/quiz-editor";
-const DETAILS_ROUTE = "../materials/quiz-details";
+const EDITOR_ROUTE = "/materials/quiz-editor";
+const DETAILS_ROUTE = "/materials/quiz-details";
 
 interface QuizRow {
   assessment_id: number;
@@ -22,15 +22,16 @@ interface QuizRow {
   title: string;
   deadline: string | null;
   status: "Draft" | "Open" | "Closed";
+  pastDeadline?: boolean;
   subtitle: string;
   maxScore?: number;
   latestScore?: number | null;
 }
 
 const STATUS_COLORS = {
-  Draft: { text: "#B26A00" },
-  Open: { text: "#1E9E5A" },
-  Closed: { text: "#C0392B" },
+  Draft: { bg: "#FFF4E0", text: "#B26A00" },
+  Open: { bg: "#E3F6EC", text: "#1E9E5A" },
+  Closed: { bg: "#FDECEA", text: "#C0392B" },
 };
 
 const formatDue = (iso: string | null) => {
@@ -101,6 +102,7 @@ export default function QuizScreen() {
       title: q.title,
       deadline: q.deadline,
       status: q.isClosed ? "Closed" : "Open",
+      pastDeadline: !!q.pastDeadline,
       subtitle: `Attempts used: ${q.attemptsUsed} of ${q.maxAttempts}`,
       maxScore: Number(q.maxScore),
       latestScore: q.latestScore === null ? null : Number(q.latestScore),
@@ -170,7 +172,11 @@ export default function QuizScreen() {
                   item.latestScore == null && styles.notDoneText,
                 ]}
               >
-                {item.latestScore != null ? "Completed" : "Not taken yet"}
+                {item.latestScore != null
+                  ? "Completed"
+                  : item.status === "Closed"
+                    ? "Missed"
+                    : "Not taken yet"}
               </Text>
             </View>
           )}
@@ -189,11 +195,16 @@ export default function QuizScreen() {
             </>
           )}
           {(isAdmin || item.status === "Closed") && (
-            <View style={[styles.badge]}>
+            <View style={[styles.badge, { backgroundColor: colors.bg }]}>
               <Text style={[styles.badgeText, { color: colors.text }]}>
                 {item.status}
               </Text>
             </View>
+          )}
+          {!isAdmin && item.status === "Closed" && (
+            <Text style={styles.closedNote}>
+              {item.pastDeadline ? "Past deadline" : "Closed by admin"}
+            </Text>
           )}
         </View>
       </TouchableOpacity>
@@ -262,6 +273,12 @@ export default function QuizScreen() {
 }
 
 const styles = StyleSheet.create({
+  closedNote: {
+    fontSize: 11,
+    color: "#C0392B",
+    marginTop: 4,
+    textAlign: "right",
+  },
   container: { flex: 1, backgroundColor: "white" },
   header: {
     backgroundColor: "#0D2A94",

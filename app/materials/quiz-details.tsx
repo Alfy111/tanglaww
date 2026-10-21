@@ -13,8 +13,8 @@ import {
   View,
 } from "react-native";
 
-const TAKE_ROUTE = "../materials/quiz-take";
-const REVIEW_ROUTE = "../materials/quiz-review";
+const TAKE_ROUTE = "/materials/quiz-take";
+const REVIEW_ROUTE = "/materials/quiz-review";
 
 interface Attempt {
   attempt_id: number;
@@ -229,7 +229,11 @@ export default function QuizDetailsScreen() {
             Available attempts: {attemptsLeft} of {quiz.maxAttempts}
           </Text>
           {quiz.isClosed && (
-            <Text style={styles.closedText}>This quiz is closed.</Text>
+            <Text style={styles.closedText}>
+              {quiz.deadline && new Date(quiz.deadline) < new Date()
+                ? "This quiz is closed. The deadline has passed, so it can no longer be taken."
+                : "This quiz is closed by the admin, so it can no longer be taken."}
+            </Text>
           )}
         </View>
 
