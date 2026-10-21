@@ -18,6 +18,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { readFileBytes } from "../lib/readFileBytes";
 import { supabase } from "../lib/supabase";
 
 const { width } = Dimensions.get("window");
@@ -245,33 +246,29 @@ export default function EnrollmentScreen() {
   const uploadAttachment = async (): Promise<string | null> => {
     if (!dataTypes.attachmentUri) return null;
 
-    const fileName = `${Date.now()}_${dataTypes.attachmentName}`;
+    const safeName = (dataTypes.attachmentName ?? "receipt").replace(
+      /[^a-zA-Z0-9._-]/g,
+      "_",
+    );
+    const fileName = `${Date.now()}_${safeName}`;
 
-    try {
-      const response = await fetch(dataTypes.attachmentUri);
-      const arrayBuffer = await response.arrayBuffer();
+    const bytes = await readFileBytes(dataTypes.attachmentUri);
 
-      const { data, error } = await supabase.storage
-        .from("receipts")
-        .upload(`payments/${fileName}`, arrayBuffer, {
-          contentType: dataTypes.attachmentType ?? "image/jpeg",
-          upsert: false,
-        });
+    const { error } = await supabase.storage
+      .from("receipts")
+      .upload(`payments/${fileName}`, bytes, {
+        contentType: dataTypes.attachmentType ?? "image/jpeg",
+        upsert: false,
+      });
 
-      if (error) {
-        console.error("Upload error:", error.message);
-        return null;
-      }
+    if (error)
+      throw new Error("Could not upload your receipt: " + error.message);
 
-      const { data: urlData } = supabase.storage
-        .from("receipts")
-        .getPublicUrl(`payments/${fileName}`);
+    const { data: urlData } = supabase.storage
+      .from("receipts")
+      .getPublicUrl(`payments/${fileName}`);
 
-      return urlData.publicUrl;
-    } catch (err) {
-      console.error("Upload catch error:", err);
-      return null;
-    }
+    return urlData.publicUrl;
   };
 
   const handleSubmit = async () => {

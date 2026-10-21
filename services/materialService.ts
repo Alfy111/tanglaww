@@ -1,5 +1,6 @@
 import * as DocumentPicker from "expo-document-picker";
 import { File, Paths } from "expo-file-system";
+import { readFileBytes } from "../lib/readFileBytes";
 import { supabase } from "../lib/supabase";
 
 export type MaterialType = "handout" | "recorded_session";
@@ -73,8 +74,7 @@ export async function uploadHandout(
     const file = result.assets[0];
     const ext = file.name.split(".").pop()?.toLowerCase() ?? "pdf";
     const storagePath = `module_${moduleId}/${Date.now()}_${file.name}`;
-
-    const bytes = await fetch(file.uri).then((r) => r.arrayBuffer());
+    const bytes = await readFileBytes(file.uri);
 
     const { error: storageError } = await supabase.storage
       .from("learning-materials")
