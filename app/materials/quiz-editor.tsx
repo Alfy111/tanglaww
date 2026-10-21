@@ -1,24 +1,24 @@
 import { supabase } from "@/lib/supabase";
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker, {
-    DateTimePickerEvent,
+  DateTimePickerEvent,
 } from "@react-native-community/datetimepicker";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    KeyboardAvoidingView,
-    Modal,
-    Platform,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Switch,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 type QuestionType = "mcq" | "identification" | "matching";
@@ -444,13 +444,20 @@ export default function QuizEditorScreen() {
       Alert.alert("Error", rpcError.message);
       return;
     }
-    Alert.alert(publish ? "Change successful" : "Draft saved");
+    Alert.alert(publish ? "Quiz saved and published" : "Draft saved");
     router.back();
   };
 
-  const deleteQuiz = () => {
+  const deleteQuiz = async () => {
     if (!assessmentId) return;
-    Alert.alert("Delete quiz", `Delete "${title}"? This cannot be undone.`, [
+    const { data: takers } = await supabase.rpc("get_assessment_taker_count", {
+      p_id: assessmentId,
+    });
+    const warning =
+      takers > 0
+        ? `${takers} ${takers === 1 ? "student has" : "students have"} already taken "${title}". Deleting it also deletes their scores and answers, and removes them from the analytics.\n\nThis cannot be undone.`
+        : `Delete "${title}"? This cannot be undone.`;
+    Alert.alert("Delete quiz", warning, [
       { text: "Cancel", style: "cancel" },
       {
         text: "Delete",
@@ -511,6 +518,35 @@ export default function QuizEditorScreen() {
             onChangeText={setInstructions}
             multiline
           />
+
+          <Text style={styles.label}>Module:</Text>
+          {modules.length === 0 ? (
+            <Text style={styles.hint}>
+              This course has no modules yet. Add a module first.
+            </Text>
+          ) : (
+            <View style={styles.chipWrap}>
+              {modules.map((m) => (
+                <TouchableOpacity
+                  key={m.module_id}
+                  style={[
+                    styles.chip,
+                    moduleId === m.module_id && styles.chipActive,
+                  ]}
+                  onPress={() => setModuleId(m.module_id)}
+                >
+                  <Text
+                    style={[
+                      styles.chipText,
+                      moduleId === m.module_id && styles.chipTextActive,
+                    ]}
+                  >
+                    {m.moduleName}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
 
           <Text style={styles.label}>Deadline:</Text>
           <TouchableOpacity
@@ -583,6 +619,10 @@ export default function QuizEditorScreen() {
             onChangeText={setTimeLimit}
             keyboardType="number-pad"
           />
+          <Text style={styles.hint}>
+            The countdown starts when a student begins an attempt and keeps
+            running if they leave.
+          </Text>
 
           <View style={styles.settingsCard}>
             <SettingRow
@@ -599,7 +639,7 @@ export default function QuizEditorScreen() {
             />
             <SettingRow
               title="Close quiz now"
-              description="Stops all new attempts right away."
+              description="Stops all new attempts right away, even before the deadline."
               value={isClosed}
               onChange={setIsClosed}
               last
@@ -607,6 +647,21 @@ export default function QuizEditorScreen() {
           </View>
 
           <View style={styles.divider} />
+
+          {hasAttempts && (
+            <View style={styles.lockBanner}>
+              <Ionicons
+                name="lock-closed"
+                size={16}
+                color={COLORS.warningText}
+              />
+              <Text style={styles.lockText}>
+                Students have already taken this quiz, so the questions are
+                locked to keep their results accurate. You can still change the
+                settings above.
+              </Text>
+            </View>
+          )}
 
           <View style={styles.questionHeader}>
             <Text style={styles.sectionTitle}>
@@ -708,7 +763,7 @@ export default function QuizEditorScreen() {
             </TouchableOpacity>
           )}
 
-          {assessmentId && !hasAttempts && (
+          {assessmentId && (
             <TouchableOpacity style={styles.deleteBtn} onPress={deleteQuiz}>
               <Ionicons name="trash-outline" size={16} color={COLORS.danger} />
               <Text style={styles.deleteBtnText}>Delete Quiz</Text>
