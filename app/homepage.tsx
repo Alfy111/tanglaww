@@ -8,8 +8,6 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
-  Dimensions,
-  Image,
   Modal,
   Platform,
   RefreshControl,
@@ -21,10 +19,8 @@ import {
   TouchableWithoutFeedback,
   View,
 } from "react-native";
+import DashboardCarousel from "../components/dashboard-carousel";
 import HamburgerMenu from "./hamburger";
-
-const { width } = Dimensions.get("window");
-const dashboardImage = require("../assets/images/dashboard-image.png");
 
 export default function Homepage() {
   const router = useRouter();
@@ -37,6 +33,7 @@ export default function Homepage() {
   const [affirmations, setAffirmations] = useState<any[]>([]);
   const [notifCount, setNotifCount] = useState(0);
   const [refresh, setRefresh] = useState(false);
+  const [carouselKey, setCarouselKey] = useState(0);
 
   const fetchAnnouncements = useCallback(async () => {
     const { data } = await supabase
@@ -105,6 +102,7 @@ export default function Homepage() {
 
   const onRefresh = useCallback(async () => {
     setRefresh(true);
+    setCarouselKey((k) => k + 1);
     await fetchAnnouncements();
     await fetchAffirmations();
     await fetchNotifCount();
@@ -204,31 +202,11 @@ export default function Homepage() {
         </Text>
 
         <View style={styles.carouselContainer}>
-          <View
-            style={{
-              width: "100%",
-              height: 200,
-              borderRadius: 12,
-              overflow: "hidden",
-            }}
-          >
-            <Image
-              source={dashboardImage}
-              style={{
-                width: "150%",
-                height: "100%",
-                marginLeft: -10,
-                resizeMode: "cover",
-                borderRadius: 12,
-              }}
-            />
-          </View>
-          <View style={styles.pagination}>
-            <View style={[styles.dot, styles.activeDot]} />
-            <View style={styles.dot} />
-            <View style={styles.dot} />
-            <View style={styles.dot} />
-          </View>
+          <DashboardCarousel
+            reloadKey={carouselKey}
+            dotColor="#DCDFE3"
+            activeDotColor="#0D2A94"
+          />
         </View>
 
         <Text style={styles.sectionTitle}>Continue where you left off...</Text>
