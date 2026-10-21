@@ -1,7 +1,7 @@
 import { supabase } from "@/lib/supabase";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Alert,
   Dimensions,
@@ -37,6 +37,14 @@ export default function AdminHamburger({
     lastName: "",
     email: "",
   });
+  const [role, setRole] = useState<string>("admin");
+  const canManageAdmins = role === "owner" || role === "super_admin";
+  const roleLabel =
+    role === "owner"
+      ? "Owner"
+      : role === "super_admin"
+        ? "Super Admin"
+        : "Instructor";
 
   const navigateTo = (path: string) => {
     onClose();
@@ -53,7 +61,7 @@ export default function AdminHamburger({
 
         const { data: adminData } = await supabase
           .from("admin")
-          .select("firstName, lastName, email")
+          .select("firstName, lastName, email, role")
           .eq("admin_id", user.id)
           .maybeSingle();
 
@@ -63,6 +71,7 @@ export default function AdminHamburger({
           lastName: adminData.lastName,
           email: adminData.email,
         });
+        setRole(adminData.role ?? "admin");
       };
       fetchAdmin();
     }
@@ -98,7 +107,7 @@ export default function AdminHamburger({
                 <Text style={styles.adminName}>
                   {admin.firstName} {admin.lastName}
                 </Text>
-                <Text style={styles.adminRole}>Instructor</Text>
+                <Text style={styles.adminRole}>{roleLabel}</Text>
                 <Text style={styles.adminEmail}>{admin.email}</Text>
               </View>
             </SafeAreaView>
@@ -119,6 +128,20 @@ export default function AdminHamburger({
                   <Ionicons name="people-outline" size={20} color="#2F459B" />
                   <Text style={styles.navText}>Student Registry</Text>
                 </TouchableOpacity>
+
+                {canManageAdmins && (
+                  <TouchableOpacity
+                    style={styles.navItem}
+                    onPress={() => navigateTo("/admin/manage-admins")}
+                  >
+                    <Ionicons
+                      name="shield-checkmark-outline"
+                      size={20}
+                      color="#2F459B"
+                    />
+                    <Text style={styles.navText}>Manage Admins</Text>
+                  </TouchableOpacity>
+                )}
 
                 <Text style={styles.sectionLabel}>APP CONFIGURATION</Text>
 
