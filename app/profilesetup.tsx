@@ -18,6 +18,7 @@ import {
   View,
 } from "react-native";
 import { useAdmin } from "../context/AdminContext";
+import { readFileBytes } from "../lib/readFileBytes";
 import { generateSessionToken, registerSession } from "../lib/session";
 
 export default function ProfileSetupScreen() {
@@ -88,12 +89,11 @@ export default function ProfileSetupScreen() {
     if (!photoUri) return null;
 
     const fileName = `${studentId}_${Date.now()}.jpg`;
-    const response = await fetch(photoUri);
-    const arrayBuffer = await response.arrayBuffer();
+    const bytes = await readFileBytes(photoUri);
 
     const { error } = await supabase.storage
       .from("profiles")
-      .upload(`photos/${fileName}`, arrayBuffer, {
+      .upload(`photos/${fileName}`, bytes, {
         contentType: "image/jpeg",
         upsert: true,
       });
