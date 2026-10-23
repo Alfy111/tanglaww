@@ -1,6 +1,6 @@
 import NotificationBell from "../NotificationBell";
 
-export default function AdminTopbar({ title }) {
+export default function AdminTopbar({ title, actions }) {
   return (
     <div style={{
       backgroundColor: "#f5a623", padding: "0 32px",
@@ -9,6 +9,7 @@ export default function AdminTopbar({ title }) {
     }}>
       <h1 style={{ fontSize: "20px", fontWeight: "700", color: "#1a1a2e", margin: 0 }}>{title}</h1>
       <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+        {actions}
         <NotificationBell />
       </div>
     </div>

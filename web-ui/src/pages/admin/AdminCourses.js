@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronUp, FileText, Image, Lightbulb, Link, PlusCircle, Video } from "lucide-react";
+import { BarChart3, ChevronDown, ChevronUp, FileText, Image, Lightbulb, Link, PlusCircle, Video } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import finalCoaching from "../../assets/images/final-coaching.jpg";
@@ -54,7 +54,20 @@ export default function AdminCourses() {
     <div style={{ display: "flex", minHeight: "100vh", fontFamily: "Poppins, sans-serif", backgroundColor: "#f5f6fa" }}>
       <AdminSidebar />
       <div style={{ marginLeft: "240px", flex: 1 }}>
-        <AdminTopbar title="Courses" />
+        <AdminTopbar
+          title="Courses"
+          actions={(
+            <button
+              type="button"
+              onClick={() => navigate("/admin/analytics")}
+              aria-label="Open analytics"
+              title="Analytics"
+              style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "38px", height: "38px", padding: 0, border: "none", borderRadius: "8px", background: "transparent", color: "#1a1a2e", cursor: "pointer" }}
+            >
+              <BarChart3 size={24} />
+            </button>
+          )}
+        />
         <div style={{ padding: "32px 40px", display: "flex", flexDirection: "column", gap: "16px" }}>
 
           {loading ? (

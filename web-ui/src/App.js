@@ -1,7 +1,9 @@
 import { Route, Routes } from "react-router-dom";
+import { applyUserTheme, getUserThemePreference } from "./lib/userTheme";
 import About from "./pages/About";
 import AboutUs from "./pages/AboutUs";
 import AdminAbout from "./pages/admin/AdminAbout";
+import AdminAnalytics from "./pages/admin/AdminAnalytics";
 import AdminApprovals from "./pages/admin/AdminApprovals";
 import AdminAuditLog from "./pages/admin/AdminAuditLog";
 import AdminAuditQueue from "./pages/admin/AdminAuditQueue";
@@ -32,7 +34,6 @@ import Settings from "./pages/Settings";
 import SignIn from "./pages/SignIn";
 import SignInWithCode from "./pages/SignInWithCode";
 import Terms from "./pages/Terms";
-import { applyUserTheme, getUserThemePreference } from "./lib/userTheme";
 
 export default function App() {
   applyUserTheme(getUserThemePreference());
@@ -64,6 +65,7 @@ export default function App() {
       <Route path="/admin/about" element={<AdminAbout />} />
       <Route path="/admin/calendar" element={<AdminCalendar />} />
       <Route path="/admin/courses" element={<AdminCourses />} />
+      <Route path="/admin/analytics" element={<AdminAnalytics />} />
       <Route path="/admin/help" element={<AdminHelp />} />
       <Route path="/admin/policies" element={<AdminPolicies />} />
       <Route path="/admin/audit-log" element={<AdminAuditLog />} />
