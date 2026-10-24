@@ -6,7 +6,7 @@
     "orientation": "portrait",
     "icon": "./assets/icons/ios-dark.png",
     "scheme": "tanglaw",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "light",
     "ios": {
       "bundleIdentifier": "com.tanglaw.tarc",
       "supportsTablet": true,
@@ -34,10 +34,7 @@
               "scheme": "tanglaw"
             }
           ],
-          "category": [
-            "BROWSABLE",
-            "DEFAULT"
-          ]
+          "category": ["BROWSABLE", "DEFAULT"]
         }
       ]
     },
@@ -64,7 +61,14 @@
       "expo-font",
       "expo-image",
       "expo-sharing",
-      "expo-status-bar"
+      "expo-status-bar",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Tanglaw needs access to your photos to upload your receipt and profile picture.",
+          "cameraPermission": "Tanglaw needs camera access to take a photo of your receipt."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

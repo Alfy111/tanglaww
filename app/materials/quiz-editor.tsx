@@ -506,6 +506,7 @@ export default function QuizEditorScreen() {
           <TextInput
             style={styles.input}
             placeholder="Title of quiz"
+            placeholderTextColor="#9AA0A6"
             value={title}
             onChangeText={setTitle}
           />
@@ -514,6 +515,7 @@ export default function QuizEditorScreen() {
           <TextInput
             style={[styles.input, styles.multiline]}
             placeholder="Instructions for students"
+            placeholderTextColor="#9AA0A6"
             value={instructions}
             onChangeText={setInstructions}
             multiline
@@ -603,6 +605,7 @@ export default function QuizEditorScreen() {
               <TextInput
                 style={styles.input}
                 placeholder={`0 - ${totalPoints}`}
+                placeholderTextColor="#9AA0A6"
                 value={passingScore}
                 onChangeText={setPassingScore}
                 keyboardType="number-pad"
@@ -615,6 +618,7 @@ export default function QuizEditorScreen() {
           <TextInput
             style={styles.input}
             placeholder="Leave empty for no time limit"
+            placeholderTextColor="#9AA0A6"
             value={timeLimit}
             onChangeText={setTimeLimit}
             keyboardType="number-pad"
