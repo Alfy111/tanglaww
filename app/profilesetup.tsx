@@ -145,8 +145,7 @@ export default function ProfileSetupScreen() {
           const cleaned = phoneNumber.replace(/\s|-/g, "");
           return /^(09|\+639)\d{9}$/.test(cleaned);
         },
-        message:
-          "Please enter a valid Philippine mobile number (e.g. 0912-345-6789).",
+        message: "Please enter a valid mobile number (e.g. 0912-345-6789).",
       },
     ];
     return rules.filter((rule) => !rule.test()).map((rule) => rule.message);
@@ -239,15 +238,17 @@ export default function ProfileSetupScreen() {
 
           <View style={styles.avatarContainer}>
             <TouchableOpacity onPress={handlePickPhoto}>
-              <View style={styles.avatarCircle}>
-                {photoUri ? (
-                  <Image
-                    source={{ uri: photoUri }}
-                    style={styles.avatarImage}
-                  />
-                ) : (
-                  <Ionicons name="person" size={50} color="#BDC3C7" />
-                )}
+              <View style={styles.avatarWrap}>
+                <View style={styles.avatarCircle}>
+                  {photoUri ? (
+                    <Image
+                      source={{ uri: photoUri }}
+                      style={styles.avatarImage}
+                    />
+                  ) : (
+                    <Ionicons name="person" size={50} color="#BDC3C7" />
+                  )}
+                </View>
                 <View style={styles.cameraBtn}>
                   <Ionicons name="camera" size={18} color="white" />
                 </View>
@@ -354,7 +355,7 @@ export default function ProfileSetupScreen() {
               <View style={{ flex: 1, marginLeft: 8 }}>
                 {errors.map((e, i) => (
                   <Text key={i} style={styles.errorText}>
-                    • {e}
+                    {e}
                   </Text>
                 ))}
               </View>
@@ -409,6 +410,7 @@ const styles = StyleSheet.create({
     position: "relative",
     overflow: "hidden",
   },
+  avatarWrap: { width: 100, height: 100 },
   cameraBtn: {
     position: "absolute",
     bottom: 0,

@@ -551,7 +551,7 @@ export default function EnrollmentScreen() {
         <View style={{ flex: 1, marginLeft: 8 }}>
           {errors.map((e, i) => (
             <Text key={i} style={styles.errorText}>
-              . {e}
+              {e}
             </Text>
           ))}
         </View>
@@ -865,14 +865,14 @@ export default function EnrollmentScreen() {
             {renderProgressHeader("Promotions & Payment")}
             <View style={styles.warningBanner}>
               <Ionicons
-                name="alert-circle"
+                name="information-circle"
                 size={18}
                 color="#b9770e"
                 style={{ marginTop: 2 }}
               />
               <View style={{ flex: 1, marginLeft: 8 }}>
                 <Text style={styles.warningText}>
-                  ATTENTION: Kindly consult with our admins regarding the course
+                  REMINDER: Kindly consult with our admins regarding the course
                   prices before proceeding.
                 </Text>
               </View>
