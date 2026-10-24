@@ -1,61 +1,64 @@
 import { Check, ChevronRight, Image, Pencil, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import dashboardBanner from "../../assets/dashboardBanner.png";
 import AdminSidebar from "../../components/admin/AdminSidebar";
 import AdminTopbar from "../../components/admin/AdminTopbar";
+import { getSlides } from "../../lib/carousel";
 import { supabase } from "../../lib/supabase";
 
-// Editable banner with image upload + carousel
-function EditableBanner() {
-  const [images, setImages] = useState([dashboardBanner, null, null, null]);
+function DashboardBanner({ onEdit }) {
+  const [slides, setSlides] = useState([]);
   const [active, setActive] = useState(0);
-  const [editing, setEditing] = useState(false);
-  const fileRef = useRef();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  const handleUpload = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const url = URL.createObjectURL(file);
-    setImages((imgs) => imgs.map((img, i) => i === active ? url : img));
-  };
+  useEffect(() => {
+    getSlides()
+      .then(setSlides)
+      .catch((loadError) => setError(`Could not load dashboard photos: ${loadError.message}`))
+      .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    if (slides.length < 2) return undefined;
+    const timer = window.setInterval(() => {
+      setActive((index) => (index + 1) % slides.length);
+    }, 4000);
+    return () => window.clearInterval(timer);
+  }, [slides.length]);
+
+  useEffect(() => {
+    if (active >= slides.length) setActive(0);
+  }, [active, slides.length]);
+
+  const image = slides.length ? slides[active]?.image_url : dashboardBanner;
 
   return (
     <div style={{ backgroundColor: "#fff", borderRadius: "12px", padding: "16px", boxShadow: "0 2px 8px rgba(0,0,0,0.06)", marginBottom: "16px", border: "1px solid #eee" }}>
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "8px" }}>
-        <button onClick={() => setEditing(!editing)} style={{ display: "flex", alignItems: "center", gap: "4px", background: "none", border: "none", cursor: "pointer", color: "#1a1a6e", fontSize: "12px", fontWeight: "600", fontFamily: "Poppins, sans-serif" }}>
-          <Pencil size={13} /> {editing ? "Done" : "Edit"}
+        <button onClick={onEdit} style={{ display: "flex", alignItems: "center", gap: "4px", background: "none", border: "none", cursor: "pointer", color: "#1a1a6e", fontSize: "12px", fontWeight: "600", fontFamily: "Poppins, sans-serif" }}>
+          <Pencil size={13} /> Edit
         </button>
       </div>
 
-      <div
-        onClick={() => editing && fileRef.current.click()}
-        style={{ backgroundColor: "#f0f0f0", borderRadius: "8px", height: "480px", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", cursor: editing ? "pointer" : "default", position: "relative" }}
-      >
-        {images[active] ? (
-          <img src={images[active]} alt="Banner" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+      <div style={{ backgroundColor: "#f0f0f0", borderRadius: "8px", width: "100%", aspectRatio: "16 / 9", minHeight: "220px", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+        {loading ? (
+          <p style={{ color: "#888" }}>Loading dashboard photos...</p>
+        ) : image ? (
+          <img src={image} alt="Dashboard carousel" style={{ width: "100%", height: "100%", objectFit: "contain", objectPosition: "center" }} />
         ) : (
-          <div style={{ textAlign: "center", color: "#bbb" }}>
-            <Image size={32} color="#bbb" />
-          </div>
-        )}
-        {editing && (
-          <div style={{ position: "absolute", inset: 0, backgroundColor: "rgba(0,0,0,0.3)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <div style={{ backgroundColor: "#fff", borderRadius: "8px", padding: "8px 16px", fontSize: "12px", fontWeight: "600", color: "#1a1a6e" }}>
-              📷 {images[active] ? "Change Photo" : "Upload Photo"}
-            </div>
-          </div>
+          <Image size={32} color="#bbb" />
         )}
       </div>
-
-      <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleUpload} />
-
-      <div style={{ display: "flex", justifyContent: "center", gap: "6px", marginTop: "10px" }}>
-        {images.map((_, i) => (
-          <div key={i} onClick={() => setActive(i)} style={{ width: "8px", height: "8px", borderRadius: "50%", backgroundColor: i === active ? "#1a1a6e" : "#ddd", cursor: "pointer" }} />
-        ))}
-      </div>
-      {editing && <p style={{ fontSize: "11px", color: "#aaa", textAlign: "center", marginTop: "8px" }}>Slide {active + 1} of {images.length} — click dot to switch</p>}
+      {slides.length > 1 && (
+        <div style={{ display: "flex", justifyContent: "center", gap: "6px", marginTop: "10px" }}>
+          {slides.map((slide, index) => (
+            <button key={slide.slide_id} type="button" aria-label={`Show dashboard photo ${index + 1}`} onClick={() => setActive(index)} style={{ width: "9px", height: "9px", padding: 0, border: "none", borderRadius: "50%", backgroundColor: index === active ? "#1a1a6e" : "#ddd", cursor: "pointer" }} />
+          ))}
+        </div>
+      )}
+      {error && <p role="alert" style={{ color: "#c0392b", fontSize: "12px", marginBottom: 0 }}>{error}</p>}
     </div>
   );
 }
@@ -193,35 +196,74 @@ function AnnouncementCard({ announcements, onSave }) {
 }
 
 // Editable affirmation card
-function AffirmationCard() {
+function AffirmationCard({ affirmation, loading, onSave }) {
   const [editing, setEditing] = useState(false);
-  const [value, setValue] = useState("You're one step closer to your dream, Future LPTs!");
-  const [draft, setDraft] = useState(value);
+  const [draft, setDraft] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
-  const save = () => { setValue(draft); setEditing(false); };
-  const cancel = () => { setDraft(value); setEditing(false); };
+  useEffect(() => {
+    setDraft(affirmation?.content ?? "");
+  }, [affirmation]);
+
+  const save = async () => {
+    const content = draft.trim();
+    if (!content) {
+      setError("Please enter an affirmation.");
+      return;
+    }
+
+    setSaving(true);
+    setError("");
+    try {
+      if (affirmation) {
+        const { error: updateError } = await supabase
+          .from("affirmation")
+          .update({ content })
+          .eq("id", affirmation.id);
+        if (updateError) throw new Error(updateError.message);
+      } else {
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        if (userError) throw new Error(userError.message);
+        if (!user) throw new Error("You must be signed in to save an affirmation.");
+        const { error: insertError } = await supabase
+          .from("affirmation")
+          .insert({ content, admin_id: user.id });
+        if (insertError) throw new Error(insertError.message);
+      }
+      await onSave();
+      setEditing(false);
+    } catch (saveError) {
+      setError(`Could not save affirmation: ${saveError.message}`);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div style={{ backgroundColor: "#fff", borderRadius: "12px", padding: "20px 24px", boxShadow: "0 2px 8px rgba(0,0,0,0.06)", marginBottom: "24px", border: "1px solid #eee" }}>
       <div style={{ display: "flex", alignItems: "center", marginBottom: "10px" }}>
         <span style={{ fontSize: "15px", fontWeight: "700", color: "#1a1a6e" }}>🤍 Daily Affirmation</span>
         {!editing && (
-          <button onClick={() => { setDraft(value); setEditing(true); }} style={{ marginLeft: "auto", background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: "4px", color: "#1a1a6e", fontSize: "12px", fontWeight: "600", fontFamily: "Poppins, sans-serif" }}>
+          <button onClick={() => { setDraft(affirmation?.content ?? ""); setError(""); setEditing(true); }} style={{ marginLeft: "auto", background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: "4px", color: "#1a1a6e", fontSize: "12px", fontWeight: "600", fontFamily: "Poppins, sans-serif" }}>
             <Pencil size={13} /> Edit
           </button>
         )}
         {editing && (
           <div style={{ marginLeft: "auto", display: "flex", gap: "8px" }}>
-            <button onClick={save} style={{ display: "flex", alignItems: "center", gap: "4px", backgroundColor: "#1a1a6e", color: "#fff", border: "none", borderRadius: "6px", padding: "4px 12px", fontSize: "12px", fontWeight: "600", cursor: "pointer", fontFamily: "Poppins, sans-serif" }}>
-              <Check size={12} /> Save
+            <button onClick={save} disabled={saving} style={{ display: "flex", alignItems: "center", gap: "4px", backgroundColor: "#1a1a6e", color: "#fff", border: "none", borderRadius: "6px", padding: "4px 12px", fontSize: "12px", fontWeight: "600", cursor: saving ? "wait" : "pointer", fontFamily: "Poppins, sans-serif" }}>
+              <Check size={12} /> {saving ? "Saving..." : "Save"}
             </button>
-            <button onClick={cancel} style={{ display: "flex", alignItems: "center", gap: "4px", backgroundColor: "#fff", color: "#e53935", border: "1px solid #e53935", borderRadius: "6px", padding: "4px 12px", fontSize: "12px", fontWeight: "600", cursor: "pointer", fontFamily: "Poppins, sans-serif" }}>
+            <button onClick={() => { setDraft(affirmation?.content ?? ""); setEditing(false); setError(""); }} style={{ display: "flex", alignItems: "center", gap: "4px", backgroundColor: "#fff", color: "#e53935", border: "1px solid #e53935", borderRadius: "6px", padding: "4px 12px", fontSize: "12px", fontWeight: "600", cursor: "pointer", fontFamily: "Poppins, sans-serif" }}>
               <X size={12} /> Cancel
             </button>
           </div>
         )}
       </div>
-      {editing ? (
+      {error && <p role="alert" style={{ color: "#c0392b", fontSize: "12px", margin: "0 0 8px" }}>{error}</p>}
+      {loading ? (
+        <p style={{ color: "#888", fontSize: "13px", margin: 0 }}>Loading affirmation...</p>
+      ) : editing ? (
         <textarea
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
@@ -229,7 +271,7 @@ function AffirmationCard() {
           style={{ width: "100%", fontSize: "13px", color: "#444", fontStyle: "italic", border: "1px solid #1a1a6e", borderRadius: "8px", padding: "10px", fontFamily: "Poppins, sans-serif", boxSizing: "border-box", outline: "none" }}
         />
       ) : (
-        <p style={{ fontSize: "13px", color: "#444", fontStyle: "italic", margin: 0 }}>"{value}"</p>
+        <p style={{ fontSize: "13px", color: "#444", fontStyle: "italic", margin: 0 }}>{affirmation?.content ? `"${affirmation.content}"` : "No affirmation yet."}</p>
       )}
     </div>
   );
@@ -239,6 +281,24 @@ export default function AdminDashboard() {
   const navigate = useNavigate();
   const [pendingEnrollments, setPendingEnrollments] = useState([]);
   const [announcements, setAnnouncements] = useState([]);
+  const [affirmation, setAffirmation] = useState(null);
+  const [affirmationLoading, setAffirmationLoading] = useState(true);
+
+  const fetchAffirmation = async () => {
+    setAffirmationLoading(true);
+    const { data, error } = await supabase
+      .from("affirmation")
+      .select("id, content, created_at")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) {
+      console.error("Failed to load dashboard affirmation", error);
+    } else {
+      setAffirmation(data);
+    }
+    setAffirmationLoading(false);
+  };
 
   const fetchAnnouncements = async () => {
     const { data, error } = await supabase
@@ -256,17 +316,20 @@ export default function AdminDashboard() {
       student (firstName, lastName),
       curriculum!enrollment_curriculum_id_fkey (curriculumName),
       verification!enrollment_verification_id_fkey (verificationStatus)
-    `);
+    `)
+      .order("enrollment_id", { ascending: false })
+      .limit(10);
     const pending = (data ?? []).filter((e) => {
       const v = Array.isArray(e.verification) ? e.verification[0] : e.verification;
-      return v?.verificationStatus === false || v?.verificationStatus === null;
-    });
+      return v?.verificationStatus === false;
+    }).slice(0, 3);
     setPendingEnrollments(pending);
   };
 
   useEffect(() => {
     fetchAnnouncements();
     fetchPending();
+    fetchAffirmation();
   }, []);
 
   return (
@@ -278,11 +341,11 @@ export default function AdminDashboard() {
 
           <h2 style={{ fontSize: "20px", fontWeight: "700", color: "#1a1a6e", marginBottom: "16px" }}>Welcome Back!</h2>
 
-          <EditableBanner />
+          <DashboardBanner onEdit={() => navigate("/admin/carousel")} />
 
           <AnnouncementCard announcements={announcements} onSave={fetchAnnouncements} />
 
-          <AffirmationCard />
+          <AffirmationCard affirmation={affirmation} loading={affirmationLoading} onSave={fetchAffirmation} />
 
           {/* Approval Stream */}
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>

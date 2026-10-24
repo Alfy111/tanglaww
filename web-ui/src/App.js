@@ -8,6 +8,7 @@ import AdminApprovals from "./pages/admin/AdminApprovals";
 import AdminAuditLog from "./pages/admin/AdminAuditLog";
 import AdminAuditQueue from "./pages/admin/AdminAuditQueue";
 import AdminCalendar from "./pages/admin/AdminCalendar";
+import AdminCarousel from "./pages/admin/AdminCarousel";
 import AdminCourses from "./pages/admin/AdminCourses";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminHandouts from "./pages/admin/AdminHandouts";
@@ -64,6 +65,7 @@ export default function App() {
       <Route path="/admin/students" element={<AdminStudentRegistry />} />
       <Route path="/admin/about" element={<AdminAbout />} />
       <Route path="/admin/calendar" element={<AdminCalendar />} />
+      <Route path="/admin/carousel" element={<AdminCarousel />} />
       <Route path="/admin/courses" element={<AdminCourses />} />
       <Route path="/admin/analytics" element={<AdminAnalytics />} />
       <Route path="/admin/help" element={<AdminHelp />} />
