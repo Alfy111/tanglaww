@@ -3,7 +3,7 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
-import React, { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -351,6 +351,7 @@ export default function SessionLinkScreen() {
               <TextInput
                 style={styles.input}
                 placeholder="e.g. LET Express - Module 3"
+                placeholderTextColor="#9AA0A6"
                 value={newTitle}
                 onChangeText={setNewTitle}
               />
@@ -359,6 +360,7 @@ export default function SessionLinkScreen() {
               <TextInput
                 style={styles.input}
                 placeholder="https://zoom.us/j/... or meet.google.com/..."
+                placeholderTextColor="#9AA0A6"
                 value={newLink}
                 onChangeText={setNewLink}
                 autoCapitalize="none"
@@ -369,6 +371,7 @@ export default function SessionLinkScreen() {
               <TextInput
                 style={[styles.input, { height: 70, textAlignVertical: "top" }]}
                 placeholder="Brief description of the session"
+                placeholderTextColor="#9AA0A6"
                 value={newDescription}
                 onChangeText={setNewDescription}
                 multiline

@@ -1,15 +1,16 @@
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
 import {
-    FlatList,
-    Modal,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
-    ViewStyle,
+  FlatList,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+  ViewStyle,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export const C = {
   primary: "#0D2A94",
@@ -174,6 +175,7 @@ export function Dropdown<T extends string | number>({
   title: string;
 }) {
   const [open, setOpen] = React.useState(false);
+  const insets = useSafeAreaInsets();
   const selected = options.find((o) => o.key === value);
   return (
     <>
@@ -190,7 +192,7 @@ export function Dropdown<T extends string | number>({
         onRequestClose={() => setOpen(false)}
       >
         <View style={s.overlay}>
-          <View style={s.sheet}>
+          <View style={[s.sheet, { paddingBottom: 16 + insets.bottom }]}>
             <View style={s.sheetHeader}>
               <Text style={s.sheetTitle}>{title}</Text>
               <TouchableOpacity onPress={() => setOpen(false)}>

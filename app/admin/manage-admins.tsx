@@ -184,6 +184,7 @@ export default function ManageAdmins() {
               <TextInput
                 style={styles.input}
                 placeholder="e.g., Juan"
+                placeholderTextColor="#9AA0A6"
                 value={firstName}
                 onChangeText={setFirstName}
               />
@@ -191,6 +192,7 @@ export default function ManageAdmins() {
               <TextInput
                 style={styles.input}
                 placeholder="e.g., Dela Cruz"
+                placeholderTextColor="#9AA0A6"
                 value={lastName}
                 onChangeText={setLastName}
               />
@@ -198,6 +200,7 @@ export default function ManageAdmins() {
               <TextInput
                 style={styles.input}
                 placeholder="email@example.com"
+                placeholderTextColor="#9AA0A6"
                 keyboardType="email-address"
                 autoCapitalize="none"
                 value={email}
