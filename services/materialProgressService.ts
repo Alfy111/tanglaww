@@ -4,7 +4,7 @@ const PROGRESS_TABLE = "material_progress";
 
 export type CompletionSource = "video_watched" | "scrolled_to_end";
 export const SEGMENT_SECONDS = 5;
-export const VIDEO_COMPLETION_THRESHOLD = 0.8;
+export const VIDEO_COMPLETION_THRESHOLD = 0.7;
 
 export function videoCoverage(
   watchedSegments: Set<number>,

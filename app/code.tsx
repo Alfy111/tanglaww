@@ -640,7 +640,7 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 10,
   },
-  errorText: { fontSize: 12, color: "#E74C3C", flex: 1 },
+  errorText: { fontSize: 12, color: "#c13121", flex: 1 },
   continueBtn: {
     backgroundColor: "#0D2A94",
     width: "100%",

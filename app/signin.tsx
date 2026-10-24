@@ -24,10 +24,6 @@ export default function SignInScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const handleQRCodePress = () => {
-    router.push("/scan-qr");
-  };
-
   const handleSignIn = async () => {
     const newErrors: string[] = [];
     if (!email.trim() || !pass.trim())
@@ -194,22 +190,6 @@ export default function SignInScreen() {
               <Text style={styles.signInText}>Sign In</Text>
             )}
           </TouchableOpacity>
-
-          <View style={styles.dividerRow}>
-            <View style={styles.line} />
-            <Text style={styles.dividerText}>Or Sign in with</Text>
-            <View style={styles.line} />
-          </View>
-
-          <TouchableOpacity style={styles.qrBtn} onPress={handleQRCodePress}>
-            <Ionicons
-              name="qr-code-outline"
-              size={20}
-              color="white"
-              style={{ marginRight: 10 }}
-            />
-            <Text style={styles.qrText}>Sign in with QR code</Text>
-          </TouchableOpacity>
         </View>
 
         <View style={styles.footerRow}>
@@ -293,15 +273,6 @@ const styles = StyleSheet.create({
   },
   line: { flex: 1, height: 1, backgroundColor: "#EEE" },
   dividerText: { marginHorizontal: 10, color: "#999", fontSize: 12 },
-  qrBtn: {
-    backgroundColor: "#0D2A94",
-    padding: 15,
-    borderRadius: 10,
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  qrText: { color: "white", fontWeight: "bold", fontSize: 16 },
   footerRow: {
     flexDirection: "row",
     justifyContent: "space-between",

@@ -626,13 +626,15 @@ export default function RecordedSessionsScreen() {
           )}
         </View>
       ) : (
-        <FlatList
-          data={sessions}
-          keyExtractor={(item) => String(item.material_id)}
-          renderItem={renderItem}
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
-        />
+        <View style={{ flex: 1 }}>
+          <FlatList
+            data={sessions}
+            keyExtractor={(item) => String(item.material_id)}
+            renderItem={renderItem}
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={false}
+          />
+        </View>
       )}
 
       <View style={styles.bottomNav}>
@@ -713,10 +715,10 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     overflow: "hidden",
   },
-  thumbnailWrap: { width: 90, flexShrink: 0 },
+  thumbnailWrap: { width: 90, alignSelf: "stretch" },
   thumbnailPlaceholder: {
+    flex: 1,
     width: 90,
-    height: "100%",
     minHeight: 90,
     backgroundColor: "#1A1A2E",
     justifyContent: "center",
