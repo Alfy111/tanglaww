@@ -42,7 +42,8 @@ export default function AdminCourses() {
 
     const { data: courseData } = await supabase
       .from("course")
-      .select("course_id, courseName, instructor");
+      .select("course_id, courseName, instructor")
+      .order("course_id");
 
     setCourses(courseData ?? []);
     setLoading(false);

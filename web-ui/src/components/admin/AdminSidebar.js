@@ -1,5 +1,7 @@
-import { BookOpen, Calendar as CalendarIcon, CheckSquare, ClipboardList, FileText, HelpCircle, Info, LayoutDashboard, LogOut, Shield, Users } from "lucide-react";
+import { BookOpen, Calendar as CalendarIcon, CheckSquare, FileText, HelpCircle, Info, LayoutDashboard, LogOut, Users } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { supabase } from "../../lib/supabase";
 
 const OVERVIEW = [
   { label: "Home", path: "/admin/dashboard", icon: <LayoutDashboard size={18} /> },
@@ -9,9 +11,7 @@ const OVERVIEW = [
 ];
 
 const MANAGEMENT = [
-  { label: "Profile Audit Queue", path: "/admin/audit-queue", icon: <Shield size={18} />, badge: 3 },
   { label: "Student Registry", path: "/admin/students", icon: <Users size={18} /> },
-  { label: "Audit Log", path: "/admin/audit-log", icon: <ClipboardList size={18} /> },
 ];
 
 const CONFIG = [
@@ -26,6 +26,56 @@ const BOTTOM = [
 export default function AdminSidebar() {
   const navigate = useNavigate();
   const location = useLocation();
+  const [admin, setAdmin] = useState({ firstName: "", lastName: "", email: "", role: "admin" });
+
+  useEffect(() => {
+    let active = true;
+
+    const loadAdmin = async (userId) => {
+      if (!userId) {
+        if (active) setAdmin({ firstName: "", lastName: "", email: "", role: "admin" });
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("admin")
+        .select("firstName, lastName, email, role")
+        .eq("admin_id", userId)
+        .maybeSingle();
+
+      if (error) {
+        console.error("Failed to load admin profile for navigation", error);
+        return;
+      }
+
+      if (active) {
+        setAdmin(data ?? { firstName: "", lastName: "", email: "", role: "admin" });
+      }
+    };
+
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      if (error) {
+        console.error("Failed to read session for admin navigation", error);
+        return;
+      }
+      loadAdmin(session?.user?.id);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      loadAdmin(session?.user?.id);
+    });
+
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  const roleLabel = admin.role === "owner"
+    ? "Owner"
+    : admin.role === "super_admin"
+      ? "Super Admin"
+      : "Instructor";
 
   const linkStyle = (path) => ({
     display: "flex", alignItems: "center", justifyContent: "space-between",
@@ -51,9 +101,9 @@ export default function AdminSidebar() {
         }}>
           <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#1a1a6e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
         </div>
-        <div style={{ fontSize: "16px", fontWeight: "700", color: "#1a1a6e" }}>Test Admin</div>
-        <div style={{ fontSize: "12px", color: "#1a1a6e", opacity: 0.8 }}>Instructor</div>
-        <div style={{ fontSize: "11px", color: "#1a1a6e", opacity: 0.7 }}>tanglawtest@gmail.com</div>
+        <div style={{ fontSize: "16px", fontWeight: "700", color: "#1a1a6e" }}>{`${admin.firstName} ${admin.lastName}`.trim()}</div>
+        <div style={{ fontSize: "12px", color: "#1a1a6e", opacity: 0.8 }}>{roleLabel}</div>
+        <div style={{ fontSize: "11px", color: "#1a1a6e", opacity: 0.7 }}>{admin.email}</div>
       </div>
 
 {/* Overview */}
