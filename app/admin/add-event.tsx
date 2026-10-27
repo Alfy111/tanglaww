@@ -91,6 +91,7 @@ export default function AddEventScreen() {
         <TextInput
           style={styles.input}
           placeholder="e.g. LET Express - Online Session"
+          placeholderTextColor="#9AA0A6"
           value={title}
           onChangeText={setTitle}
         />
@@ -99,6 +100,7 @@ export default function AddEventScreen() {
         <TextInput
           style={[styles.input, { height: 80, textAlignVertical: "top" }]}
           placeholder="Brief description of the event"
+          placeholderTextColor="#9AA0A6"
           value={description}
           onChangeText={setDescription}
           multiline
@@ -108,6 +110,7 @@ export default function AddEventScreen() {
         <TextInput
           style={styles.input}
           placeholder="zoommtg://zoom.us/join?confno=..."
+          placeholderTextColor="#9AA0A6"
           value={link}
           onChangeText={setLink}
           autoCapitalize="none"

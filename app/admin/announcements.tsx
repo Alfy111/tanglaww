@@ -159,6 +159,7 @@ export default function AdminAnnouncement() {
             <TextInput
               style={styles.input}
               placeholder="e.g., Enrollment Update"
+              placeholderTextColor="#9AA0A6"
               value={title}
               onChangeText={setTitle}
             />
@@ -167,6 +168,7 @@ export default function AdminAnnouncement() {
             <TextInput
               style={[styles.input, styles.textArea]}
               placeholder="Type your announcement here..."
+              placeholderTextColor="#9AA0A6"
               value={message}
               onChangeText={setMessage}
               multiline

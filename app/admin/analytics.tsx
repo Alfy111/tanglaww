@@ -2,47 +2,48 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    FlatList,
-    Image,
-    Modal,
-    RefreshControl,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  FlatList,
+  Image,
+  Modal,
+  RefreshControl,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
-    BarRow,
-    C,
-    Card,
-    Chips,
-    Dropdown,
-    EmptyNote,
-    Header,
-    Histogram,
-    pct,
-    scoreColor,
-    ScoreStat,
-    shortDate,
-    StatTile,
-    Tabs,
+  BarRow,
+  C,
+  Card,
+  Chips,
+  Dropdown,
+  EmptyNote,
+  Header,
+  Histogram,
+  pct,
+  scoreColor,
+  ScoreStat,
+  shortDate,
+  StatTile,
+  Tabs,
 } from "../../components/analytics-ui";
 import { useAdmin } from "../../context/AdminContext";
 import {
-    AdminCourse,
-    AdminOverview,
-    getAdminCourse,
-    getAdminOverview,
-    getAdminRankings,
-    getAdminStudents,
-    getStudentReport,
-    RankingRow,
-    setDiagnosticAssessment,
-    StudentListItem,
-    StudentReport,
+  AdminCourse,
+  AdminOverview,
+  getAdminCourse,
+  getAdminOverview,
+  getAdminRankings,
+  getAdminStudents,
+  getStudentReport,
+  RankingRow,
+  setDiagnosticAssessment,
+  StudentListItem,
+  StudentReport,
 } from "../../services/analyticsService";
 
 type TabKey = "overview" | "course" | "student";
@@ -70,6 +71,7 @@ export default function AdminAnalytics() {
   const [quizId, setQuizId] = useState<number | null>(null);
   const [showAllQ, setShowAllQ] = useState(false);
   const [openQ, setOpenQ] = useState<string | null>(null);
+  const insets = useSafeAreaInsets();
 
   const loadBase = useCallback(async () => {
     if (authLoading || !isAdmin) return;
@@ -931,7 +933,7 @@ export default function AdminAnalytics() {
         onRequestClose={() => setPickerOpen(false)}
       >
         <View style={styles.overlay}>
-          <View style={styles.sheet}>
+          <View style={[styles.sheet, { paddingBottom: 16 + insets.bottom }]}>
             <View style={styles.sheetHeader}>
               <Text style={styles.sheetTitle}>Select a student</Text>
               <TouchableOpacity onPress={() => setPickerOpen(false)}>

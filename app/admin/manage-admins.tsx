@@ -2,26 +2,26 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import {
-    AdminRole,
-    AdminTeam,
-    cancelAdminInvite,
-    getAdminTeam,
-    ROLE_LABELS,
-    sendAdminInvite,
-    TeamInvite,
+  AdminRole,
+  AdminTeam,
+  cancelAdminInvite,
+  getAdminTeam,
+  ROLE_LABELS,
+  sendAdminInvite,
+  TeamInvite,
 } from "../../services/adminInviteService";
 
 const ROLE_COLORS: Record<AdminRole, { bg: string; text: string }> = {
@@ -175,8 +175,7 @@ export default function ManageAdmins() {
               <Ionicons name="person-add" size={40} color="#FFD75E" />
               <Text style={styles.infoTitle}>Add an Admin</Text>
               <Text style={styles.infoSubtitle}>
-                The new admin gets an activation code by email. They enter it
-                under Admin Access → Activate admin account.
+                New admins are sent an activation code through email.
               </Text>
             </View>
 
@@ -185,6 +184,7 @@ export default function ManageAdmins() {
               <TextInput
                 style={styles.input}
                 placeholder="e.g., Juan"
+                placeholderTextColor="#9AA0A6"
                 value={firstName}
                 onChangeText={setFirstName}
               />
@@ -192,6 +192,7 @@ export default function ManageAdmins() {
               <TextInput
                 style={styles.input}
                 placeholder="e.g., Dela Cruz"
+                placeholderTextColor="#9AA0A6"
                 value={lastName}
                 onChangeText={setLastName}
               />
@@ -199,6 +200,7 @@ export default function ManageAdmins() {
               <TextInput
                 style={styles.input}
                 placeholder="email@example.com"
+                placeholderTextColor="#9AA0A6"
                 keyboardType="email-address"
                 autoCapitalize="none"
                 value={email}
@@ -229,10 +231,6 @@ export default function ManageAdmins() {
                       </TouchableOpacity>
                     ))}
                   </View>
-                  <Text style={styles.roleHint}>
-                    Super admins can also add admins. Only the owner can add
-                    super admins.
-                  </Text>
                 </>
               )}
             </View>
