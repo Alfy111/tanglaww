@@ -121,7 +121,7 @@ export default function Calendar() {
 
               {/* Legend */}
               <div style={{ display: "flex", gap: "16px", marginTop: "10px" }}>
-                {[["#1a1a6e", "Event"], ["#f5a623", "Todo"]].map(([color, label]) => (
+                {[["#1a1a6e", "Event"], ["#f5a623", "To do"]].map(([color, label]) => (
                   <div key={label} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "#555" }}>
                     <div style={{ width: "8px", height: "8px", borderRadius: "50%", backgroundColor: color }} /> {label}
                   </div>

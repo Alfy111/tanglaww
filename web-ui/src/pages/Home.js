@@ -28,7 +28,7 @@ function Home() {
       <section className="hero" style={{ backgroundImage: `url(${heroImage})` }}>
         <div className="hero-content">
           <img src={mainLogo} alt="Tanglaw Logo" className="hero-logo" />
-          <p className="hero-tagline">"Where a Dreamer becomes an Achiever."</p>
+          <p className="hero-tagline">"Where a Dreamer Becomes an Achiever."</p>
           <div className="hero-buttons">
             <button className="btn-primary" onClick={() => navigate("/enroll")}>Enroll now!</button>
            <button className="btn-secondary" onClick={() => navigate("/download")}>Download the App</button>

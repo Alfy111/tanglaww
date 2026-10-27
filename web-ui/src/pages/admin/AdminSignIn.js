@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { Eye, EyeOff } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../../components/Navbar";
+import { clearFailedLogins, getLoginLockout, getLockoutMessage, recordFailedLogin } from "../../lib/loginLockout";
 import { supabase } from "../../lib/supabase";
 
 export default function AdminSignIn() {
@@ -10,6 +12,35 @@ export default function AdminSignIn() {
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [lockoutRemainingMs, setLockoutRemainingMs] = useState(0);
+  const normalizedEmail = email.trim().toLowerCase();
+
+  useEffect(() => {
+    let active = true;
+    const refreshLockout = () => {
+      try {
+        const status = getLoginLockout("admin", normalizedEmail);
+        if (active) {
+          setLockoutRemainingMs(status.remainingMs);
+          setErrors((previous) => {
+            if (previous[0]?.startsWith("You've been temporarily locked out")) {
+              return status.remainingMs > 0 ? [getLockoutMessage(status.remainingMs)] : [];
+            }
+            return previous;
+          });
+        }
+      } catch (error) {
+        if (active) setErrors([`Unable to check sign-in status: ${error.message}`]);
+      }
+    };
+
+    refreshLockout();
+    const intervalId = window.setInterval(refreshLockout, 1000);
+    return () => {
+      active = false;
+      window.clearInterval(intervalId);
+    };
+  }, [normalizedEmail]);
 
   const inputStyle = {
     width: "100%", padding: "10px 14px", borderRadius: "8px",
@@ -23,7 +54,12 @@ export default function AdminSignIn() {
     marginTop: "16px", display: "block",
   };
 
-const handleSignIn = async () => {
+  const handleSignIn = async () => {
+    if (lockoutRemainingMs > 0) {
+      setErrors([getLockoutMessage(lockoutRemainingMs)]);
+      return;
+    }
+
     const newErrors = [];
     if (!email.trim()) newErrors.push("Email is required.");
     if (!password.trim()) newErrors.push("Password is required.");
@@ -36,41 +72,49 @@ const handleSignIn = async () => {
       console.log("STEP 1: attempting sign in...");
 
       const { data, error } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
+        email: normalizedEmail,
         password,
       });
 
       console.log("STEP 2: auth result", { data, error });
 
       if (error) {
-        setErrors(["Invalid email or password."]);
-        setLoading(false);
+        if (error.status === 400) {
+          const status = recordFailedLogin("admin", normalizedEmail);
+          setLockoutRemainingMs(status.remainingMs);
+          setErrors([status.remainingMs > 0
+            ? getLockoutMessage(status.remainingMs)
+            : `Invalid email or password. ${5 - status.attempts} attempt${status.attempts === 4 ? "" : "s"} remaining before a temporary lockout.`]);
+        } else {
+          setErrors([error.message]);
+        }
         return;
       }
 
-      const { data: adminRow } = await supabase
+      clearFailedLogins("admin", normalizedEmail);
+      setLockoutRemainingMs(0);
+      const { data: adminRow, error: adminLookupError } = await supabase
         .from("admin")
         .select("admin_id")
         .eq("admin_id", data.user.id)
         .maybeSingle();
 
-      console.log("STEP 3: adminRow", adminRow);
+      if (adminLookupError) throw new Error(`Unable to verify administrator access: ${adminLookupError.message}`);
 
       if (!adminRow) {
-        await supabase.auth.signOut();
+        const { error: signOutError } = await supabase.auth.signOut();
+        if (signOutError) throw new Error(`Access denied. This account is not an administrator. Sign-out failed: ${signOutError.message}`);
         setErrors(["Access denied. This account is not an administrator."]);
-        setLoading(false);
         return;
       }
 
-      console.log("STEP 4: navigating...");
       navigate("/admin/dashboard");
     } catch (err) {
-      console.log("CAUGHT ERROR:", err);
       setErrors([err.message ?? "Something went wrong."]);
+    } finally {
       setLoading(false);
     }
-  };    
+  };
 
   return (
     <div style={{ fontFamily: "Poppins, sans-serif", minHeight: "100vh", backgroundColor: "#f5f5f5" }}>
@@ -113,20 +157,20 @@ const handleSignIn = async () => {
               onChange={(e) => setPassword(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSignIn()}
             />
-            <span onClick={() => setShowPassword(!showPassword)} style={{ position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", cursor: "pointer", fontSize: "16px", color: "#888" }}>
-              {showPassword ? "🙈" : "👁"}
-            </span>
+            <button type="button" aria-label={showPassword ? "Hide password" : "Show password"} onClick={() => setShowPassword(!showPassword)} style={{ position: "absolute", right: "10px", top: "50%", transform: "translateY(-50%)", cursor: "pointer", border: "none", background: "none", padding: "4px", display: "flex", alignItems: "center", color: "#888" }}>
+              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
           </div>
         </div>
 
         <div style={{ textAlign: "right", marginTop: "6px" }}>
-          <span style={{ fontSize: "12px", color: "#1a1a6e", cursor: "pointer", fontWeight: "600" }}>Forgot Password?</span>
+          <button type="button" onClick={() => navigate("/admin/forgot-password")} style={{ border: 0, padding: 0, background: "none", fontSize: "12px", color: "#1a1a6e", cursor: "pointer", fontWeight: "600", fontFamily: "inherit" }}>Forgot Password?</button>
         </div>
 
         <button
           onClick={handleSignIn}
-          disabled={loading}
-          style={{ width: "100%", padding: "14px", backgroundColor: "#f5a623", color: "#1a1a2e", border: "none", borderRadius: "8px", fontSize: "15px", fontWeight: "700", cursor: loading ? "not-allowed" : "pointer", fontFamily: "Poppins, sans-serif", marginTop: "24px", opacity: loading ? 0.7 : 1 }}
+          disabled={loading || lockoutRemainingMs > 0}
+          style={{ width: "100%", padding: "14px", backgroundColor: "#f5a623", color: "#1a1a2e", border: "none", borderRadius: "8px", fontSize: "15px", fontWeight: "700", cursor: loading || lockoutRemainingMs > 0 ? "not-allowed" : "pointer", fontFamily: "Poppins, sans-serif", marginTop: "24px", opacity: loading || lockoutRemainingMs > 0 ? 0.7 : 1 }}
         >
           {loading ? "Signing in..." : "Sign In as Admin"}
         </button>
@@ -134,6 +178,10 @@ const handleSignIn = async () => {
         <div style={{ textAlign: "center", marginTop: "28px", fontSize: "12px", color: "#888" }}>
           Not an admin?{" "}
           <span onClick={() => navigate("/signin")} style={{ color: "#1a1a6e", fontWeight: "700", cursor: "pointer" }}>Student Sign-in</span>
+        </div>
+        <div style={{ textAlign: "center", marginTop: "12px", fontSize: "12px", color: "#888" }}>
+          Got an admin invite?{" "}
+          <button type="button" onClick={() => navigate("/admin/activate")} style={{ color: "#1a1a6e", fontWeight: "700", cursor: "pointer", border: 0, padding: 0, background: "none", font: "inherit" }}>Activate account</button>
         </div>
       </div>
     </div>

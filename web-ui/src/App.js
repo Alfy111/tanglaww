@@ -4,6 +4,7 @@ import About from "./pages/About";
 import AboutUs from "./pages/AboutUs";
 import AdminAbout from "./pages/admin/AdminAbout";
 import AdminAnalytics from "./pages/admin/AdminAnalytics";
+import AdminActivate from "./pages/admin/AdminActivate";
 import AdminApprovals from "./pages/admin/AdminApprovals";
 import AdminAuditLog from "./pages/admin/AdminAuditLog";
 import AdminAuditQueue from "./pages/admin/AdminAuditQueue";
@@ -30,6 +31,7 @@ import HelpdeskPage from "./pages/HelpdeskPage";
 import Home from "./pages/Home";
 import Notifications from "./pages/Notifications";
 import OurCourses from "./pages/OurCourses";
+import PasswordRecovery from "./pages/PasswordRecovery";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
 import SignIn from "./pages/SignIn";
@@ -44,6 +46,8 @@ export default function App() {
       <Route path="/" element={<Home />} />
       <Route path="/enroll" element={<Enroll />} />
       <Route path="/signin" element={<SignIn />} />
+      <Route path="/forgot-password" element={<PasswordRecovery />} />
+      <Route path="/reset-password" element={<PasswordRecovery isResetPage />} />
       <Route path="/signin/code" element={<SignInWithCode />} />
       <Route path="/dashboard" element={<Dashboard />} />
       <Route path="/dashboard/Analytics" element={<Analytics />} /> {/* <-- 2. ADD THIS ROUTE */}
@@ -59,6 +63,9 @@ export default function App() {
    
       <Route path="/dashboard/notifications" element={<Notifications />} />
       <Route path="/admin/signin" element={<AdminSignIn />} />
+      <Route path="/admin/activate" element={<AdminActivate />} />
+      <Route path="/admin/forgot-password" element={<PasswordRecovery isAdmin />} />
+      <Route path="/admin/reset-password" element={<PasswordRecovery isAdmin isResetPage />} />
       <Route path="/admin/dashboard" element={<AdminDashboard />} />
       <Route path="/admin/approvals" element={<AdminApprovals />} />
       <Route path="/admin/audit-queue" element={<AdminAuditQueue />} />
