@@ -187,7 +187,7 @@ export default function SignInScreen() {
             {loading ? (
               <ActivityIndicator color="white" />
             ) : (
-              <Text style={styles.signInText}>Sign In</Text>
+              <Text style={styles.signInText}>Sign-In</Text>
             )}
           </TouchableOpacity>
         </View>

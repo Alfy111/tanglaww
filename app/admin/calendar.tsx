@@ -1,7 +1,7 @@
 import { supabase } from "@/lib/supabase";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -316,7 +316,7 @@ export default function AdminCalendar() {
           </View>
           <View style={styles.legendItem}>
             <View style={[styles.calDot, { backgroundColor: "#FFD75E" }]} />
-            <Text style={styles.legendText}>Todo</Text>
+            <Text style={styles.legendText}>To Do</Text>
           </View>
         </View>
 

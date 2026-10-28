@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import { useState } from "react";
 import {
   Image,
   Linking,
@@ -118,7 +118,7 @@ export default function LoginScreen() {
         <View style={{ height: 50 }} />
         <SafeAreaView style={styles.innerContainer}>
           <Text style={styles.quoteText}>
-            "Where a Dreamer becomes an Achiever!"
+            "Where a Dreamer Becomes an Achiever"
           </Text>
           <View style={{ height: 5 }} />
 
