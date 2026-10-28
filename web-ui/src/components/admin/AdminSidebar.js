@@ -27,6 +27,7 @@ export default function AdminSidebar() {
   const navigate = useNavigate();
   const location = useLocation();
   const [admin, setAdmin] = useState({ firstName: "", lastName: "", email: "", role: "admin" });
+  const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -77,6 +78,16 @@ export default function AdminSidebar() {
       ? "Super Admin"
       : "Instructor";
 
+  const handleSignOut = async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      window.alert(`Unable to sign out: ${error.message}`);
+      return;
+    }
+
+    navigate("/admin/signin");
+  };
+
   const linkStyle = (path) => ({
     display: "flex", alignItems: "center", justifyContent: "space-between",
     padding: "12px 24px", cursor: "pointer", fontSize: "14px", fontWeight: "500",
@@ -87,6 +98,7 @@ export default function AdminSidebar() {
   });
 
   return (
+    <>
     <aside style={{
       width: "240px", backgroundColor: "#fff", borderRight: "1px solid #eee",
       position: "fixed", top: 0, left: 0, height: "100vh",
@@ -159,12 +171,46 @@ export default function AdminSidebar() {
           </div>
         ))}
         <div
-          onClick={() => navigate("/admin/signin")}
+          onClick={() => setShowSignOutConfirm(true)}
           style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px 24px", cursor: "pointer", fontSize: "14px", fontWeight: "500", color: "#e53935" }}
         >
           <LogOut size={18} /> Sign Out
         </div>
       </div>
     </aside>
+      {showSignOutConfirm && (
+        <div
+          className="signout-modal-backdrop"
+          onClick={() => setShowSignOutConfirm(false)}
+        >
+          <section
+            className="signout-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="admin-signout-modal-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2 id="admin-signout-modal-title">Sign out?</h2>
+            <p>Are you sure you want to sign out of your account?</p>
+            <div className="signout-modal-actions">
+              <button
+                type="button"
+                className="signout-modal-cancel"
+                onClick={() => setShowSignOutConfirm(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="signout-modal-confirm"
+                onClick={handleSignOut}
+              >
+                Sign out
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+    </>
   );
 }

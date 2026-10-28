@@ -1,9 +1,9 @@
 import { Trash2, Upload } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import AdminSidebar from "../../components/admin/AdminSidebar";
 import AdminTopbar from "../../components/admin/AdminTopbar";
-import { supabase } from "../../lib/supabase";
+import { supabase, uploadStorageFileWithProgress } from "../../lib/supabase";
 import "../Dashboard.css";
 
 export default function AdminHandouts() {
@@ -14,8 +14,16 @@ export default function AdminHandouts() {
   const [selectedModule, setSelectedModule] = useState(null);
   const [materials, setMaterials] = useState([]);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(null);
+  const [sortBy, setSortBy] = useState("date-desc");
   const [loading, setLoading] = useState(true);
   const [adminId, setAdminId] = useState(null);
+  const sortedMaterials = useMemo(() => [...materials].sort((a, b) => {
+    if (sortBy === "name-asc") return a.title.localeCompare(b.title, undefined, { sensitivity: "base" });
+    if (sortBy === "name-desc") return b.title.localeCompare(a.title, undefined, { sensitivity: "base" });
+    const dateDifference = new Date(a.uploadedAt).getTime() - new Date(b.uploadedAt).getTime();
+    return sortBy === "date-asc" ? dateDifference : -dateDifference;
+  }), [materials, sortBy]);
 
   useEffect(() => {
     const init = async () => {
@@ -35,39 +43,71 @@ export default function AdminHandouts() {
     init();
   }, [courseId]);
 
-  useEffect(() => {
-    if (selectedModule) fetchMaterials();
-  }, [selectedModule]);
-
-  const fetchMaterials = async () => {
+  const fetchMaterials = useCallback(async (moduleId) => {
+    if (!moduleId) return;
     const { data } = await supabase
       .from("learning_material").select("*")
-      .eq("module_id", selectedModule.module_id)
+      .eq("module_id", moduleId)
       .eq("materialType", "handout")
       .order("uploadedAt", { ascending: false });
     setMaterials(data ?? []);
-  };
+  }, []);
+
+  useEffect(() => {
+    if (selectedModule) fetchMaterials(selectedModule.module_id);
+  }, [fetchMaterials, selectedModule]);
 
   const handleUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file || !selectedModule || !adminId) return;
+    const files = Array.from(e.target.files ?? []);
+    e.target.value = "";
+    if (files.length === 0 || !selectedModule || !adminId) return;
+
+    const moduleId = selectedModule.module_id;
+    const totalBytes = files.reduce((total, file) => total + file.size, 0);
+    let completedBytes = 0;
+    const failures = [];
+
     setUploading(true);
-    const ext = file.name.split(".").pop().toLowerCase();
-    const storagePath = `module_${selectedModule.module_id}/${Date.now()}_${file.name}`;
-    const { error: storageError } = await supabase.storage
-      .from("learning-materials")
-      .upload(storagePath, file, { contentType: file.type, upsert: false });
-    if (storageError) { alert("Upload error: " + storageError.message); setUploading(false); return; }
-    const { data: urlData } = supabase.storage.from("learning-materials").getPublicUrl(storagePath);
-    const { error: dbError } = await supabase.from("learning_material").insert({
-      title: file.name, fileType: ext, fileUrl: urlData.publicUrl,
-      storagePath, isDownloadable: true, fileSize: file.size,
-      materialType: "handout", module_id: selectedModule.module_id,
-      admin_id: adminId, uploadedAt: new Date().toISOString(),
-    });
-    if (dbError) { alert("DB error: " + dbError.message); setUploading(false); return; }
-    setUploading(false);
-    fetchMaterials();
+    setUploadProgress({ percent: 0, current: 1, total: files.length, fileName: files[0].name });
+
+    try {
+      for (const [index, file] of files.entries()) {
+        const ext = file.name.includes(".") ? file.name.split(".").pop().toLowerCase() : "";
+        const storagePath = `module_${moduleId}/${Date.now()}_${index}_${file.name}`;
+        const bytesBeforeCurrentFile = completedBytes;
+        setUploadProgress({ percent: totalBytes === 0 ? 100 : Math.round((completedBytes / totalBytes) * 100), current: index + 1, total: files.length, fileName: file.name });
+
+        try {
+          await uploadStorageFileWithProgress("learning-materials", storagePath, file, (loaded) => {
+            const percent = totalBytes === 0 ? 100 : Math.round(((bytesBeforeCurrentFile + Math.min(file.size, loaded)) / totalBytes) * 100);
+            setUploadProgress({ percent, current: index + 1, total: files.length, fileName: file.name });
+          });
+
+          const { data: urlData } = supabase.storage.from("learning-materials").getPublicUrl(storagePath);
+          const { error: dbError } = await supabase.from("learning_material").insert({
+            title: file.name, fileType: ext, fileUrl: urlData.publicUrl,
+            storagePath, isDownloadable: true, fileSize: file.size,
+            materialType: "handout", module_id: moduleId,
+            admin_id: adminId, uploadedAt: new Date().toISOString(),
+          });
+          if (dbError) {
+            const { error: cleanupError } = await supabase.storage.from("learning-materials").remove([storagePath]);
+            throw new Error(`Database error: ${dbError.message}${cleanupError ? `; storage cleanup failed: ${cleanupError.message}` : ""}`);
+          }
+        } catch (error) {
+          failures.push(`${file.name}: ${error.message}`);
+        }
+
+        completedBytes += file.size;
+        setUploadProgress({ percent: totalBytes === 0 ? 100 : Math.round((completedBytes / totalBytes) * 100), current: Math.min(index + 2, files.length), total: files.length, fileName: files[index + 1]?.name ?? file.name });
+      }
+
+      await fetchMaterials(moduleId);
+      if (failures.length > 0) alert(`Some handouts could not be uploaded:\n${failures.join("\n")}`);
+    } finally {
+      setUploading(false);
+      setUploadProgress(null);
+    }
   };
 
   const handleDelete = async (material) => {
@@ -76,7 +116,7 @@ export default function AdminHandouts() {
       await supabase.storage.from("learning-materials").remove([material.storagePath]);
     }
     await supabase.from("learning_material").delete().eq("material_id", material.material_id);
-    fetchMaterials();
+    await fetchMaterials(material.module_id);
   };
 
   const formatDate = (str) => new Date(str).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
@@ -108,10 +148,11 @@ export default function AdminHandouts() {
               <div style={{ fontSize: "13px", fontWeight: "700", color: "#aaa", marginBottom: "10px", textTransform: "uppercase", letterSpacing: "0.08em" }}>Module</div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
                 {modules.map((m) => (
-                  <div key={m.module_id} onClick={() => setSelectedModule(m)} style={{
-                    padding: "8px 16px", borderRadius: "20px", cursor: "pointer", fontSize: "13px", fontWeight: "600",
+                  <div key={m.module_id} onClick={() => !uploading && setSelectedModule(m)} style={{
+                    padding: "8px 16px", borderRadius: "20px", cursor: uploading ? "not-allowed" : "pointer", fontSize: "13px", fontWeight: "600",
                     backgroundColor: selectedModule?.module_id === m.module_id ? "#f5a623" : "#f0f0f0",
                     color: selectedModule?.module_id === m.module_id ? "#fff" : "#555",
+                    opacity: uploading ? 0.7 : 1,
                     transition: "all 0.15s",
                   }}>
                     {m.moduleName}
@@ -130,10 +171,24 @@ export default function AdminHandouts() {
               fontSize: "14px", fontWeight: "700", cursor: "pointer",
             }}>
               <Upload size={16} />
-              {uploading ? "Uploading..." : "Upload Handout"}
-              <input type="file" accept=".pdf,.doc,.docx" onChange={handleUpload} style={{ display: "none" }} />
+              {uploading ? `Uploading ${uploadProgress?.percent ?? 0}%` : "Upload Handouts"}
+              <input type="file" accept=".pdf,.doc,.docx" multiple disabled={uploading} onChange={handleUpload} style={{ display: "none" }} />
             </label>
           </div>
+
+          {uploading && uploadProgress && (
+            <div role="status" aria-live="polite" style={{ maxWidth: "480px", marginBottom: "20px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", marginBottom: "6px", fontSize: "12px", color: "#555" }}>
+                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  Uploading {uploadProgress.current} of {uploadProgress.total}: {uploadProgress.fileName}
+                </span>
+                <span>{uploadProgress.percent}%</span>
+              </div>
+              <div style={{ height: "8px", backgroundColor: "#e8e8e8", borderRadius: "8px", overflow: "hidden" }}>
+                <div style={{ width: `${uploadProgress.percent}%`, height: "100%", backgroundColor: "#f5a623", transition: "width 0.15s ease" }} />
+              </div>
+            </div>
+          )}
 
           {/* Handouts list */}
           {loading ? (
@@ -141,8 +196,21 @@ export default function AdminHandouts() {
           ) : materials.length === 0 ? (
             <p style={{ color: "#aaa", fontStyle: "italic" }}>No handouts yet.</p>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-              {materials.map((m) => (
+            <div>
+              <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
+                <label htmlFor="handout-sort" style={{ fontSize: "13px", color: "#666" }}>Sort by</label>
+                <select id="handout-sort" value={sortBy} onChange={(e) => setSortBy(e.target.value)} style={{
+                  padding: "8px 12px", border: "1px solid #ddd", borderRadius: "8px",
+                  backgroundColor: "#fff", color: "#333", fontFamily: "Poppins, sans-serif",
+                }}>
+                  <option value="date-desc">Upload date (newest first)</option>
+                  <option value="date-asc">Upload date (oldest first)</option>
+                  <option value="name-asc">File name (A–Z)</option>
+                  <option value="name-desc">File name (Z–A)</option>
+                </select>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              {sortedMaterials.map((m) => (
                 <div key={m.material_id} style={{
                   backgroundColor: "#fff", borderRadius: "12px", padding: "16px 20px",
                   border: "1px solid #eee", display: "flex", alignItems: "center", gap: "14px",
@@ -181,6 +249,7 @@ export default function AdminHandouts() {
                   </div>
                 </div>
               ))}
+              </div>
             </div>
           )}
         </div>

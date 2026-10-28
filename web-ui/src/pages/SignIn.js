@@ -1,7 +1,8 @@
 import { Eye, EyeOff, KeyRound } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
+import { clearFailedLogins, getLoginLockout, getLockoutMessage, recordFailedLogin } from "../lib/loginLockout";
 import { supabase } from "../lib/supabase";
 
 export default function SignIn() {
@@ -11,6 +12,35 @@ export default function SignIn() {
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [lockoutRemainingMs, setLockoutRemainingMs] = useState(0);
+  const normalizedEmail = email.trim().toLowerCase();
+
+  useEffect(() => {
+    let active = true;
+    const refreshLockout = () => {
+      try {
+        const status = getLoginLockout("student", normalizedEmail);
+        if (active) {
+          setLockoutRemainingMs(status.remainingMs);
+          setErrors((previous) => {
+            if (previous[0]?.startsWith("You've been temporarily locked out")) {
+              return status.remainingMs > 0 ? [getLockoutMessage(status.remainingMs)] : [];
+            }
+            return previous;
+          });
+        }
+      } catch (error) {
+        if (active) setErrors([`Unable to check sign-in status: ${error.message}`]);
+      }
+    };
+
+    refreshLockout();
+    const intervalId = window.setInterval(refreshLockout, 1000);
+    return () => {
+      active = false;
+      window.clearInterval(intervalId);
+    };
+  }, [normalizedEmail]);
 
   const inputStyle = (hasError) => ({
     width: "100%", padding: "10px 14px", borderRadius: "8px",
@@ -25,6 +55,11 @@ export default function SignIn() {
   };
 
   const handleSignIn = async () => {
+    if (lockoutRemainingMs > 0) {
+      setErrors([getLockoutMessage(lockoutRemainingMs)]);
+      return;
+    }
+
     const newErrors = [];
     if (!email.trim()) newErrors.push("Email is required.");
     if (!password.trim()) newErrors.push("Password is required.");
@@ -37,11 +72,25 @@ export default function SignIn() {
 
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
-        email: email.trim().toLowerCase(),
+        email: normalizedEmail,
         password,
       });
 
-      if (error) { setErrors([error.message]); setLoading(false); return; }
+      if (error) {
+        if (error.status === 400) {
+          const status = recordFailedLogin("student", normalizedEmail);
+          setLockoutRemainingMs(status.remainingMs);
+          setErrors([status.remainingMs > 0
+            ? getLockoutMessage(status.remainingMs)
+            : `Invalid email or password. ${5 - status.attempts} attempt${status.attempts === 4 ? "" : "s"} remaining before a temporary lockout.`]);
+        } else {
+          setErrors([error.message]);
+        }
+        return;
+      }
+
+      clearFailedLogins("student", normalizedEmail);
+      setLockoutRemainingMs(0);
 
       // Check if user is an admin — if so, block
       const { data: adminRow } = await supabase
@@ -140,13 +189,13 @@ export default function SignIn() {
         </div>
 
         <div style={{ textAlign: "right", marginTop: "6px" }}>
-          <span style={{ fontSize: "12px", color: "#1a1a6e", cursor: "pointer", fontWeight: "600" }}>Forgot Password?</span>
+          <button type="button" onClick={() => navigate("/forgot-password")} style={{ border: 0, padding: 0, background: "none", fontSize: "12px", color: "#1a1a6e", cursor: "pointer", fontWeight: "600", fontFamily: "inherit" }}>Forgot Password?</button>
         </div>
 
         <button
           onClick={handleSignIn}
-          disabled={loading}
-          style={{ width: "100%", padding: "14px", backgroundColor: "#1a1a6e", color: "#fff", border: "none", borderRadius: "8px", fontSize: "15px", fontWeight: "600", cursor: loading ? "not-allowed" : "pointer", fontFamily: "Poppins, sans-serif", marginTop: "24px", opacity: loading ? 0.7 : 1 }}
+          disabled={loading || lockoutRemainingMs > 0}
+          style={{ width: "100%", padding: "14px", backgroundColor: "#1a1a6e", color: "#fff", border: "none", borderRadius: "8px", fontSize: "15px", fontWeight: "600", cursor: loading || lockoutRemainingMs > 0 ? "not-allowed" : "pointer", fontFamily: "Poppins, sans-serif", marginTop: "24px", opacity: loading || lockoutRemainingMs > 0 ? 0.7 : 1 }}
         >
           {loading ? "Signing in..." : "Sign In"}
         </button>
