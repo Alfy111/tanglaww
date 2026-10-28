@@ -80,12 +80,12 @@ export default function AdminSignIn() {
       </TouchableOpacity>
 
       <View style={styles.content}>
-        <Text style={styles.headerTitle}>Admin Access</Text>
+        <Text style={styles.headerTitle}>Administrator Login</Text>
         <Text style={styles.headerSubtitle}>
-          Secure portal for system administrators and instructors.
+          Authorized administrators only.
         </Text>
 
-        <Text style={styles.welcomeText}>Management Login</Text>
+        <Text style={styles.welcomeText}>Welcome Back, Admin!</Text>
 
         <View style={styles.card}>
           <Text style={styles.inputLabel}>Email:</Text>
@@ -126,6 +126,13 @@ export default function AdminSignIn() {
             </TouchableOpacity>
           </View>
 
+          <TouchableOpacity
+            style={{ alignSelf: "flex-end", marginTop: -5 }}
+            onPress={() => router.push("/forgotpass")}
+          >
+            <Text style={styles.forgotText}>Forgot Password?</Text>
+          </TouchableOpacity>
+
           {errors.length > 0 && (
             <View style={styles.errorBanner}>
               <Ionicons name="alert-circle" size={18} color="#c0392b" />
@@ -147,7 +154,7 @@ export default function AdminSignIn() {
             {loading ? (
               <ActivityIndicator color="white" />
             ) : (
-              <Text style={styles.signInText}>Verify & Login</Text>
+              <Text style={styles.signInText}>Sign-In</Text>
             )}
           </TouchableOpacity>
         </View>
@@ -170,7 +177,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F8F9FA" },
   backButton: { padding: 20 },
   content: { paddingHorizontal: 25, alignItems: "center" },
-  headerTitle: { fontSize: 32, fontWeight: "bold", color: "#0D2A94" },
+  headerTitle: { fontSize: 32, fontWeight: "bold", color: "#FFD75E" },
   headerSubtitle: {
     fontSize: 14,
     color: "#666",
@@ -210,12 +217,13 @@ const styles = StyleSheet.create({
     marginBottom: 25,
   },
   signInBtn: {
-    backgroundColor: "#0D2A94",
+    backgroundColor: "#FFD75E",
     padding: 15,
     borderRadius: 10,
     alignItems: "center",
   },
-  signInText: { color: "white", fontWeight: "bold", fontSize: 16 },
+  signInText: { color: "black", fontWeight: "bold", fontSize: 16 },
+  forgotText: { color: "#A9A9A9", fontSize: 12, marginBottom: 20 },
   errorBanner: {
     flexDirection: "row",
     backgroundColor: "#fff5f5",
@@ -228,5 +236,9 @@ const styles = StyleSheet.create({
   errorText: { color: "#c0392b", fontSize: 13 },
   activateLink: { marginTop: 22, padding: 6 },
   activateText: { fontSize: 14, color: "#666", textAlign: "center" },
-  activateTextBold: { color: "#0D2A94", fontWeight: "bold" },
+  activateTextBold: {
+    color: "#0D2A94",
+    fontWeight: "bold",
+    textDecorationLine: "underline",
+  },
 });

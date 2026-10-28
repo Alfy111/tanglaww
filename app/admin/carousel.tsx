@@ -2,22 +2,22 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Image,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Image,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import {
-    addSlide,
-    deleteSlide,
-    getSlides,
-    Slide,
-    swapSlides,
+  addSlide,
+  deleteSlide,
+  getSlides,
+  Slide,
+  swapSlides,
 } from "../../services/carouselService";
 
 export default function AdminCarousel() {
@@ -110,7 +110,7 @@ export default function AdminCarousel() {
           <Ionicons name="images" size={40} color="#FFD75E" />
           <Text style={styles.infoTitle}>Carousel Photos</Text>
           <Text style={styles.infoSubtitle}>
-            These photos slide on the dashboard of all students and admins. Wide
+            These photos are visible to both students and admin dashboards. Wide
             photos (16:9) look best.
           </Text>
         </View>
