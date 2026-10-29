@@ -113,6 +113,34 @@
   background-color: #12125a;
 }
 
+.step-navigation {
+  display: flex;
+  gap: 12px;
+  margin-top: 32px;
+}
+
+.step-navigation .continue-btn {
+  flex: 1;
+  margin-top: 0;
+}
+
+.back-btn {
+  flex: 1;
+  padding: 14px;
+  background-color: #fff;
+  color: #1a1a6e;
+  border: 1px solid #1a1a6e;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: "Poppins", sans-serif;
+}
+
+.back-btn:hover {
+  background-color: #f3f4fb;
+}
+
 /* ── Summary Accordion ───────────────────────────────────── */
 .summary-section {
   border: 1px solid #ddd;

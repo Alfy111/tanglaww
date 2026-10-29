@@ -1,7 +1,7 @@
 import { useState } from "react";
 import StepBanner from "../../components/StepBanner";
 import ContinueButton from "../../components/ContinueButton";
-export default function Step1Privacy({ data, setData, onNext }) {
+export default function Step1Privacy({ data, setData, onNext, onBack }) {
   const [errors, setErrors] = useState({});
   const validate = () => {
     if (!data.privacy) { setErrors({ privacy: "Please select an option." }); return; }
@@ -27,7 +27,7 @@ export default function Step1Privacy({ data, setData, onNext }) {
           ))}
         </div>
         {errors.privacy && <p className="field-error">{errors.privacy}</p>}
-        <ContinueButton onClick={validate} />
+        <ContinueButton onClick={validate} onBack={onBack} />
       </div>
     </>
   );

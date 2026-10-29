@@ -1,11 +1,9 @@
 import { useState } from "react";
 import StepBanner from "../../components/StepBanner";
 import ContinueButton from "../../components/ContinueButton";
-const BEED_MAJORS = ["General Education", "Special Education", "Early Childhood Education"];
-const BSED_MAJORS = ["English", "Filipino", "Mathematics", "Science", "Social Studies", "MAPEH", "Values Education"];
-export default function Step2Curriculum({ data, setData, onNext }) {
+const SPECIALIZATIONS = ["English", "Filipino", "Mathematics", "Science", "Social Values", "Values Education"];
+export default function Step2Curriculum({ data, setData, onNext, onBack }) {
   const [errors, setErrors] = useState({});
-  const majors = data.curriculum === "BEEd" ? BEED_MAJORS : BSED_MAJORS;
   const clearError = (key) => setErrors((e) => ({ ...e, [key]: null }));
   const validate = () => {
     const e = {};
@@ -20,6 +18,18 @@ export default function Step2Curriculum({ data, setData, onNext }) {
       <StepBanner title="Program & Curriculum" currentStep={1} />
       <div className="enroll-body">
         <p className="enroll-subtitle">Please fill up the necessary information:</p>
+        <div className="field-group">
+          <span className={`field-label ${errors.takerType ? "error" : ""}`}>Type of Taker:*</span>
+          <div className="radio-group">
+            {["First time taker", "Retaker"].map((opt) => (
+              <label key={opt} className="radio-label">
+                <input type="radio" name="takerType" checked={data.takerType === opt} onChange={() => { setData({ ...data, takerType: opt }); clearError("takerType"); }} />
+                {opt}
+              </label>
+            ))}
+          </div>
+          {errors.takerType && <p className="field-error">{errors.takerType}</p>}
+        </div>
         <div className="field-group">
           <span className={`field-label ${errors.curriculum ? "error" : ""}`}>Curriculum:*</span>
           <div className="radio-group">
@@ -36,23 +46,11 @@ export default function Step2Curriculum({ data, setData, onNext }) {
           <span className={`field-label ${errors.specialization ? "error" : ""}`}>Specialization:*</span>
           <select className={`field-input ${errors.specialization ? "error" : ""}`} value={data.specialization || ""} onChange={(e) => { setData({ ...data, specialization: e.target.value }); clearError("specialization"); }}>
             <option value="">Majorship</option>
-            {majors.map((m) => <option key={m} value={m}>{m}</option>)}
+            {SPECIALIZATIONS.map((specialization) => <option key={specialization} value={specialization}>{specialization}</option>)}
           </select>
           {errors.specialization && <p className="field-error">{errors.specialization}</p>}
         </div>
-        <div className="field-group">
-          <span className={`field-label ${errors.takerType ? "error" : ""}`}>Type of Taker:*</span>
-          <div className="radio-group">
-            {["First time taker", "Retaker"].map((opt) => (
-              <label key={opt} className="radio-label">
-                <input type="radio" name="takerType" checked={data.takerType === opt} onChange={() => { setData({ ...data, takerType: opt }); clearError("takerType"); }} />
-                {opt}
-              </label>
-            ))}
-          </div>
-          {errors.takerType && <p className="field-error">{errors.takerType}</p>}
-        </div>
-        <ContinueButton onClick={validate} />
+        <ContinueButton onClick={validate} onBack={onBack} />
       </div>
     </>
   );

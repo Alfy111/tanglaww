@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import Step1Privacy from "./enroll-steps/Step1Privacy";
 import Step2Curriculum from "./enroll-steps/Step2Curriculum";
@@ -11,20 +12,26 @@ const INITIAL_DATA = {
   privacy: "Agree",
   curriculum: "BEEd",
   takerType: "First time taker",
-  unitLearner: "Yes",
 };
 
 export default function Enroll() {
+  const navigate = useNavigate();
   const [step, setStep] = useState(0);
+  const [personalSubStep, setPersonalSubStep] = useState(0);
   const [formData, setFormData] = useState(INITIAL_DATA);
 
   const next = () => setStep((s) => Math.min(s + 1, 4));
+  const previous = () => setStep((s) => Math.max(s - 1, 0));
+  const backToPromotions = () => {
+    setStep(2);
+    setPersonalSubStep(1);
+  };
 
   const steps = [
-    <Step1Privacy data={formData} setData={setFormData} onNext={next} />,
-    <Step2Curriculum data={formData} setData={setFormData} onNext={next} />,
-    <Step3Personal data={formData} setData={setFormData} onNext={next} />,
-    <Step4Payment data={formData} setData={setFormData} onNext={next} />,
+    <Step1Privacy data={formData} setData={setFormData} onNext={next} onBack={() => navigate("/signin")} />,
+    <Step2Curriculum data={formData} setData={setFormData} onNext={next} onBack={previous} />,
+    <Step3Personal data={formData} setData={setFormData} onNext={next} onBack={previous} subStep={personalSubStep} setSubStep={setPersonalSubStep} />,
+    <Step4Payment data={formData} onNext={next} onBack={backToPromotions} />,
     <Step5Complete />,
   ];
 

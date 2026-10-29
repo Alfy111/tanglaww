@@ -1,5 +1,5 @@
 import { Play, Plus, Trash2, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import AdminSidebar from "../../components/admin/AdminSidebar";
 import AdminTopbar from "../../components/admin/AdminTopbar";
@@ -37,6 +37,13 @@ export default function AdminRecordedSessions() {
   const [playingId, setPlayingId] = useState(null);
   const [showAdd, setShowAdd] = useState(false);
   const [newSession, setNewSession] = useState({ title: "", url: "" });
+  const [sortBy, setSortBy] = useState("date-desc");
+  const sortedMaterials = useMemo(() => [...materials].sort((a, b) => {
+    if (sortBy === "name-asc") return a.title.localeCompare(b.title, undefined, { sensitivity: "base" });
+    if (sortBy === "name-desc") return b.title.localeCompare(a.title, undefined, { sensitivity: "base" });
+    const dateDifference = new Date(a.uploadedAt).getTime() - new Date(b.uploadedAt).getTime();
+    return sortBy === "date-asc" ? dateDifference : -dateDifference;
+  }), [materials, sortBy]);
 
   useEffect(() => {
     const init = async () => {
@@ -159,8 +166,21 @@ export default function AdminRecordedSessions() {
           ) : materials.length === 0 ? (
             <p style={{ color: "#aaa", fontStyle: "italic" }}>No recorded sessions yet.</p>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-              {materials.map((m) => (
+            <div>
+              <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
+                <label htmlFor="recorded-session-sort" style={{ fontSize: "13px", color: "#666" }}>Sort by</label>
+                <select id="recorded-session-sort" value={sortBy} onChange={(e) => setSortBy(e.target.value)} style={{
+                  padding: "8px 12px", border: "1px solid #ddd", borderRadius: "8px",
+                  backgroundColor: "#fff", color: "#333", fontFamily: "Poppins, sans-serif",
+                }}>
+                  <option value="date-desc">Upload date (newest first)</option>
+                  <option value="date-asc">Upload date (oldest first)</option>
+                  <option value="name-asc">Session title (A–Z)</option>
+                  <option value="name-desc">Session title (Z–A)</option>
+                </select>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              {sortedMaterials.map((m) => (
                 <div key={m.material_id}>
                   {playingId === m.material_id && m.youtubeId && (
                     <YouTubeEmbed youtubeId={m.youtubeId} />
@@ -205,6 +225,7 @@ export default function AdminRecordedSessions() {
                   </div>
                 </div>
               ))}
+              </div>
             </div>
           )}
         </div>
