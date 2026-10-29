@@ -1,5 +1,5 @@
-import { Play, Plus, Trash2, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { Pencil, Play, Plus, Trash2, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import AdminSidebar from "../../components/admin/AdminSidebar";
 import AdminTopbar from "../../components/admin/AdminTopbar";
@@ -36,6 +36,7 @@ export default function AdminRecordedSessions() {
   const [adminId, setAdminId] = useState(null);
   const [playingId, setPlayingId] = useState(null);
   const [showAdd, setShowAdd] = useState(false);
+  const [editingSession, setEditingSession] = useState(null);
   const [newSession, setNewSession] = useState({ title: "", url: "" });
   const [sortBy, setSortBy] = useState("date-desc");
   const sortedMaterials = useMemo(() => [...materials].sort((a, b) => {
@@ -63,41 +64,61 @@ export default function AdminRecordedSessions() {
     init();
   }, [courseId]);
 
-  useEffect(() => {
-    if (selectedModule) fetchMaterials();
-  }, [selectedModule]);
-
-  const fetchMaterials = async () => {
+  const fetchMaterials = useCallback(async () => {
+    if (!selectedModule) return;
     const { data } = await supabase
       .from("learning_material").select("*")
       .eq("module_id", selectedModule.module_id)
       .eq("materialType", "recorded_session")
       .order("uploadedAt", { ascending: false });
     setMaterials(data ?? []);
-  };
+  }, [selectedModule]);
 
-  const handleAdd = async () => {
+  useEffect(() => {
+    if (selectedModule) fetchMaterials();
+  }, [fetchMaterials, selectedModule]);
+
+  const handleSaveSession = async () => {
     if (!newSession.title || !newSession.url || !selectedModule || !adminId) return;
     const youtubeId = extractYoutubeId(newSession.url);
     if (!youtubeId) { alert("Invalid YouTube URL"); return; }
-    const { error } = await supabase.from("learning_material").insert({
-      title: newSession.title, fileType: "youtube",
-      fileUrl: newSession.url, youtubeId,
-      storagePath: null, isDownloadable: false, fileSize: null,
-      materialType: "recorded_session",
-      module_id: selectedModule.module_id,
-      admin_id: adminId, uploadedAt: new Date().toISOString(),
-    });
+
+    const { error } = editingSession
+      ? await supabase.from("learning_material").update({
+        title: newSession.title, fileUrl: newSession.url, youtubeId,
+      }).eq("material_id", editingSession.material_id)
+      : await supabase.from("learning_material").insert({
+        title: newSession.title, fileType: "youtube",
+        fileUrl: newSession.url, youtubeId,
+        storagePath: null, isDownloadable: false, fileSize: null,
+        materialType: "recorded_session",
+        module_id: selectedModule.module_id,
+        admin_id: adminId, uploadedAt: new Date().toISOString(),
+      });
     if (error) { alert("Error: " + error.message); return; }
     setNewSession({ title: "", url: "" });
     setShowAdd(false);
-    fetchMaterials();
+    setEditingSession(null);
+    await fetchMaterials();
+  };
+
+  const openEditSession = (material) => {
+    setEditingSession(material);
+    setNewSession({ title: material.title, url: material.fileUrl });
+    setShowAdd(true);
+  };
+
+  const closeSessionModal = () => {
+    setShowAdd(false);
+    setEditingSession(null);
+    setNewSession({ title: "", url: "" });
   };
 
   const handleDelete = async (material) => {
     if (!window.confirm("Delete this session?")) return;
-    await supabase.from("learning_material").delete().eq("material_id", material.material_id);
-    fetchMaterials();
+    const { error } = await supabase.from("learning_material").delete().eq("material_id", material.material_id);
+    if (error) { alert("Error: " + error.message); return; }
+    await fetchMaterials();
   };
 
   const formatDate = (str) => new Date(str).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
@@ -209,6 +230,15 @@ export default function AdminRecordedSessions() {
                       }}>
                         {playingId === m.material_id ? "Close" : "Play"}
                       </button>
+                      <button onClick={() => openEditSession(m)} style={{
+                        padding: "7px 10px", borderRadius: "8px",
+                        border: "1px solid #ddd", backgroundColor: "#fff",
+                        color: "#555", fontSize: "12px", fontWeight: "600",
+                        cursor: "pointer", display: "flex", alignItems: "center", gap: "5px",
+                        fontFamily: "Poppins, sans-serif",
+                      }}>
+                        <Pencil size={13} /> Edit
+                      </button>
                       <a href={m.fileUrl} target="_blank" rel="noreferrer" style={{
                         padding: "7px 14px", borderRadius: "8px",
                         border: "1px solid #f5a623", color: "#f5a623",
@@ -236,8 +266,8 @@ export default function AdminRecordedSessions() {
         <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 999 }}>
           <div style={{ backgroundColor: "#fff", borderRadius: "16px", padding: "32px", width: "440px", fontFamily: "Poppins, sans-serif" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-              <h3 style={{ fontSize: "16px", fontWeight: "700", color: "#1a1a2e", margin: 0 }}>Add Session</h3>
-              <button onClick={() => setShowAdd(false)} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={18} color="#aaa" /></button>
+              <h3 style={{ fontSize: "16px", fontWeight: "700", color: "#1a1a2e", margin: 0 }}>{editingSession ? "Edit Session" : "Add Session"}</h3>
+              <button onClick={closeSessionModal} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={18} color="#aaa" /></button>
             </div>
             <div style={{ marginBottom: "12px" }}>
               <label style={{ fontSize: "13px", fontWeight: "600", color: "#222", display: "block", marginBottom: "4px" }}>Title*</label>
@@ -248,8 +278,8 @@ export default function AdminRecordedSessions() {
               <input value={newSession.url} onChange={(e) => setNewSession({ ...newSession, url: e.target.value })} style={inputStyle} placeholder="https://youtu.be/..." />
             </div>
             <div style={{ display: "flex", gap: "10px", marginTop: "16px" }}>
-              <button onClick={() => setShowAdd(false)} style={{ flex: 1, padding: "12px", borderRadius: "8px", border: "1px solid #ddd", backgroundColor: "#fff", fontSize: "14px", cursor: "pointer", fontFamily: "Poppins, sans-serif" }}>Cancel</button>
-              <button onClick={handleAdd} style={{ flex: 1, padding: "12px", borderRadius: "8px", border: "none", backgroundColor: "#f5a623", color: "#1a1a2e", fontSize: "14px", fontWeight: "600", cursor: "pointer", fontFamily: "Poppins, sans-serif" }}>Add</button>
+              <button onClick={closeSessionModal} style={{ flex: 1, padding: "12px", borderRadius: "8px", border: "1px solid #ddd", backgroundColor: "#fff", fontSize: "14px", cursor: "pointer", fontFamily: "Poppins, sans-serif" }}>Cancel</button>
+              <button onClick={handleSaveSession} style={{ flex: 1, padding: "12px", borderRadius: "8px", border: "none", backgroundColor: "#f5a623", color: "#1a1a2e", fontSize: "14px", fontWeight: "600", cursor: "pointer", fontFamily: "Poppins, sans-serif" }}>{editingSession ? "Save Changes" : "Add"}</button>
             </div>
           </div>
         </div>
