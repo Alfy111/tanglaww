@@ -21,10 +21,6 @@ import {
   View,
 } from "react-native";
 
-// ------------------------------------------------------------------
-// Types
-// ------------------------------------------------------------------
-
 type QuestionType = "mcq" | "identification" | "matching";
 
 interface ChoiceDraft {
@@ -60,10 +56,6 @@ interface ModuleOption {
   module_id: number;
   moduleName: string;
 }
-
-// ------------------------------------------------------------------
-// Helpers
-// ------------------------------------------------------------------
 
 const COLORS = {
   primary: "#0D2A94",
@@ -122,7 +114,6 @@ const isWholeNumber = (value: string, min: number) => {
   return value.trim() !== "" && Number.isInteger(n) && n >= min;
 };
 
-// Removes blank rows and trims text before validating or saving
 const cleanQuestion = (q: QuestionDraft): QuestionDraft => ({
   ...q,
   questionText: q.questionText.trim(),
@@ -172,10 +163,6 @@ const validateQuestion = (q: QuestionDraft): string | null => {
   return null;
 };
 
-// ------------------------------------------------------------------
-// Quiz editor screen
-// ------------------------------------------------------------------
-
 export default function QuizEditorScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{
@@ -183,7 +170,7 @@ export default function QuizEditorScreen() {
     courseTitle: string;
     assessmentId?: string;
     moduleId?: string;
-    diagnostic?: string; // "1" = creating/editing the diagnostic exam
+    diagnostic?: string;
   }>();
   const isDiagnostic = params.diagnostic === "1";
   const courseId = Number(params.courseId);
@@ -192,7 +179,6 @@ export default function QuizEditorScreen() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  // Settings
   const [title, setTitle] = useState("");
   const [instructions, setInstructions] = useState("");
   const [moduleId, setModuleId] = useState<number | null>(null);
@@ -200,13 +186,12 @@ export default function QuizEditorScreen() {
   const [picker, setPicker] = useState<"date" | "time" | null>(null);
   const [maxAttempts, setMaxAttempts] = useState("1");
   const [passingScore, setPassingScore] = useState("");
-  const [timeLimit, setTimeLimit] = useState(""); // minutes; empty = no limit
+  const [timeLimit, setTimeLimit] = useState("");
   const [showCorrectAnswers, setShowCorrectAnswers] = useState(false);
   const [closeAfterDeadline, setCloseAfterDeadline] = useState(true);
   const [isClosed, setIsClosed] = useState(false);
   const [isPublished, setIsPublished] = useState(false);
 
-  // Questions and lookups
   const [questions, setQuestions] = useState<QuestionDraft[]>([]);
   const [modules, setModules] = useState<ModuleOption[]>([]);
   const [topics, setTopics] = useState<Topic[]>([]);
@@ -224,7 +209,6 @@ export default function QuizEditorScreen() {
   const topicName = (id: number | null) =>
     topics.find((t) => t.topic_id === id)?.topicName ?? "No tag";
 
-  // ---------------- Load ----------------
   useEffect(() => {
     const load = async () => {
       setLoading(true);
@@ -234,7 +218,6 @@ export default function QuizEditorScreen() {
           .from("module")
           .select("module_id, moduleName")
           .eq("course_id", courseId)
-          // Diagnostic exam: only the diagnostic module. Normal quizzes: hide it.
           .eq("is_diagnostic", isDiagnostic)
           .order("module_id"),
         supabase
@@ -319,7 +302,7 @@ export default function QuizEditorScreen() {
           .eq("assessment_id", assessmentId);
         setHasAttempts((count ?? 0) > 0);
       } else if (params.moduleId) {
-        setModuleId(Number(params.moduleId)); // module selected on the quiz list
+        setModuleId(Number(params.moduleId));
       } else if (moduleList.length === 1) {
         setModuleId(moduleList[0].module_id);
       }
@@ -329,7 +312,6 @@ export default function QuizEditorScreen() {
     load();
   }, [assessmentId, courseId]);
 
-  // ---------------- Deadline picker ----------------
   const onPickerChange = (event: DateTimePickerEvent, selected?: Date) => {
     const mode = picker;
     setPicker(null);
@@ -347,7 +329,6 @@ export default function QuizEditorScreen() {
     setDeadline(next);
   };
 
-  // ---------------- Question list actions ----------------
   const saveQuestion = (q: QuestionDraft) => {
     if (!editing) return;
     setQuestions((prev) => {
@@ -381,7 +362,6 @@ export default function QuizEditorScreen() {
     });
   };
 
-  // ---------------- Save / delete quiz ----------------
   const validateQuiz = (publish: boolean): string | null => {
     if (!title.trim()) return "Enter a quiz title.";
     if (!moduleId) return "Select a module.";
@@ -496,7 +476,6 @@ export default function QuizEditorScreen() {
     ]);
   };
 
-  // ---------------- Render ----------------
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -526,7 +505,6 @@ export default function QuizEditorScreen() {
           contentContainerStyle={styles.scroll}
           keyboardShouldPersistTaps="handled"
         >
-          {/* ---------- Details ---------- */}
           <Text style={styles.label}>Title:</Text>
           <TextInput
             style={styles.input}
@@ -649,7 +627,6 @@ export default function QuizEditorScreen() {
             running if they leave.
           </Text>
 
-          {/* ---------- Settings ---------- */}
           <View style={styles.settingsCard}>
             <SettingRow
               title="Show correct answers"
@@ -672,7 +649,6 @@ export default function QuizEditorScreen() {
             />
           </View>
 
-          {/* ---------- Questions ---------- */}
           <View style={styles.divider} />
 
           {hasAttempts && (
@@ -764,7 +740,6 @@ export default function QuizEditorScreen() {
             </TouchableOpacity>
           ))}
 
-          {/* ---------- Buttons ---------- */}
           <TouchableOpacity
             style={[styles.primaryBtn, saving && { opacity: 0.7 }]}
             disabled={saving}
@@ -814,10 +789,6 @@ export default function QuizEditorScreen() {
   );
 }
 
-// ------------------------------------------------------------------
-// Setting row with a switch
-// ------------------------------------------------------------------
-
 function SettingRow(props: {
   title: string;
   description: string;
@@ -841,10 +812,6 @@ function SettingRow(props: {
   );
 }
 
-// ------------------------------------------------------------------
-// Question editor modal
-// ------------------------------------------------------------------
-
 function QuestionEditorModal(props: {
   initial: QuestionDraft;
   isNew: boolean;
@@ -866,7 +833,6 @@ function QuestionEditorModal(props: {
   const update = (changes: Partial<QuestionDraft>) =>
     setDraft((d) => ({ ...d, ...changes }));
 
-  // MCQ
   const setChoiceText = (key: string, text: string) =>
     update({
       choices: draft.choices.map((c) =>
@@ -887,7 +853,6 @@ function QuestionEditorModal(props: {
   const removeChoice = (key: string) =>
     update({ choices: draft.choices.filter((c) => c.key !== key) });
 
-  // Identification
   const setAnswerText = (key: string, text: string) =>
     update({
       answers: draft.answers.map((a) =>
@@ -899,7 +864,6 @@ function QuestionEditorModal(props: {
   const removeAnswer = (key: string) =>
     update({ answers: draft.answers.filter((a) => a.key !== key) });
 
-  // Matching
   const setPairText = (
     key: string,
     side: "leftText" | "rightText",
@@ -947,7 +911,6 @@ function QuestionEditorModal(props: {
             contentContainerStyle={styles.scroll}
             keyboardShouldPersistTaps="handled"
           >
-            {/* Type */}
             <Text style={styles.label}>Question type:</Text>
             <View style={styles.segment}>
               {(Object.keys(TYPE_LABELS) as QuestionType[]).map((t) => (
@@ -971,7 +934,6 @@ function QuestionEditorModal(props: {
               ))}
             </View>
 
-            {/* Tags */}
             <Text style={styles.label}>Major tag:</Text>
             {majors.length === 0 ? (
               <Text style={styles.hint}>
@@ -1040,7 +1002,6 @@ function QuestionEditorModal(props: {
               </>
             )}
 
-            {/* Question text and points */}
             <Text style={styles.label}>Question:</Text>
             <TextInput
               style={[styles.input, styles.multiline]}
@@ -1058,7 +1019,6 @@ function QuestionEditorModal(props: {
               keyboardType="number-pad"
             />
 
-            {/* MCQ */}
             {draft.questionType === "mcq" && (
               <>
                 <Text style={styles.label}>Choices:</Text>
@@ -1110,7 +1070,6 @@ function QuestionEditorModal(props: {
               </>
             )}
 
-            {/* Identification */}
             {draft.questionType === "identification" && (
               <>
                 <Text style={styles.label}>Accepted answers:</Text>
@@ -1146,7 +1105,6 @@ function QuestionEditorModal(props: {
               </>
             )}
 
-            {/* Matching */}
             {draft.questionType === "matching" && (
               <>
                 <Text style={styles.label}>Pairs:</Text>
@@ -1208,10 +1166,6 @@ function QuestionEditorModal(props: {
     </Modal>
   );
 }
-
-// ------------------------------------------------------------------
-// Styles
-// ------------------------------------------------------------------
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "white" },

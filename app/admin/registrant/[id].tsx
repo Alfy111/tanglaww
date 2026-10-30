@@ -79,7 +79,8 @@ export default function RegistrantDetails() {
         student (
           firstName, lastName, middleName,
           email, bachelorsDegree, lastSchoolAttended,
-          province, profilephotourl, phoneNumber
+          province, profilephotourl, phoneNumber,
+          validIdUrl, formalPhotoUrl
         ),
         curriculum!enrollment_curriculum_id_fkey (curriculumName),
         specialization!enrollment_specialization_id_fkey (specializationName),
@@ -89,7 +90,7 @@ export default function RegistrantDetails() {
           verification_id, verificationStatus, verificationNotes, allow_reenrollment, status
         ),
         paymentDetails (
-          amountTransferred, referenceNumber,
+          amountTransferred, referenceNumber, dateOfPayment,
           proofOfPaymentUrl, paymentType, balanceProofUrl, balanceSubmittedAt,
           payment_channel!paymentDetails_paymentChannel_id_fkey (paymentChannelName)
         )
@@ -467,6 +468,18 @@ export default function RegistrantDetails() {
           />
           <DetailRow label="Reference #" value={payment?.referenceNumber} />
           <DetailRow
+            label="Date of Transaction"
+            value={
+              payment?.dateOfPayment
+                ? new Date(payment.dateOfPayment).toLocaleDateString("en-PH", {
+                    month: "long",
+                    day: "numeric",
+                    year: "numeric",
+                  })
+                : "Not set"
+            }
+          />
+          <DetailRow
             label="Payment Type"
             value={PAYMENT_TYPE_LABELS[payment?.paymentType] ?? "Not specified"}
           />
@@ -479,6 +492,29 @@ export default function RegistrantDetails() {
           onPress={() => openDocument(proofUrl, "Proof of Payment")}
         >
           <Text style={styles.infoRowText}>Proof of Payment</Text>
+          <Ionicons name="chevron-forward" size={20} color="#555" />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.infoRow}
+          onPress={() =>
+            openDocument(student?.formalPhotoUrl, "Graduation or Formal Photo")
+          }
+        >
+          <Text style={styles.infoRowText}>Graduation or Formal Photo</Text>
+          <Ionicons name="chevron-forward" size={20} color="#555" />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.infoRow}
+          onPress={() => openDocument(student?.validIdUrl, "Valid ID")}
+        >
+          <View style={{ flex: 1 }}>
+            <Text style={styles.infoRowText}>Valid ID</Text>
+            {!student?.validIdUrl && (
+              <Text style={styles.balanceSub}>Not provided</Text>
+            )}
+          </View>
           <Ionicons name="chevron-forward" size={20} color="#555" />
         </TouchableOpacity>
 
@@ -556,7 +592,9 @@ export default function RegistrantDetails() {
             onPress={() => handleApprove("approved")}
             disabled={approveLoading}
           >
-            <Text style={styles.buttonText}>Fully Approve</Text>
+            <Text style={styles.buttonText}>
+              Fully Approve (balance settled)
+            </Text>
           </TouchableOpacity>
         )}
 

@@ -330,7 +330,6 @@ export default function SessionLinkScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Add Session Modal */}
       <Modal visible={addModalVisible} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.modalSheet}>
