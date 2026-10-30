@@ -73,6 +73,15 @@ export default function SignInScreen() {
         setErrors(["No student account found."]);
         return;
       }
+
+      const { data: status } = await supabase.rpc("my_enrollment_status");
+      if (status === "withdrawn") {
+        await supabase.auth.signOut({ scope: "local" });
+        setErrors([
+          "Your enrollment has been withdrawn. Please contact the admin if you wish to continue.",
+        ]);
+        return;
+      }
       const token = await generateSessionToken();
       await registerSession(student.id, token);
 
