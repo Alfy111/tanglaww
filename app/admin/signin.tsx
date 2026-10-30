@@ -1,4 +1,16 @@
+import LoginWarningModal, {
+  LoginWarning,
+} from "@/components/LoginWarningModal";
+import { useLoginLock } from "@/hooks/useLoginLock";
 import { supabase } from "@/lib/supabase";
+import {
+  clearLoginFailures,
+  formatRemaining,
+  getLockStatus,
+  isWrongPasswordError,
+  normalizeEmail,
+  recordLoginFailure,
+} from "@/services/loginSecurityService";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useState } from "react";
@@ -21,6 +33,37 @@ export default function AdminSignIn() {
   const [errors, setErrors] = useState<string[]>([]);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [warning, setWarning] = useState<LoginWarning | null>(null);
+  const lock = useLoginLock(email);
+
+  const goToReset = () => {
+    setWarning(null);
+    router.push({
+      pathname: "/forgotpass",
+      params: { email: normalizeEmail(email) },
+    } as any);
+  };
+
+  const handleWrongPassword = async () => {
+    const status = await recordLoginFailure(email);
+    lock.apply(status);
+    if (status.lockMinutes) {
+      setWarning({
+        title: "Sign-in disabled",
+        message: `Too many wrong attempts. Password entry is disabled for ${status.lockMinutes} minutes.`,
+        locked: true,
+      });
+    } else if (status.failures === 4 && status.lockCount === 0) {
+      setWarning({
+        title: "Incorrect password",
+        message:
+          "You have one last attempt. One more wrong password will disable sign-in for 3 minutes.",
+        locked: false,
+      });
+    } else {
+      setErrors(["Invalid email or password."]);
+    }
+  };
 
   const handleAdminSignIn = async () => {
     const newErrors: string[] = [];
@@ -35,15 +78,24 @@ export default function AdminSignIn() {
     setLoading(true);
     setGateValidating(true);
     try {
+      const status = await getLockStatus(email);
+      if (status.remainingSeconds > 0) {
+        lock.apply(status);
+        return;
+      }
+
       const { data, error } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
+        email: normalizeEmail(email),
         password,
       });
 
       if (error) {
-        setErrors(["Invalid email or password."]);
+        if (isWrongPasswordError(error)) await handleWrongPassword();
+        else setErrors([error.message]);
         return;
       }
+
+      await clearLoginFailures().catch(() => {});
 
       const { data: adminRow } = await supabase
         .from("admin")
@@ -108,10 +160,11 @@ export default function AdminSignIn() {
                   flex: 1,
                   borderBottomWidth: 0,
                   marginBottom: 0,
-                  color: "#000000",
+                  color: lock.locked ? "#A9A9A9" : "#000000",
                 },
               ]}
-              placeholder="Password"
+              editable={!lock.locked}
+              placeholder={lock.locked ? "Password entry disabled" : "Password"}
               secureTextEntry={!showPassword}
               placeholderTextColor="#A9A9A9"
               value={password}
@@ -125,6 +178,17 @@ export default function AdminSignIn() {
               />
             </TouchableOpacity>
           </View>
+
+          {lock.locked ? (
+            <Text style={styles.lockText}>
+              Too many wrong attempts. Try again in{" "}
+              {formatRemaining(lock.remaining)}.
+            </Text>
+          ) : lock.lockCount > 0 ? (
+            <Text style={styles.lockNote}>
+              One more wrong password will disable sign-in for 10 minutes.
+            </Text>
+          ) : null}
 
           {errors.length > 0 && (
             <View style={styles.errorBanner}>
@@ -141,15 +205,18 @@ export default function AdminSignIn() {
 
           <TouchableOpacity
             style={{ alignSelf: "flex-end", marginTop: -5 }}
-            onPress={() => router.push("/forgotpass")}
+            onPress={goToReset}
           >
             <Text style={styles.forgotText}>Forgot Password?</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.signInBtn, loading && { opacity: 0.7 }]}
+            style={[
+              styles.signInBtn,
+              (loading || lock.locked) && { opacity: 0.6 },
+            ]}
             onPress={handleAdminSignIn}
-            disabled={loading}
+            disabled={loading || lock.locked}
           >
             {loading ? (
               <ActivityIndicator color="white" />
@@ -169,6 +236,12 @@ export default function AdminSignIn() {
           </Text>
         </TouchableOpacity>
       </View>
+
+      <LoginWarningModal
+        warning={warning}
+        onClose={() => setWarning(null)}
+        onReset={goToReset}
+      />
     </SafeAreaView>
   );
 }
@@ -234,6 +307,18 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   errorText: { color: "#c0392b", fontSize: 13 },
+  lockText: {
+    color: "#c0392b",
+    fontSize: 12,
+    marginBottom: 12,
+    lineHeight: 17,
+  },
+  lockNote: {
+    color: "#B26A00",
+    fontSize: 12,
+    marginBottom: 12,
+    lineHeight: 17,
+  },
   activateLink: { marginTop: 22, padding: 6 },
   activateText: { fontSize: 14, color: "#666", textAlign: "center" },
   activateTextBold: {
