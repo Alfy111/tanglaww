@@ -20,7 +20,13 @@ import { supabase } from "../lib/supabase";
 const { width } = Dimensions.get("window");
 const headerBg = require("../assets/images/tanglaw_header.png");
 
-type StatusType = "pending" | "approved" | "rejected" | null;
+type StatusType =
+  | "pending"
+  | "partially_approved"
+  | "approved"
+  | "rejected"
+  | "withdrawn"
+  | null;
 type ActiveTab = "code" | "status";
 
 export default function EnrollmentCodeScreen() {
@@ -109,6 +115,22 @@ export default function EnrollmentCodeScreen() {
         return;
       }
 
+      const { data: codeEnrollment } = await supabase
+        .from("enrollment")
+        .select("verification!enrollment_verification_id_fkey (status)")
+        .eq("enrollment_id", codeData.enrollment_id)
+        .maybeSingle();
+      const cv: any = Array.isArray(codeEnrollment?.verification)
+        ? codeEnrollment?.verification[0]
+        : codeEnrollment?.verification;
+      if (cv?.status === "withdrawn" || cv?.status === "rejected") {
+        setCodeError(
+          "This enrollment is no longer active. Please contact the admin.",
+        );
+        setCodeLoading(false);
+        return;
+      }
+
       if (student.isAccountSetup) {
         setCodeError(
           "This account has already been activated. Please log in instead.",
@@ -165,12 +187,15 @@ export default function EnrollmentCodeScreen() {
           verification!enrollment_verification_id_fkey (
             verificationStatus,
             verificationNotes,
-            allow_reenrollment
+            allow_reenrollment,
+            status
           )
         `,
         )
         .eq("student_id", student.id)
-        .single();
+        .order("enrollment_id", { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
       if (enrollmentError || !enrollment) {
         setStatusError("No enrollment found for this account.");
@@ -184,14 +209,18 @@ export default function EnrollmentCodeScreen() {
 
       setStudentData(student);
 
-      if (v?.verificationStatus === true) {
-        setStatus("approved");
-      } else if (v?.verificationStatus === false && v?.verificationNotes) {
-        setStatus("rejected");
-        setRejectionNotes(v.verificationNotes);
+      const current: StatusType =
+        v?.status ??
+        (v?.verificationStatus === true
+          ? "approved"
+          : v?.verificationNotes
+            ? "rejected"
+            : "pending");
+
+      setStatus(current);
+      if (current === "rejected") {
+        setRejectionNotes(v?.verificationNotes ?? "");
         setAllowReenroll(v?.allow_reenrollment ?? false);
-      } else {
-        setStatus("pending");
       }
     } catch (err: any) {
       setStatusError("Something went wrong. Please try again.");
@@ -252,6 +281,52 @@ export default function EnrollmentCodeScreen() {
           >
             <Text style={styles.switchTabBtnText}>Go to Enter Code</Text>
           </TouchableOpacity>
+        </View>
+      );
+    }
+
+    if (status === "partially_approved") {
+      return (
+        <View style={[styles.statusCard, styles.partialCard]}>
+          <Ionicons name="checkmark-circle-outline" size={44} color="#2F80ED" />
+          <View style={styles.statusTitleRow}>
+            <Text style={styles.statusTitle}>Partially Approved</Text>
+          </View>
+          <Text style={styles.statusName}>
+            Welcome, {studentData.firstName}!
+          </Text>
+          <Text style={styles.statusMessage}>
+            Your downpayment enrollment has been approved. You can access the
+            courses up to LEPT Express, but to unlock the rest, upload your
+            remaining balance receipt in your Profile after signing in. Check
+            your email for your activation code, then switch to the{" "}
+            <Text style={styles.tabHint}>Enter Code</Text> tab.
+          </Text>
+          <TouchableOpacity
+            style={styles.switchTabBtn}
+            onPress={() => {
+              resetStatus();
+              setActiveTab("code");
+            }}
+          >
+            <Text style={styles.switchTabBtnText}>Go to Enter Code</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    if (status === "withdrawn") {
+      return (
+        <View style={[styles.statusCard, styles.withdrawnCard]}>
+          <Ionicons name="remove-circle-outline" size={44} color="#7F8C8D" />
+          <View style={styles.statusTitleRow}>
+            <Text style={styles.statusTitle}>Enrollment Withdrawn</Text>
+          </View>
+          <Text style={styles.statusName}>Hello, {studentData.firstName}.</Text>
+          <Text style={styles.statusMessage}>
+            Your enrollment has been withdrawn, so your account access is
+            disabled. If you wish to continue, please contact the admin.
+          </Text>
         </View>
       );
     }
@@ -704,6 +779,16 @@ const styles = StyleSheet.create({
     backgroundColor: "#ffffff",
     borderWidth: 1,
     borderColor: "#27ae60",
+  },
+  partialCard: {
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: "#2F80ED",
+  },
+  withdrawnCard: {
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: "#7F8C8D",
   },
   rejectedCard: {
     backgroundColor: "#ffffff",

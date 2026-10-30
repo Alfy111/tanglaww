@@ -4,10 +4,13 @@ import {
   Ionicons,
   MaterialCommunityIcons,
 } from "@expo/vector-icons";
+import * as DocumentPicker from "expo-document-picker";
+import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Image,
   Modal,
   RefreshControl,
@@ -19,7 +22,15 @@ import {
   TouchableWithoutFeedback,
   View,
 } from "react-native";
+import { readFileBytes } from "../lib/readFileBytes";
 import HamburgerMenu from "./hamburger";
+
+type MyEnrollment = {
+  status: string | null;
+  paymentType: string | null;
+  balanceProofUrl: string | null;
+  balanceSubmittedAt: string | null;
+};
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -27,6 +38,10 @@ export default function ProfileScreen() {
   const [loading, setLoading] = useState(true);
   const [student, setStudent] = useState<any>(null);
   const [refresh, setRefresh] = useState(false);
+  const [enrollmentInfo, setEnrollmentInfo] = useState<MyEnrollment | null>(
+    null,
+  );
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     fetchProfile();
@@ -60,6 +75,9 @@ export default function ProfileScreen() {
 
     if (error) console.error("Profile fetch error:", error.message);
     if (data) setStudent(data);
+
+    const { data: info } = await supabase.rpc("get_my_enrollment");
+    setEnrollmentInfo((info as MyEnrollment) ?? null);
     setLoading(false);
   };
 
@@ -72,6 +90,102 @@ export default function ProfileScreen() {
   const specialization =
     (student?.enrollment as any)?.[0]?.specialization?.specializationName ??
     "—";
+
+  const uploadBalanceReceipt = async (
+    uri: string,
+    name: string,
+    mimeType: string,
+  ) => {
+    if (!student) return;
+    setUploading(true);
+    try {
+      const safeName = name.replace(/[^a-zA-Z0-9._-]/g, "_");
+      const path = `balance/${student.id}_${Date.now()}_${safeName}`;
+      const bytes = await readFileBytes(uri);
+
+      const { error: uploadError } = await supabase.storage
+        .from("receipts")
+        .upload(path, bytes, { contentType: mimeType, upsert: false });
+      if (uploadError) throw new Error(uploadError.message);
+
+      const { data: urlData } = supabase.storage
+        .from("receipts")
+        .getPublicUrl(path);
+      const { error } = await supabase.rpc("submit_balance_receipt", {
+        p_url: urlData.publicUrl,
+      });
+      if (error) throw new Error(error.message);
+
+      Alert.alert(
+        "Receipt submitted",
+        "The admin will review your payment. The remaining courses unlock once you are fully approved.",
+      );
+      await fetchProfile();
+    } catch (err: any) {
+      Alert.alert("Upload failed", err.message ?? "Please try again.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const pickBalanceReceipt = () => {
+    Alert.alert("Upload Receipt", "Choose an option", [
+      {
+        text: "Camera",
+        onPress: async () => {
+          const result = await ImagePicker.launchCameraAsync({
+            mediaTypes: ["images"],
+            quality: 0.8,
+          });
+          if (!result.canceled) {
+            const a = result.assets[0];
+            uploadBalanceReceipt(
+              a.uri,
+              a.fileName ?? "receipt.jpg",
+              a.mimeType ?? "image/jpeg",
+            );
+          }
+        },
+      },
+      {
+        text: "Gallery",
+        onPress: async () => {
+          const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ["images"],
+            quality: 0.8,
+          });
+          if (!result.canceled) {
+            const a = result.assets[0];
+            uploadBalanceReceipt(
+              a.uri,
+              a.fileName ?? "receipt.jpg",
+              a.mimeType ?? "image/jpeg",
+            );
+          }
+        },
+      },
+      {
+        text: "File (PDF)",
+        onPress: async () => {
+          const result = await DocumentPicker.getDocumentAsync({
+            type: ["application/pdf", "image/*"],
+            copyToCacheDirectory: true,
+          });
+          if (!result.canceled) {
+            const f = result.assets[0];
+            uploadBalanceReceipt(
+              f.uri,
+              f.name,
+              f.mimeType ?? "application/pdf",
+            );
+          }
+        },
+      },
+      { text: "Cancel", style: "cancel" },
+    ]);
+  };
+
+  const isPartial = enrollmentInfo?.status === "partially_approved";
 
   const onRefresh = useCallback(async () => {
     setRefresh(true);
@@ -108,9 +222,7 @@ export default function ProfileScreen() {
           <Ionicons name="menu" size={28} color="white" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Profile</Text>
-        <TouchableOpacity>
-          <MaterialCommunityIcons name="qrcode-scan" size={24} color="white" />
-        </TouchableOpacity>
+        <View style={{ width: 28 }} />
       </View>
 
       <ScrollView
@@ -194,6 +306,59 @@ export default function ProfileScreen() {
             ))}
           </View>
         </View>
+
+        {isPartial && (
+          <View style={styles.balanceCard}>
+            <View style={styles.balanceHeader}>
+              <Ionicons name="wallet-outline" size={22} color="#0D2A94" />
+              <Text style={styles.balanceTitle}>Remaining Balance</Text>
+            </View>
+            <Text style={styles.balanceText}>
+              Upload your remaining balance receipt to unlock the rest of the
+              courses.
+            </Text>
+
+            {enrollmentInfo?.balanceProofUrl ? (
+              <View style={styles.balanceDone}>
+                <Ionicons name="time-outline" size={16} color="#B26A00" />
+                <Text style={styles.balanceDoneText}>
+                  Receipt submitted on{" "}
+                  {new Date(
+                    enrollmentInfo.balanceSubmittedAt ?? "",
+                  ).toLocaleDateString("en-PH", {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                  })}
+                  . Waiting for admin review.
+                </Text>
+              </View>
+            ) : null}
+
+            <TouchableOpacity
+              style={[styles.balanceBtn, uploading && { opacity: 0.7 }]}
+              onPress={pickBalanceReceipt}
+              disabled={uploading}
+            >
+              {uploading ? (
+                <ActivityIndicator color="white" />
+              ) : (
+                <>
+                  <Ionicons
+                    name="cloud-upload-outline"
+                    size={18}
+                    color="white"
+                  />
+                  <Text style={styles.balanceBtnText}>
+                    {enrollmentInfo?.balanceProofUrl
+                      ? "Replace Receipt"
+                      : "Upload Receipt"}
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
       </ScrollView>
 
       <View style={styles.bottomNav}>
@@ -287,6 +452,41 @@ const styles = StyleSheet.create({
   },
   inputText: { fontSize: 14, color: "#555" },
   inputTextMuted: { color: "#BDC3C7", fontStyle: "italic" },
+  balanceCard: {
+    backgroundColor: "white",
+    borderRadius: 20,
+    padding: 20,
+    marginTop: 20,
+    elevation: 5,
+  },
+  balanceHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 8,
+  },
+  balanceTitle: { fontSize: 16, fontWeight: "bold", color: "#0D2A94" },
+  balanceText: { fontSize: 13, color: "#555", lineHeight: 19 },
+  balanceDone: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 6,
+    borderRadius: 8,
+    padding: 3,
+    marginTop: 9,
+  },
+  balanceDoneText: { flex: 1, fontSize: 12, color: "#B26A00", lineHeight: 17 },
+  balanceBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: "#0D2A94",
+    padding: 14,
+    borderRadius: 10,
+    marginTop: 14,
+  },
+  balanceBtnText: { color: "white", fontWeight: "bold", fontSize: 15 },
   bottomNav: {
     position: "absolute",
     bottom: 0,

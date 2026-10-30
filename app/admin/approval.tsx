@@ -17,38 +17,15 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import {
+  approveWithCode,
+  EnrollmentStatus,
+  getStatus,
+  getVerification,
+  sendActivationEmail,
+  setEnrollmentStatus,
+} from "../../services/enrollmentStatusService";
 import AdminHamburger from "./hamburger";
-
-const generateCode = (): string => {
-  return Math.floor(100000 + Math.random() * 900000).toString();
-};
-
-const sendActivationEmail = async (
-  to: string,
-  studentName: string,
-  code: string,
-): Promise<boolean> => {
-  try {
-    const response = await fetch(
-      "https://ohqzmjlerxudlhggxqnn.supabase.co/functions/v1/send-activation-email",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!}`,
-        },
-        body: JSON.stringify({ to, studentName, code }),
-      },
-    );
-
-    const text = await response.text();
-    const data = JSON.parse(text);
-    return data?.success === true;
-  } catch (err) {
-    console.error("Email send error:", err);
-    return false;
-  }
-};
 
 export default function AdminApproval() {
   const router = useRouter();
@@ -81,26 +58,13 @@ export default function AdminApproval() {
     return data ? `${data.firstName} ${data.lastName}` : "Admin";
   };
 
-  const pending = auditRequests.filter((e: any) => {
-    const v = Array.isArray(e.verification)
-      ? e.verification[0]
-      : e.verification;
-    return v?.verificationStatus === false && !v?.verificationNotes;
-  });
-
-  const approved = auditRequests.filter((e: any) => {
-    const v = Array.isArray(e.verification)
-      ? e.verification[0]
-      : e.verification;
-    return v?.verificationStatus === true;
-  });
-
-  const rejected = auditRequests.filter((e: any) => {
-    const v = Array.isArray(e.verification)
-      ? e.verification[0]
-      : e.verification;
-    return v?.verificationStatus === false && v?.verificationNotes;
-  });
+  const byStatus = (status: EnrollmentStatus) =>
+    auditRequests.filter((e: any) => getStatus(e) === status);
+  const pending = byStatus("pending");
+  const partial = byStatus("partially_approved");
+  const approved = byStatus("approved");
+  const withdrawn = byStatus("withdrawn");
+  const rejected = byStatus("rejected");
 
   const handleApprove = async (enrollment: any) => {
     Alert.alert(
@@ -113,56 +77,11 @@ export default function AdminApproval() {
           onPress: async () => {
             setActionLoading(enrollment.enrollment_id);
             try {
-              const v = Array.isArray(enrollment.verification)
-                ? enrollment.verification[0]
-                : enrollment.verification;
-
-              const { error: verifyError } = await supabase
-                .from("verification")
-                .update({
-                  verificationStatus: true,
-                  lastVerificationDate: new Date().toISOString(),
-                })
-                .eq("verification_id", v?.verification_id);
-
-              if (verifyError) throw new Error(verifyError.message);
-
-              const { data: existingCode } = await supabase
-                .from("activation_codes")
-                .select("code")
-                .eq("enrollment_id", enrollment.enrollment_id)
-                .eq("is_used", false)
-                .gt("expires_at", new Date().toISOString())
-                .maybeSingle();
-
-              let code: string;
-
-              if (existingCode) {
-                code = existingCode.code;
-              } else {
-                code = generateCode();
-                const expiresAt = new Date();
-                expiresAt.setDate(expiresAt.getDate() + 3);
-
-                const { error: codeError } = await supabase
-                  .from("activation_codes")
-                  .insert({
-                    code,
-                    student_id: enrollment.student_id,
-                    enrollment_id: enrollment.enrollment_id,
-                    is_used: false,
-                    expires_at: expiresAt.toISOString(),
-                  });
-
-                if (codeError) throw new Error(codeError.message);
-              }
-
-              const studentName = `${enrollment.student.firstName} ${enrollment.student.lastName}`;
-              const sent = await sendActivationEmail(
-                enrollment.student.email,
-                enrollment.student.firstName,
-                code,
+              const { code, emailSent: sent } = await approveWithCode(
+                enrollment,
+                "approved",
               );
+              const studentName = `${enrollment.student.firstName} ${enrollment.student.lastName}`;
 
               const adminName = await getAdminName();
               await logAudit({
@@ -212,20 +131,11 @@ export default function AdminApproval() {
           onPress: async () => {
             setActionLoading(enrollment.enrollment_id);
             try {
-              const v = Array.isArray(enrollment.verification)
-                ? enrollment.verification[0]
-                : enrollment.verification;
-
-              const { error } = await supabase
-                .from("verification")
-                .update({
-                  verificationStatus: false,
-                  verificationNotes: "Application rejected by administrator.",
-                  lastVerificationDate: new Date().toISOString(),
-                })
-                .eq("verification_id", v?.verification_id);
-
-              if (error) throw new Error(error.message);
+              await setEnrollmentStatus(
+                getVerification(enrollment)?.verification_id,
+                "rejected",
+                "Application rejected by administrator.",
+              );
 
               const adminName = await getAdminName();
               const studentName = `${enrollment.student.firstName} ${enrollment.student.lastName}`;
@@ -360,14 +270,15 @@ export default function AdminApproval() {
             <Ionicons name="close" size={18} color="white" />
           </TouchableOpacity>
         </View>
-      ) : (
+      ) : getStatus(enrollment) === "approved" ||
+        getStatus(enrollment) === "partially_approved" ? (
         <TouchableOpacity
           style={styles.codeBtn}
           onPress={() => handleViewCode(enrollment)}
         >
           <Text style={styles.codeBtnText}>Code</Text>
         </TouchableOpacity>
-      )}
+      ) : null}
     </TouchableOpacity>
   );
 
@@ -411,11 +322,41 @@ export default function AdminApproval() {
             ))
           )}
 
+          <Text style={styles.sectionTitle}>
+            Partially Approved ({partial.length})
+          </Text>
+          {partial.length === 0 ? (
+            <Text style={styles.emptyText}>No partially approved students</Text>
+          ) : (
+            partial.map((e) => (
+              <ApprovalCard
+                key={e.enrollment_id}
+                enrollment={e}
+                showActions={false}
+              />
+            ))
+          )}
+
           <Text style={styles.sectionTitle}>Approved ({approved.length})</Text>
           {approved.length === 0 ? (
             <Text style={styles.emptyText}>No approved enrollments</Text>
           ) : (
             approved.map((e) => (
+              <ApprovalCard
+                key={e.enrollment_id}
+                enrollment={e}
+                showActions={false}
+              />
+            ))
+          )}
+
+          <Text style={styles.sectionTitle}>
+            Withdrawn ({withdrawn.length})
+          </Text>
+          {withdrawn.length === 0 ? (
+            <Text style={styles.emptyText}>No withdrawn students</Text>
+          ) : (
+            withdrawn.map((e) => (
               <ApprovalCard
                 key={e.enrollment_id}
                 enrollment={e}

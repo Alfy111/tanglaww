@@ -44,6 +44,7 @@ interface dataTypes {
   promoId: number | null;
   paymentChannel: string;
   paymentChannelId: number | null;
+  paymentType: "downpayment" | "full" | null;
   referenceNumber: string;
   amountTransferred: string;
   paymentNoticeAgreement: boolean;
@@ -71,6 +72,7 @@ const defaultValues: dataTypes = {
   promoId: null,
   paymentChannel: "",
   paymentChannelId: null,
+  paymentType: null,
   referenceNumber: "",
   amountTransferred: "",
   paymentNoticeAgreement: false,
@@ -117,6 +119,10 @@ function validateStep(step: number, form: dataTypes): string[] {
       !form.amountTransferred.trim()
     )
       errors.push("Please fill in all necessary informations.");
+    if (!form.paymentType)
+      errors.push(
+        "Please choose a payment type (downpayment or full payment).",
+      );
     if (!form.attachmentUri)
       errors.push("Please upload your payment receipt/verification.");
     if (!form.paymentNoticeAgreement)
@@ -438,6 +444,9 @@ export default function EnrollmentScreen() {
             amountTransferred: parseFloat(dataTypes.amountTransferred),
             dateOfPayment: new Date().toISOString(),
             proofOfPaymentUrl: proofUrl,
+            paymentType: dataTypes.paymentType,
+            balanceProofUrl: null,
+            balanceSubmittedAt: null,
             agreedToPaymentNotice: dataTypes.paymentNoticeAgreement,
           })
           .eq("paymentDetails_id", existingPayment.paymentDetails_id);
@@ -453,6 +462,9 @@ export default function EnrollmentScreen() {
             amountTransferred: parseFloat(dataTypes.amountTransferred),
             dateOfPayment: new Date().toISOString(),
             proofOfPaymentUrl: proofUrl,
+            paymentType: dataTypes.paymentType,
+            balanceProofUrl: null,
+            balanceSubmittedAt: null,
             agreedToPaymentNotice: dataTypes.paymentNoticeAgreement,
           });
 
@@ -551,7 +563,7 @@ export default function EnrollmentScreen() {
         <View style={{ flex: 1, marginLeft: 8 }}>
           {errors.map((e, i) => (
             <Text key={i} style={styles.errorText}>
-              {e}
+              . {e}
             </Text>
           ))}
         </View>
@@ -864,15 +876,9 @@ export default function EnrollmentScreen() {
           <View>
             {renderProgressHeader("Promotions & Payment")}
             <View style={styles.warningBanner}>
-              <Ionicons
-                name="information-circle"
-                size={18}
-                color="#b9770e"
-                style={{ marginTop: 2 }}
-              />
               <View style={{ flex: 1, marginLeft: 8 }}>
                 <Text style={styles.warningText}>
-                  REMINDER: Kindly consult with our admins regarding the course
+                  ATTENTION: Kindly consult with our admins regarding the course
                   prices before proceeding.
                 </Text>
               </View>
@@ -937,6 +943,36 @@ export default function EnrollmentScreen() {
                     </TouchableOpacity>
                   ))}
                 </View>
+              )}
+
+              <Text style={styles.label}>Payment Type:*</Text>
+              {[
+                { key: "downpayment" as const, name: "Downpayment" },
+                { key: "full" as const, name: "Full Payment" },
+              ].map((opt) => (
+                <TouchableOpacity
+                  key={opt.key}
+                  style={styles.radioRow}
+                  onPress={() => setField("paymentType", opt.key)}
+                >
+                  <Ionicons
+                    name={
+                      dataTypes.paymentType === opt.key
+                        ? "radio-button-on"
+                        : "radio-button-off"
+                    }
+                    size={22}
+                    color="#0D2A94"
+                  />
+                  <Text style={styles.radioLabel}>{opt.name}</Text>
+                </TouchableOpacity>
+              ))}
+              {dataTypes.paymentType === "downpayment" && (
+                <Text style={styles.payTypeNote}>
+                  With a downpayment, you can access the courses up to LEPT
+                  Express. Upload your remaining balance receipt later in your
+                  Profile to unlock the rest.
+                </Text>
               )}
 
               <Text style={styles.label}>Amount Transferred:*</Text>
@@ -1184,6 +1220,15 @@ export default function EnrollmentScreen() {
                       value: dataTypes.paymentChannel,
                     })}
                     {summaryRow({
+                      label: "Payment Type",
+                      value:
+                        dataTypes.paymentType === "downpayment"
+                          ? "Downpayment"
+                          : dataTypes.paymentType === "full"
+                            ? "Full Payment"
+                            : "—",
+                    })}
+                    {summaryRow({
                       label: "Amount",
                       value: dataTypes.amountTransferred,
                     })}
@@ -1419,6 +1464,15 @@ const styles = StyleSheet.create({
   },
   summaryValue: { fontSize: 14, color: "#000" },
   bold: { fontWeight: "bold" },
+  payTypeNote: {
+    fontSize: 12,
+    color: "#2F459B",
+    backgroundColor: "#eaf0ff",
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 10,
+    lineHeight: 17,
+  },
   previewBtn: {
     flexDirection: "row",
     alignItems: "center",
