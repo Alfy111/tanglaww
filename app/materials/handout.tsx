@@ -14,7 +14,13 @@ import {
   View,
 } from "react-native";
 import { WebView } from "react-native-webview";
+import MaterialReorder from "../../components/MaterialReorder";
 import { useAdmin } from "../../context/AdminContext";
+import {
+  deleteMaterials,
+  saveMaterialOrder,
+  uploadHandouts,
+} from "../../services/materialAdminService";
 import {
   getCompletedMaterialIds,
   markMaterialCompleted,
@@ -27,7 +33,6 @@ import {
   getMaterialsByCourse,
   getModulesByCourse,
   LearningMaterial,
-  uploadHandout,
 } from "../../services/materialService";
 
 const formatBytes = (bytes: number | null) => {
@@ -242,6 +247,11 @@ export default function HandoutScreen() {
   const [handouts, setHandouts] = useState<LearningMaterial[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState("");
+
+  const [mode, setMode] = useState<"normal" | "select" | "reorder">("normal");
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [deleting, setDeleting] = useState(false);
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
   const [viewingMaterial, setViewingMaterial] =
     useState<LearningMaterial | null>(null);
@@ -353,10 +363,91 @@ export default function HandoutScreen() {
   const handleUpload = async () => {
     if (!currentAdminId || !uploadModuleId) return;
     setUploading(true);
-    const result = await uploadHandout(uploadModuleId, currentAdminId);
-    setUploading(false);
-    if (result.success) fetchHandouts();
-    else if (result.error) Alert.alert("Upload Failed", result.error);
+    try {
+      const result = await uploadHandouts(
+        uploadModuleId,
+        currentAdminId,
+        (done, total) =>
+          setUploadProgress(
+            total > 1
+              ? `Uploading ${Math.min(done + 1, total)} of ${total}…`
+              : "",
+          ),
+      );
+      if (!result) return;
+      if (result.uploaded > 0) fetchHandouts();
+      if (result.failed.length > 0) {
+        Alert.alert(
+          `${result.uploaded} uploaded, ${result.failed.length} failed`,
+          result.failed.join("\n"),
+        );
+      }
+    } catch (err: any) {
+      Alert.alert("Upload Failed", err.message ?? "Unknown error");
+    } finally {
+      setUploading(false);
+      setUploadProgress("");
+    }
+  };
+
+  const exitMode = () => {
+    setMode("normal");
+    setSelectedIds(new Set());
+  };
+
+  const toggleSelected = (id: number) =>
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const allSelected =
+    handouts.length > 0 && selectedIds.size === handouts.length;
+
+  const toggleSelectAll = () =>
+    setSelectedIds(
+      allSelected ? new Set() : new Set(handouts.map((h) => h.material_id)),
+    );
+
+  const handleDeleteSelected = () => {
+    const items = handouts.filter((h) => selectedIds.has(h.material_id));
+    if (items.length === 0) return;
+    Alert.alert(
+      "Delete Learning Modules",
+      `Delete ${items.length} selected file${items.length > 1 ? "s" : ""}? This cannot be undone.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            setDeleting(true);
+            const result = await deleteMaterials(items);
+            setDeleting(false);
+            exitMode();
+            fetchHandouts();
+            if (result.failed.length > 0) {
+              Alert.alert(
+                "Some files were not deleted",
+                result.failed.join("\n"),
+              );
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const handleSaveOrder = async (ids: number[]) => {
+    try {
+      await saveMaterialOrder(ids);
+      exitMode();
+      fetchHandouts();
+    } catch (err: any) {
+      Alert.alert("Couldn't save the order", err.message);
+    }
   };
 
   const handleDelete = (item: LearningMaterial) => {
@@ -435,8 +526,23 @@ export default function HandoutScreen() {
   const renderItem = ({ item }: { item: LearningMaterial }) => {
     const isDownloading = downloadingId === item.material_id;
     const isCompleted = completedMaterialIds.has(item.material_id);
+    const selecting = mode === "select";
+    const isSelected = selectedIds.has(item.material_id);
     return (
-      <View style={styles.fileCard}>
+      <TouchableOpacity
+        style={[styles.fileCard, isSelected && styles.fileCardSelected]}
+        disabled={!selecting}
+        activeOpacity={0.7}
+        onPress={() => toggleSelected(item.material_id)}
+      >
+        {selecting && (
+          <Ionicons
+            name={isSelected ? "checkbox" : "square-outline"}
+            size={22}
+            color={isSelected ? "#2F459B" : "#A0A7B4"}
+            style={styles.checkbox}
+          />
+        )}
         <View style={styles.fileIconWrap}>
           <MaterialCommunityIcons
             name={fileIconName(item.fileType) as any}
@@ -465,50 +571,52 @@ export default function HandoutScreen() {
               </Text>
             </View>
           )}
-          <View style={styles.actions}>
-            <TouchableOpacity
-              style={styles.actionBtn}
-              onPress={() => handleView(item)}
-            >
-              <Ionicons name="eye-outline" size={15} color="#2F459B" />
-              <Text style={styles.actionBtnText}>View</Text>
-            </TouchableOpacity>
-
-            {item.isDownloadable && (
+          {!selecting && (
+            <View style={styles.actions}>
               <TouchableOpacity
                 style={styles.actionBtn}
-                onPress={() => handleDownload(item)}
-                disabled={isDownloading}
+                onPress={() => handleView(item)}
               >
-                {isDownloading ? (
-                  <ActivityIndicator size="small" color="#2F459B" />
-                ) : (
-                  <>
-                    <Ionicons
-                      name="download-outline"
-                      size={15}
-                      color="#2F459B"
-                    />
-                    <Text style={styles.actionBtnText}>Download</Text>
-                  </>
-                )}
+                <Ionicons name="eye-outline" size={15} color="#2F459B" />
+                <Text style={styles.actionBtnText}>View</Text>
               </TouchableOpacity>
-            )}
 
-            {isAdmin && (
-              <TouchableOpacity
-                style={[styles.actionBtn, styles.deleteBtn]}
-                onPress={() => handleDelete(item)}
-              >
-                <Ionicons name="trash-outline" size={15} color="#E74C3C" />
-                <Text style={[styles.actionBtnText, { color: "#E74C3C" }]}>
-                  Delete
-                </Text>
-              </TouchableOpacity>
-            )}
-          </View>
+              {item.isDownloadable && (
+                <TouchableOpacity
+                  style={styles.actionBtn}
+                  onPress={() => handleDownload(item)}
+                  disabled={isDownloading}
+                >
+                  {isDownloading ? (
+                    <ActivityIndicator size="small" color="#2F459B" />
+                  ) : (
+                    <>
+                      <Ionicons
+                        name="download-outline"
+                        size={15}
+                        color="#2F459B"
+                      />
+                      <Text style={styles.actionBtnText}>Download</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              )}
+
+              {isAdmin && (
+                <TouchableOpacity
+                  style={[styles.actionBtn, styles.deleteBtn]}
+                  onPress={() => handleDelete(item)}
+                >
+                  <Ionicons name="trash-outline" size={15} color="#E74C3C" />
+                  <Text style={[styles.actionBtnText, { color: "#E74C3C" }]}>
+                    Delete
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
         </View>
-      </View>
+      </TouchableOpacity>
     );
   };
 
@@ -526,24 +634,101 @@ export default function HandoutScreen() {
         <Text style={styles.courseSub}>Learning Modules</Text>
       </View>
 
-      {isAdmin && uploadModuleId && (
+      {isAdmin && uploadModuleId && mode === "normal" && (
         <TouchableOpacity
           style={[styles.uploadBtn, uploading && { opacity: 0.7 }]}
           onPress={handleUpload}
           disabled={uploading}
         >
           {uploading ? (
-            <ActivityIndicator color="white" />
+            <>
+              <ActivityIndicator color="white" />
+              {!!uploadProgress && (
+                <Text style={styles.uploadBtnText}>{uploadProgress}</Text>
+              )}
+            </>
           ) : (
             <>
               <Ionicons name="add-circle-outline" size={20} color="white" />
-              <Text style={styles.uploadBtnText}>Upload Module</Text>
+              <Text style={styles.uploadBtnText}>Upload Modules</Text>
             </>
           )}
         </TouchableOpacity>
       )}
 
-      {loading ? (
+      {isAdmin && !loading && handouts.length > 0 && mode === "normal" && (
+        <View style={styles.toolsRow}>
+          <TouchableOpacity
+            style={styles.toolBtn}
+            onPress={() => setMode("select")}
+            disabled={uploading}
+          >
+            <Ionicons name="checkbox-outline" size={15} color="#2F459B" />
+            <Text style={styles.toolBtnText}>Select</Text>
+          </TouchableOpacity>
+          {handouts.length > 1 && (
+            <TouchableOpacity
+              style={styles.toolBtn}
+              onPress={() => setMode("reorder")}
+              disabled={uploading}
+            >
+              <Ionicons name="reorder-three" size={17} color="#2F459B" />
+              <Text style={styles.toolBtnText}>Reorder</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
+
+      {isAdmin && mode === "select" && (
+        <View style={styles.selectBar}>
+          <TouchableOpacity onPress={toggleSelectAll}>
+            <Text style={styles.selectAllText}>
+              {allSelected ? "Unselect all" : "Select all"}
+            </Text>
+          </TouchableOpacity>
+          <Text style={styles.selectCount}>{selectedIds.size} selected</Text>
+          <TouchableOpacity
+            onPress={exitMode}
+            style={styles.toolBtn}
+            disabled={deleting}
+          >
+            <Text style={styles.toolBtnText}>Cancel</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={handleDeleteSelected}
+            style={[
+              styles.deleteSelectedBtn,
+              (selectedIds.size === 0 || deleting) && { opacity: 0.5 },
+            ]}
+            disabled={selectedIds.size === 0 || deleting}
+          >
+            {deleting ? (
+              <ActivityIndicator size="small" color="white" />
+            ) : (
+              <Text style={styles.deleteSelectedText}>Delete</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {isAdmin && mode === "reorder" ? (
+        <MaterialReorder
+          items={handouts.map((h) => ({
+            key: String(h.material_id),
+            id: h.material_id,
+            title: h.title,
+            icon: (
+              <MaterialCommunityIcons
+                name={fileIconName(h.fileType) as any}
+                size={26}
+                color={fileIconColor(h.fileType)}
+              />
+            ),
+          }))}
+          onSave={handleSaveOrder}
+          onCancel={exitMode}
+        />
+      ) : loading ? (
         <View style={styles.centered}>
           <ActivityIndicator size="large" color="#2F459B" />
         </View>
@@ -557,13 +742,15 @@ export default function HandoutScreen() {
           <Text style={styles.emptyText}>No learning modules yet.</Text>
           {isAdmin && (
             <Text style={styles.emptyHint}>
-              Tap "Upload Learning Module" to add files.
+              Tap "Upload Modules" to add files. You can pick several at once.
             </Text>
           )}
         </View>
       ) : (
         <FlatList
+          style={{ flex: 1 }}
           data={handouts}
+          extraData={[mode, selectedIds]}
           keyExtractor={(item) => String(item.material_id)}
           renderItem={renderItem}
           contentContainerStyle={styles.listContent}
@@ -620,6 +807,45 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   uploadBtnText: { color: "white", fontWeight: "bold", fontSize: 15 },
+  toolsRow: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 8,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+  },
+  toolBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: "#2F459B",
+    backgroundColor: "white",
+  },
+  toolBtnText: { fontSize: 12, color: "#2F459B", fontWeight: "600" },
+  selectBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 20,
+    paddingTop: 14,
+  },
+  selectAllText: { fontSize: 12, color: "#2F459B", fontWeight: "600" },
+  selectCount: { flex: 1, fontSize: 12, color: "#777", textAlign: "center" },
+  deleteSelectedBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 6,
+    backgroundColor: "#E74C3C",
+    minWidth: 64,
+    alignItems: "center",
+  },
+  deleteSelectedText: { fontSize: 12, color: "white", fontWeight: "bold" },
+  fileCardSelected: { borderColor: "#2F459B", backgroundColor: "#EEF1FB" },
+  checkbox: { marginRight: 10, alignSelf: "center" },
   listContent: { padding: 20, paddingBottom: 100 },
   fileCard: {
     flexDirection: "row",

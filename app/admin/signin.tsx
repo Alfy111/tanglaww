@@ -126,13 +126,6 @@ export default function AdminSignIn() {
             </TouchableOpacity>
           </View>
 
-          <TouchableOpacity
-            style={{ alignSelf: "flex-end", marginTop: -5 }}
-            onPress={() => router.push("/forgotpass")}
-          >
-            <Text style={styles.forgotText}>Forgot Password?</Text>
-          </TouchableOpacity>
-
           {errors.length > 0 && (
             <View style={styles.errorBanner}>
               <Ionicons name="alert-circle" size={18} color="#c0392b" />
@@ -145,6 +138,13 @@ export default function AdminSignIn() {
               </View>
             </View>
           )}
+
+          <TouchableOpacity
+            style={{ alignSelf: "flex-end", marginTop: -5 }}
+            onPress={() => router.push("/forgotpass")}
+          >
+            <Text style={styles.forgotText}>Forgot Password?</Text>
+          </TouchableOpacity>
 
           <TouchableOpacity
             style={[styles.signInBtn, loading && { opacity: 0.7 }]}

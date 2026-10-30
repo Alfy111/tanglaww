@@ -18,6 +18,7 @@ import {
   TouchableWithoutFeedback,
   View,
 } from "react-native";
+import DiagnosticCard from "../components/DiagnosticCard";
 import { useAdmin } from "../context/AdminContext";
 import { supabase } from "../lib/supabase";
 import {
@@ -94,6 +95,7 @@ export default function CoursesScreen() {
 
     setCourses(coursesWithModules);
     setProgressMap(await getMyCourseProgress());
+
     setLoading(false);
   };
 
@@ -184,12 +186,21 @@ export default function CoursesScreen() {
           }
           contentContainerStyle={styles.scrollContent}
         >
+          <DiagnosticCard isAdmin={false} />
+
           {courses.map((course) => {
             const status = progressMap.get(course.course_id);
             const isLocked = !!status?.lockReason;
-            const lockMessage = `Complete ${
-              status?.previousCourseName ?? "the previous course"
-            } to unlock`;
+            const lockMessage =
+              status?.lockReason === "payment"
+                ? "Please settle the remaining balance to access the remaining courses"
+                : status?.lockReason === "not_applicable"
+                  ? "Not part of the BEEd curriculum"
+                  : status?.lockReason === "access"
+                    ? "Your enrollment is not active. Please contact the admin."
+                    : `Complete ${
+                        status?.previousCourseName ?? "the previous course"
+                      } to unlock`;
             const isExpanded = expandedId === course.course_id;
             const progress = getProgress(course.course_id);
 
@@ -379,6 +390,28 @@ const styles = StyleSheet.create({
   centered: { flex: 1, justifyContent: "center", alignItems: "center" },
   scrollContent: { padding: 15, paddingBottom: 100 },
   cardContainer: { marginBottom: 15 },
+  diagnosticCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "white",
+    borderRadius: 12,
+    padding: 15,
+    marginBottom: 15,
+    elevation: 3,
+    gap: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: "#FFB800",
+  },
+  diagnosticIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "#EEF1FF",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  diagnosticTitle: { fontSize: 15, fontWeight: "bold", color: "#333" },
+  diagnosticSub: { fontSize: 12, color: "#7F8C8D", marginTop: 2 },
   courseCard: {
     backgroundColor: "white",
     borderRadius: 12,

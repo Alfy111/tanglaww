@@ -11,7 +11,7 @@ const ENROLLMENT_SELECT = `
     profilephotourl
   ),
   paymentDetails (
-    referenceNumber,
+    referenceNumber, paymentType,
     payment_channel!paymentDetails_paymentChannel_id_fkey (paymentChannelName)
   ),
   curriculum!enrollment_curriculum_id_fkey (curriculumName),
@@ -21,7 +21,8 @@ const ENROLLMENT_SELECT = `
   verification!enrollment_verification_id_fkey (
     verificationStatus,
     verification_id,
-    verificationNotes
+    verificationNotes,
+    status
   )`;
 
 function logError(

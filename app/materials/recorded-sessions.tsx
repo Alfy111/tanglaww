@@ -18,7 +18,12 @@ import {
   View,
 } from "react-native";
 import YoutubePlayer, { YoutubeIframeRef } from "react-native-youtube-iframe";
+import MaterialReorder from "../../components/MaterialReorder";
 import { useAdmin } from "../../context/AdminContext";
+import {
+  deleteMaterials,
+  saveMaterialOrder,
+} from "../../services/materialAdminService";
 import {
   getCompletedMaterialIds,
   getWatchedSegments,
@@ -87,13 +92,21 @@ function AddSessionModal({
   const [saving, setSaving] = useState(false);
   const [urlError, setUrlError] = useState("");
 
+  const [addedCount, setAddedCount] = useState(0);
+
   const reset = () => {
     setTitle("");
     setUrl("");
     setUrlError("");
   };
 
-  const handleSave = async () => {
+  const close = () => {
+    reset();
+    setAddedCount(0);
+    onClose();
+  };
+
+  const handleSave = async (keepOpen: boolean) => {
     if (!title.trim()) {
       Alert.alert("Validation", "Enter a session title.");
       return;
@@ -118,27 +131,34 @@ function AddSessionModal({
     if (result.success) {
       reset();
       onSaved();
-      onClose();
+      if (keepOpen) setAddedCount((n) => n + 1);
+      else close();
     } else Alert.alert("Error", result.error);
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent
+      onRequestClose={close}
+    >
       <View style={modal.overlay}>
         <View style={modal.sheet}>
           <View style={modal.header}>
             <Text style={modal.headerText}>Add Recorded Session</Text>
-            <TouchableOpacity
-              onPress={() => {
-                reset();
-                onClose();
-              }}
-            >
+            <TouchableOpacity onPress={close}>
               <Ionicons name="close" size={24} color="#333" />
             </TouchableOpacity>
           </View>
 
           <ScrollView keyboardShouldPersistTaps="handled">
+            {addedCount > 0 && (
+              <Text style={modal.addedNote}>
+                {addedCount} session{addedCount > 1 ? "s" : ""} added. Enter the
+                next one, or tap Done.
+              </Text>
+            )}
             <Text style={modal.label}>Session Title: *</Text>
             <TextInput
               style={modal.input}
@@ -167,17 +187,34 @@ function AddSessionModal({
             )}
           </ScrollView>
 
-          <TouchableOpacity
-            style={[modal.saveBtn, saving && { opacity: 0.7 }]}
-            onPress={handleSave}
-            disabled={saving}
-          >
-            {saving ? (
-              <ActivityIndicator color="white" />
-            ) : (
-              <Text style={modal.saveBtnText}>Save Session</Text>
-            )}
-          </TouchableOpacity>
+          <View style={modal.btnRow}>
+            <TouchableOpacity
+              style={[modal.secondaryBtn, saving && { opacity: 0.7 }]}
+              onPress={() => handleSave(true)}
+              disabled={saving}
+            >
+              <Text style={modal.secondaryBtnText}>Save & Add Another</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[modal.saveBtn, saving && { opacity: 0.7 }]}
+              onPress={() =>
+                addedCount > 0 && !title.trim() && !url.trim()
+                  ? close()
+                  : handleSave(false)
+              }
+              disabled={saving}
+            >
+              {saving ? (
+                <ActivityIndicator color="white" />
+              ) : (
+                <Text style={modal.saveBtnText}>
+                  {addedCount > 0 && !title.trim() && !url.trim()
+                    ? "Done"
+                    : "Save Session"}
+                </Text>
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     </Modal>
@@ -312,7 +349,9 @@ function SessionPlayer({
           </Text>
           {trackProgress && (
             <Text style={player.headerHint} numberOfLines={1}>
-              {alreadyCompleted ? "Watched" : `Watch until the end to complete`}
+              {alreadyCompleted
+                ? "Watched"
+                : `Watch at least ${percent}% to complete`}
             </Text>
           )}
         </View>
@@ -400,6 +439,10 @@ export default function RecordedSessionsScreen() {
   );
   const [loading, setLoading] = useState(true);
   const [addModalVisible, setAddModalVisible] = useState(false);
+
+  const [mode, setMode] = useState<"normal" | "select" | "reorder">("normal");
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [deleting, setDeleting] = useState(false);
   const [activeSession, setActiveSession] = useState<LearningMaterial | null>(
     null,
   );
@@ -464,6 +507,66 @@ export default function RecordedSessionsScreen() {
     ]);
   };
 
+  const exitMode = () => {
+    setMode("normal");
+    setSelectedIds(new Set());
+  };
+
+  const toggleSelected = (id: number) =>
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const allSelected =
+    sessions.length > 0 && selectedIds.size === sessions.length;
+
+  const toggleSelectAll = () =>
+    setSelectedIds(
+      allSelected ? new Set() : new Set(sessions.map((s) => s.material_id)),
+    );
+
+  const handleDeleteSelected = () => {
+    const items = sessions.filter((s) => selectedIds.has(s.material_id));
+    if (items.length === 0) return;
+    Alert.alert(
+      "Delete Sessions",
+      `Delete ${items.length} selected session${items.length > 1 ? "s" : ""}? This cannot be undone.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            setDeleting(true);
+            const result = await deleteMaterials(items);
+            setDeleting(false);
+            exitMode();
+            fetchSessions();
+            if (result.failed.length > 0) {
+              Alert.alert(
+                "Some sessions were not deleted",
+                result.failed.join("\n"),
+              );
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const handleSaveOrder = async (ids: number[]) => {
+    try {
+      await saveMaterialOrder(ids);
+      exitMode();
+      fetchSessions();
+    } catch (err: any) {
+      Alert.alert("Couldn't save the order", err.message);
+    }
+  };
+
   const handleSessionViewed = async (session: LearningMaterial) => {
     if (isAdmin || !currentStudentId) return;
     try {
@@ -526,11 +629,31 @@ export default function RecordedSessionsScreen() {
 
   const renderItem = ({ item }: { item: LearningMaterial }) => {
     const isCompleted = completedMaterialIds.has(item.material_id);
+    const selecting = mode === "select";
+    const isSelected = selectedIds.has(item.material_id);
     return (
-      <View style={styles.sessionCard}>
+      <TouchableOpacity
+        style={[styles.sessionCard, isSelected && styles.sessionCardSelected]}
+        disabled={!selecting}
+        activeOpacity={0.7}
+        onPress={() => toggleSelected(item.material_id)}
+      >
+        {selecting && (
+          <View style={styles.checkboxWrap}>
+            <Ionicons
+              name={isSelected ? "checkbox" : "square-outline"}
+              size={22}
+              color={isSelected ? "#2F459B" : "#A0A7B4"}
+            />
+          </View>
+        )}
         <TouchableOpacity
           style={styles.thumbnailWrap}
-          onPress={() => setActiveSession(item)}
+          onPress={() =>
+            selecting
+              ? toggleSelected(item.material_id)
+              : setActiveSession(item)
+          }
           activeOpacity={0.85}
         >
           <View style={styles.thumbnailPlaceholder}>
@@ -561,29 +684,35 @@ export default function RecordedSessionsScreen() {
             </View>
           )}
 
-          <View style={styles.actions}>
-            <TouchableOpacity
-              style={styles.actionBtn}
-              onPress={() => setActiveSession(item)}
-            >
-              <Ionicons name="play-circle-outline" size={15} color="#2F459B" />
-              <Text style={styles.actionBtnText}>Play</Text>
-            </TouchableOpacity>
-
-            {isAdmin && (
+          {!selecting && (
+            <View style={styles.actions}>
               <TouchableOpacity
-                style={[styles.actionBtn, styles.deleteBtn]}
-                onPress={() => handleDelete(item)}
+                style={styles.actionBtn}
+                onPress={() => setActiveSession(item)}
               >
-                <Ionicons name="trash-outline" size={15} color="#E74C3C" />
-                <Text style={[styles.actionBtnText, { color: "#E74C3C" }]}>
-                  Delete
-                </Text>
+                <Ionicons
+                  name="play-circle-outline"
+                  size={15}
+                  color="#2F459B"
+                />
+                <Text style={styles.actionBtnText}>Play</Text>
               </TouchableOpacity>
-            )}
-          </View>
+
+              {isAdmin && (
+                <TouchableOpacity
+                  style={[styles.actionBtn, styles.deleteBtn]}
+                  onPress={() => handleDelete(item)}
+                >
+                  <Ionicons name="trash-outline" size={15} color="#E74C3C" />
+                  <Text style={[styles.actionBtnText, { color: "#E74C3C" }]}>
+                    Delete
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
         </View>
-      </View>
+      </TouchableOpacity>
     );
   };
 
@@ -601,17 +730,81 @@ export default function RecordedSessionsScreen() {
         <Text style={styles.courseSub}>Recorded Sessions</Text>
       </View>
 
-      {isAdmin && uploadModuleId && (
+      {isAdmin && uploadModuleId && mode === "normal" && (
         <TouchableOpacity
           style={styles.addBtn}
           onPress={() => setAddModalVisible(true)}
         >
           <Ionicons name="add-circle-outline" size={20} color="white" />
-          <Text style={styles.addBtnText}>Upload Session</Text>
+          <Text style={styles.addBtnText}>Upload Sessions</Text>
         </TouchableOpacity>
       )}
 
-      {loading ? (
+      {isAdmin && !loading && sessions.length > 0 && mode === "normal" && (
+        <View style={styles.toolsRow}>
+          <TouchableOpacity
+            style={styles.toolBtn}
+            onPress={() => setMode("select")}
+          >
+            <Ionicons name="checkbox-outline" size={15} color="#2F459B" />
+            <Text style={styles.toolBtnText}>Select</Text>
+          </TouchableOpacity>
+          {sessions.length > 1 && (
+            <TouchableOpacity
+              style={styles.toolBtn}
+              onPress={() => setMode("reorder")}
+            >
+              <Ionicons name="reorder-three" size={17} color="#2F459B" />
+              <Text style={styles.toolBtnText}>Reorder</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
+
+      {isAdmin && mode === "select" && (
+        <View style={styles.selectBar}>
+          <TouchableOpacity onPress={toggleSelectAll}>
+            <Text style={styles.selectAllText}>
+              {allSelected ? "Unselect all" : "Select all"}
+            </Text>
+          </TouchableOpacity>
+          <Text style={styles.selectCount}>{selectedIds.size} selected</Text>
+          <TouchableOpacity
+            onPress={exitMode}
+            style={styles.toolBtn}
+            disabled={deleting}
+          >
+            <Text style={styles.toolBtnText}>Cancel</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={handleDeleteSelected}
+            style={[
+              styles.deleteSelectedBtn,
+              (selectedIds.size === 0 || deleting) && { opacity: 0.5 },
+            ]}
+            disabled={selectedIds.size === 0 || deleting}
+          >
+            {deleting ? (
+              <ActivityIndicator size="small" color="white" />
+            ) : (
+              <Text style={styles.deleteSelectedText}>Delete</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {isAdmin && mode === "reorder" ? (
+        <MaterialReorder
+          items={sessions.map((s) => ({
+            key: String(s.material_id),
+            id: s.material_id,
+            title: s.title,
+            icon: <Ionicons name="logo-youtube" size={24} color="#E74C3C" />,
+          }))}
+          onSave={handleSaveOrder}
+          onCancel={exitMode}
+        />
+      ) : loading ? (
         <View style={styles.centered}>
           <ActivityIndicator size="large" color="#2F459B" />
         </View>
@@ -621,7 +814,7 @@ export default function RecordedSessionsScreen() {
           <Text style={styles.emptyText}>No recorded sessions yet.</Text>
           {isAdmin && (
             <Text style={styles.emptyHint}>
-              Tap "Add Session" to add a YouTube link.
+              Tap "Upload Sessions" to add YouTube links.
             </Text>
           )}
         </View>
@@ -629,6 +822,7 @@ export default function RecordedSessionsScreen() {
         <View style={{ flex: 1 }}>
           <FlatList
             data={sessions}
+            extraData={[mode, selectedIds]}
             keyExtractor={(item) => String(item.material_id)}
             renderItem={renderItem}
             contentContainerStyle={styles.listContent}
@@ -705,6 +899,45 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   addBtnText: { color: "white", fontWeight: "bold", fontSize: 15 },
+  toolsRow: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 8,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+  },
+  toolBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: "#2F459B",
+    backgroundColor: "white",
+  },
+  toolBtnText: { fontSize: 12, color: "#2F459B", fontWeight: "600" },
+  selectBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 20,
+    paddingTop: 14,
+  },
+  selectAllText: { fontSize: 12, color: "#2F459B", fontWeight: "600" },
+  selectCount: { flex: 1, fontSize: 12, color: "#777", textAlign: "center" },
+  deleteSelectedBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 6,
+    backgroundColor: "#E74C3C",
+    minWidth: 64,
+    alignItems: "center",
+  },
+  deleteSelectedText: { fontSize: 12, color: "white", fontWeight: "bold" },
+  sessionCardSelected: { borderColor: "#2F459B", backgroundColor: "#EEF1FB" },
+  checkboxWrap: { justifyContent: "center", paddingLeft: 10, paddingRight: 4 },
   listContent: { padding: 20, paddingBottom: 100 },
   sessionCard: {
     flexDirection: "row",
@@ -820,12 +1053,30 @@ const modal = StyleSheet.create({
   inputError: { borderColor: "#E74C3C" },
   errorText: { fontSize: 12, color: "#E74C3C", marginBottom: 16 },
   hint: { fontSize: 12, color: "#95A5A6", marginBottom: 16 },
+  btnRow: { flexDirection: "row", gap: 10, marginTop: 8 },
   saveBtn: {
+    flex: 1,
     backgroundColor: "#2F459B",
     paddingVertical: 14,
     borderRadius: 10,
     alignItems: "center",
-    marginTop: 8,
+  },
+  secondaryBtn: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: "#2F459B",
+    paddingVertical: 14,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+  secondaryBtnText: { color: "#2F459B", fontWeight: "bold", fontSize: 14 },
+  addedNote: {
+    fontSize: 12,
+    color: "#1E9E5A",
+    backgroundColor: "#EAF7F0",
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 14,
   },
   saveBtnText: { color: "white", fontWeight: "bold", fontSize: 15 },
 });

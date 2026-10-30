@@ -12,6 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import DiagnosticCard from "../../components/DiagnosticCard";
 import { supabase } from "../../lib/supabase";
 import { getModulesByCourse } from "../../services/materialService";
 import AdminHamburger from "./hamburger";
@@ -244,6 +245,7 @@ export default function AdminCourses() {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
+          <DiagnosticCard isAdmin />
           {courses.map((course) => (
             <CourseCard
               key={course.course_id}

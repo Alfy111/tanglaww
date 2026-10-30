@@ -13,9 +13,12 @@ import {
 } from "react-native";
 import { useAdmin } from "../../context/AdminContext";
 
+// Set these to the routes of the other quiz screens.
+// Example: if all files are in app/course/, use "/course/quiz-editor".
 const EDITOR_ROUTE = "/materials/quiz-editor";
 const DETAILS_ROUTE = "/materials/quiz-details";
 
+// One shape for both admin and student rows
 interface QuizRow {
   assessment_id: number;
   module_id: number;
@@ -24,6 +27,7 @@ interface QuizRow {
   status: "Draft" | "Open" | "Closed";
   pastDeadline?: boolean;
   subtitle: string;
+  // Student only
   maxScore?: number;
   latestScore?: number | null;
 }
@@ -53,13 +57,34 @@ const formatScore = (n: number) => String(Number(n.toFixed(2)));
 
 export default function QuizScreen() {
   const router = useRouter();
-  const { courseId: courseIdParam, courseTitle = "Course" } =
-    useLocalSearchParams<{ courseId: string; courseTitle: string }>();
+  const {
+    courseId: courseIdParam,
+    courseTitle = "Course",
+    diagnostic,
+  } = useLocalSearchParams<{
+    courseId: string;
+    courseTitle: string;
+    diagnostic?: string; // "1" = Diagnostic Examination list
+  }>();
   const courseId = Number(courseIdParam);
+  const isDiagnostic = diagnostic === "1";
   const { isAdmin, isStudent, authLoading } = useAdmin();
 
   const [quizzes, setQuizzes] = useState<QuizRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [diagnosticModuleId, setDiagnosticModuleId] = useState<number | null>(
+    null,
+  );
+
+  // The diagnostic quiz lives in its own module. Show it only on the
+  // Diagnostic Examination list, and hide it from the normal course list.
+  const getDiagnosticModuleId = async (): Promise<number | null> => {
+    const { data } = await supabase.rpc("get_diagnostic_quiz");
+    return (data as any)?.module_id ?? null;
+  };
+
+  const keepRow = (moduleId: number, diagModuleId: number | null) =>
+    isDiagnostic ? moduleId === diagModuleId : moduleId !== diagModuleId;
 
   const fetchAdminQuizzes = async (): Promise<QuizRow[]> => {
     const { data, error } = await supabase
@@ -111,16 +136,23 @@ export default function QuizScreen() {
 
   const fetchQuizzes = useCallback(async () => {
     setLoading(true);
+    // Wait until the role is known, then load the list for that role only
     if (authLoading) return;
-    const rows = isAdmin
-      ? await fetchAdminQuizzes()
-      : isStudent
-        ? await fetchStudentQuizzes()
-        : [];
-    setQuizzes(rows);
+    const [rows, diagModuleId] = await Promise.all([
+      isAdmin
+        ? fetchAdminQuizzes()
+        : isStudent
+          ? fetchStudentQuizzes()
+          : Promise.resolve([] as QuizRow[]),
+      getDiagnosticModuleId(),
+    ]);
+    setQuizzes(rows.filter((r) => keepRow(r.module_id, diagModuleId)));
+    setDiagnosticModuleId(diagModuleId);
     setLoading(false);
-  }, [courseId, isAdmin, isStudent, authLoading]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [courseId, isAdmin, isStudent, authLoading, isDiagnostic]);
 
+  // Refresh whenever the screen comes back into view
   useFocusEffect(
     useCallback(() => {
       if (courseId) fetchQuizzes();
@@ -134,6 +166,10 @@ export default function QuizScreen() {
         courseId: String(courseId),
         courseTitle,
         ...(assessmentId ? { assessmentId: String(assessmentId) } : {}),
+        // Diagnostic quizzes go into the diagnostic module
+        ...(isDiagnostic && diagnosticModuleId
+          ? { diagnostic: "1", moduleId: String(diagnosticModuleId) }
+          : {}),
       },
     });
   };
@@ -230,7 +266,7 @@ export default function QuizScreen() {
 
       <View style={styles.courseLabelWrap}>
         <Text style={styles.courseLabel}>{courseTitle}</Text>
-        <Text style={styles.courseSub}>Quizzes</Text>
+        {!isDiagnostic && <Text style={styles.courseSub}>Quizzes</Text>}
       </View>
 
       {loading ? (
