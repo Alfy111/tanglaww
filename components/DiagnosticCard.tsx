@@ -11,9 +11,6 @@ type Diagnostic = {
   isPublished: boolean;
 };
 
-// "Diagnostic Examination" card shown above the courses.
-// Admin: always shown. Opens the quiz list so they can create/edit the exam.
-// Student: shown only when the exam is published. Opens the exam directly.
 export default function DiagnosticCard({ isAdmin }: { isAdmin: boolean }) {
   const router = useRouter();
   const [diag, setDiag] = useState<Diagnostic | null>(null);
@@ -41,7 +38,7 @@ export default function DiagnosticCard({ isAdmin }: { isAdmin: boolean }) {
       router.push({
         pathname: "/materials/quiz" as any,
         params: {
-          courseId: "1", // the diagnostic module sits under Concept-Driven
+          courseId: "1",
           courseTitle: "Diagnostic Examination",
           diagnostic: "1",
         },

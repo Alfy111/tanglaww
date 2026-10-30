@@ -29,7 +29,6 @@ export async function getMaterialsByModule(
     .select("*")
     .eq("module_id", moduleId)
     .eq("materialType", type)
-    // The order the admin set by dragging (new uploads go to the end)
     .order("position", { ascending: true, nullsFirst: false })
     .order("uploadedAt", { ascending: false });
 
@@ -39,7 +38,6 @@ export async function getMaterialsByModule(
   return (data ?? []) as LearningMaterial[];
 }
 
-// All materials of one type across every module of a course
 export async function getMaterialsByCourse(
   courseId: number,
   type: MaterialType,
@@ -49,7 +47,6 @@ export async function getMaterialsByCourse(
     .select("*, module!inner(course_id)")
     .eq("module.course_id", courseId)
     .eq("materialType", type)
-    // The order the admin set by dragging (new uploads go to the end)
     .order("position", { ascending: true, nullsFirst: false })
     .order("uploadedAt", { ascending: false });
 
@@ -79,9 +76,6 @@ export async function uploadHandout(
     const file = result.assets[0];
     const ext = file.name.split(".").pop()?.toLowerCase() ?? "pdf";
     const storagePath = `module_${moduleId}/${Date.now()}_${file.name}`;
-
-    // Read the picked file as bytes (avoids empty uploads and the
-    // File API's "missing READ permission" error)
     const bytes = await readFileBytes(file.uri);
 
     const { error: storageError } = await supabase.storage
@@ -204,7 +198,6 @@ export async function downloadMaterial(
   }
 }
 
-// The course a module belongs to (for screens opened with only a moduleId)
 export async function getCourseIdForModule(
   moduleId: number,
 ): Promise<number | null> {
@@ -225,7 +218,7 @@ export async function getModulesByCourse(courseId: number) {
     .from("module")
     .select("module_id, moduleName, description")
     .eq("course_id", courseId)
-    .eq("is_diagnostic", false) // the diagnostic module has its own card
+    .eq("is_diagnostic", false)
     .order("module_id");
 
   if (error) {
@@ -233,10 +226,6 @@ export async function getModulesByCourse(courseId: number) {
   }
   return data ?? [];
 }
-
-// ------------------------------------------------------------------
-// Completion tracking (students only; the database ignores admins)
-// ------------------------------------------------------------------
 
 export async function markMaterialOpened(materialId: number): Promise<void> {
   const { error } = await supabase.rpc("mark_material_opened", {
@@ -288,7 +277,6 @@ export interface SectionProgress {
 
 export interface CourseProgress {
   percent: number;
-  // null = unlocked; "access" = no enrollment/access; "previous" = earlier course not finished
   lockReason: "access" | "previous" | "payment" | "not_applicable" | null;
   previousCourseName: string | null;
   handouts: SectionProgress;
