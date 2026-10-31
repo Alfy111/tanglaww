@@ -1,6 +1,6 @@
 import { Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import LoginWarningModal from "../../components/LoginWarningModal";
 import Navbar from "../../components/Navbar";
 import {
@@ -14,10 +14,8 @@ import {
 } from "../../lib/loginLockout";
 import { supabase } from "../../lib/supabase";
 import { useLoginLock } from "../../lib/useLoginLock";
-import "../SignIn.css";
 
 export default function AdminSignIn() {
-  const location = useLocation();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -54,6 +52,17 @@ export default function AdminSignIn() {
     color: "#555",
     marginBottom: "5px",
     display: "block",
+  };
+
+  const linkStyle = {
+    border: 0,
+    padding: 0,
+    background: "none",
+    font: "inherit",
+    color: "#0D2A94",
+    fontWeight: "700",
+    textDecoration: "underline",
+    cursor: "pointer",
   };
 
   const handleSignIn = async () => {
@@ -126,23 +135,64 @@ export default function AdminSignIn() {
   };
 
   return (
-    <div className="auth-page">
-      <Navbar brandOnly />
+    <div
+      style={{
+        fontFamily: "Poppins, sans-serif",
+        minHeight: "100vh",
+        backgroundColor: "#f5f5f5",
+      }}
+    >
+      <Navbar />
       <div
-        className={`auth-card${location.state?.authTransition === "student-to-admin" ? " auth-card--enter-from-right" : ""}`}
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          padding: "40px 16px",
+          minHeight: "calc(100vh - 100px)",
+          boxSizing: "border-box",
+        }}
       >
-
-        <div style={{ textAlign: "center", marginBottom: "32px" }}>
-          <div style={{ display: "inline-block", backgroundColor: "#fff8e1", color: "#f5a623", fontWeight: "700", fontSize: "12px", padding: "4px 14px", borderRadius: "20px", border: "1px solid #f5a623", marginBottom: "12px" }}>
-            ADMIN PORTAL
+        <div
+          style={{
+            width: "100%",
+            maxWidth: "480px",
+            margin: 0,
+            backgroundColor: "#fff",
+            borderRadius: "12px",
+            boxShadow: "0 4px 20px rgba(0,0,0,0.1)",
+            padding: "32px 40px 40px",
+            boxSizing: "border-box",
+          }}
+        >
+          <div style={{ textAlign: "center" }}>
+            <h1
+              style={{
+                fontSize: "32px",
+                fontWeight: "700",
+                color: "#FFD75E",
+                margin: "8px 0 0",
+              }}
+            >
+              Administrator Login
+            </h1>
+            <p style={{ fontSize: "14px", color: "#666", margin: "5px 0 0" }}>
+              Authorized administrators only.
+            </p>
+            <p
+              style={{
+                fontSize: "20px",
+                fontWeight: "700",
+                color: "#333",
+                margin: "25px 0",
+              }}
+            >
+              Welcome Back, Admin!
+            </p>
           </div>
-          <h1 style={{ fontSize: "28px", fontWeight: "700", color: "#1a1a6e", marginBottom: "6px" }}>Sign in</h1>
-          <p style={{ fontSize: "13px", color: "#888" }}>Authorized administrators only.</p>
-          <p style={{ fontSize: "16px", fontWeight: "600", color: "#222", marginTop: "16px" }}>Welcome Back, Admin!</p>
-        </div>
 
-        <div>
-          <label htmlFor="admin-email" style={labelStyle}>
+          <div>
+            <label htmlFor="admin-email" style={labelStyle}>
               Email:
             </label>
             <input
@@ -268,23 +318,63 @@ export default function AdminSignIn() {
                 Forgot Password?
               </button>
             </div>
-        </div>
 
-        <button
-          onClick={handleSignIn}
-          disabled={loading || lock.locked}
-          style={{ width: "100%", padding: "14px", backgroundColor: "#f5a623", color: "#1a1a2e", border: "none", borderRadius: "8px", fontSize: "15px", fontWeight: "700", cursor: loading || lock.locked ? "not-allowed" : "pointer", fontFamily: "Poppins, sans-serif", marginTop: "24px", opacity: loading || lock.locked ? 0.7 : 1 }}
-        >
-          {loading ? "Signing in..." : "Sign In as Admin"}
-        </button>
+            <button
+              type="button"
+              onClick={handleSignIn}
+              disabled={loading || lock.locked}
+              style={{
+                width: "100%",
+                padding: "15px",
+                backgroundColor: "#FFD75E",
+                color: "#000",
+                border: "none",
+                borderRadius: "10px",
+                fontSize: "16px",
+                fontWeight: "700",
+                fontFamily: "Poppins, sans-serif",
+                cursor: loading || lock.locked ? "not-allowed" : "pointer",
+                opacity: loading || lock.locked ? 0.6 : 1,
+              }}
+            >
+              {loading ? "Signing in..." : "Sign-In"}
+            </button>
+          </div>
 
-        <div style={{ textAlign: "center", marginTop: "28px", fontSize: "12px", color: "#888" }}>
-          Not an admin?{" "}
-          <button type="button" onClick={() => navigate("/signin", { state: { authTransition: "admin-to-student" } })} style={{ border: 0, padding: 0, background: "none", color: "#1a1a6e", fontWeight: "700", cursor: "pointer", font: "inherit" }}>Student Sign-in</button>
-        </div>
-        <div style={{ textAlign: "center", marginTop: "12px", fontSize: "12px", color: "#888" }}>
-          Got an admin invite?{" "}
-          <button type="button" onClick={() => navigate("/admin/activate")} style={{ color: "#1a1a6e", fontWeight: "700", cursor: "pointer", border: 0, padding: 0, background: "none", font: "inherit" }}>Activate account</button>
+          <p
+            style={{
+              textAlign: "center",
+              marginTop: "28px",
+              fontSize: "14px",
+              color: "#666",
+            }}
+          >
+            Got an admin invite?{" "}
+            <button
+              type="button"
+              onClick={() => navigate("/admin/activate")}
+              style={linkStyle}
+            >
+              Activate admin account
+            </button>
+          </p>
+          <p
+            style={{
+              textAlign: "center",
+              marginTop: "10px",
+              fontSize: "14px",
+              color: "#666",
+            }}
+          >
+            Not an admin?{" "}
+            <button
+              type="button"
+              onClick={() => navigate("/signin")}
+              style={linkStyle}
+            >
+              Student Sign-in
+            </button>
+          </p>
         </div>
       </div>
       <LoginWarningModal

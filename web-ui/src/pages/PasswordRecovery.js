@@ -119,20 +119,21 @@ export default function PasswordRecovery({
     border: 0,
     padding: 0,
     background: "none",
-    color: "#1a1a6e",
+    color: isAdmin ? "#0D2A94" : "#1a1a6e",
     fontWeight: "700",
+    textDecoration: isAdmin ? "underline" : "none",
     cursor: "pointer",
     font: "inherit",
   };
 
   const buttonStyle = {
     width: "100%",
-    padding: "14px",
-    backgroundColor: isAdmin ? "#f5a623" : "#1a1a6e",
-    color: isAdmin ? "#1a1a2e" : "#fff",
+    padding: isAdmin ? "15px" : "14px",
+    backgroundColor: isAdmin ? "#FFD75E" : "#1a1a6e",
+    color: isAdmin ? "#000" : "#fff",
     border: "none",
-    borderRadius: "8px",
-    fontSize: "15px",
+    borderRadius: isAdmin ? "10px" : "8px",
+    fontSize: isAdmin ? "16px" : "15px",
     fontWeight: "700",
     cursor: loading ? "not-allowed" : "pointer",
     fontFamily: "Poppins, sans-serif",
@@ -224,28 +225,11 @@ export default function PasswordRecovery({
         }}
       >
         <div style={{ textAlign: "center", marginBottom: "28px" }}>
-          {isAdmin && (
-            <div
-              style={{
-                display: "inline-block",
-                backgroundColor: "#fff8e1",
-                color: "#f5a623",
-                fontWeight: "700",
-                fontSize: "12px",
-                padding: "4px 14px",
-                borderRadius: "20px",
-                border: "1px solid #f5a623",
-                marginBottom: "12px",
-              }}
-            >
-              ADMIN PORTAL
-            </div>
-          )}
           <h1
             style={{
-              fontSize: "25px",
+              fontSize: isAdmin ? "30px" : "25px",
               fontWeight: "700",
-              color: "#1a1a6e",
+              color: isAdmin ? "#FFD75E" : "#1a1a6e",
               margin: "0 0 8px",
             }}
           >

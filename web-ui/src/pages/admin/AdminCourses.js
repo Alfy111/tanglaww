@@ -31,6 +31,7 @@ const courseImages = {
   4: integrative,
   5: finalCoaching,
   6: testHighlights,
+  7: finalCoaching,
 };
 
 const SECTIONS = [
@@ -233,7 +234,8 @@ export default function AdminCourses() {
         await Promise.all([
           supabase
             .from("course")
-            .select("course_id, courseName, instructor")
+            .select("course_id, courseName, instructor, sort_order")
+            .order("sort_order")
             .order("course_id"),
           supabase.rpc("get_diagnostic_quiz"),
         ]);

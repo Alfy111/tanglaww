@@ -1,52 +1,222 @@
+import {
+  Award,
+  BarChart3,
+  BookOpen,
+  CalendarCheck,
+  Target,
+  TrendingDown,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import Sidebar from "../components/Sidebar";
 import UserTopbar from "../components/UserTopbar";
-import { getStudentCourseProgress } from "../lib/materialProgress";
 import { supabase } from "../lib/supabase";
 import "./Dashboard.css";
 
+const NAVY = "#0D2A94";
+const GREEN = "#2e7d32";
+
+const pct = (value) => (value == null ? "—" : `${Math.round(Number(value))}%`);
+const shortDate = (iso) =>
+  iso
+    ? new Date(iso).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+      })
+    : "";
+const barColor = (value) =>
+  value == null
+    ? "#C4C9D2"
+    : value >= 75
+      ? GREEN
+      : value >= 50
+        ? "#F39C12"
+        : "#E74C3C";
+
+function CardTitle({ icon: Icon, title, subtitle }) {
+  return (
+    <div style={{ marginBottom: "14px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+        {Icon && <Icon size={18} color={NAVY} />}
+        <span style={{ fontSize: "15px", fontWeight: "700", color: "#1a1a2e" }}>
+          {title}
+        </span>
+      </div>
+      {subtitle && (
+        <div style={{ fontSize: "12px", color: "#888", marginTop: "2px" }}>
+          {subtitle}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BarRow({ label, value, note }) {
+  const width = Math.max(0, Math.min(100, Number(value) || 0));
+  return (
+    <div style={{ marginBottom: "12px" }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          gap: "12px",
+          marginBottom: "5px",
+        }}
+      >
+        <span style={{ fontSize: "13px", fontWeight: "600", color: "#333" }}>
+          {label}
+          {note && (
+            <span
+              style={{ fontSize: "11px", color: "#888", fontWeight: "400" }}
+            >
+              {" "}
+              · {note}
+            </span>
+          )}
+        </span>
+        <span style={{ fontSize: "12px", fontWeight: "700", color: NAVY }}>
+          {pct(value)}
+        </span>
+      </div>
+      <div
+        style={{
+          height: "8px",
+          backgroundColor: "#eef2ff",
+          borderRadius: "4px",
+          overflow: "hidden",
+        }}
+      >
+        <div
+          style={{
+            height: "100%",
+            width: `${width}%`,
+            backgroundColor: barColor(value),
+            borderRadius: "4px",
+            transition: "width 0.4s ease",
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function Empty({ text }) {
+  return (
+    <p
+      style={{
+        fontSize: "13px",
+        color: "#888",
+        fontStyle: "italic",
+        margin: 0,
+      }}
+    >
+      {text}
+    </p>
+  );
+}
+
+function StatCard({ icon: Icon, tint, color, label, value, note }) {
+  return (
+    <div
+      className="card"
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: "16px",
+        padding: "16px",
+      }}
+    >
+      <div
+        style={{
+          background: tint,
+          padding: "12px",
+          borderRadius: "10px",
+          color,
+          display: "flex",
+        }}
+      >
+        <Icon size={24} />
+      </div>
+      <div>
+        <div style={{ fontSize: "12px", color: "#777", fontWeight: "500" }}>
+          {label}
+        </div>
+        <div style={{ fontSize: "20px", fontWeight: "700", color: "#1a1a2e" }}>
+          {value}
+        </div>
+        {note && <div style={{ fontSize: "11px", color: "#999" }}>{note}</div>}
+      </div>
+    </div>
+  );
+}
+
+function ColumnChart({ quizzes }) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "flex-end",
+        gap: "10px",
+        height: "170px",
+        padding: "0 4px",
+        borderBottom: "1px solid #eee",
+      }}
+    >
+      {quizzes.map((q, i) => {
+        const value = Math.max(0, Math.min(100, Number(q.pct) || 0));
+        return (
+          <div
+            key={i}
+            title={`${q.title}: ${pct(q.pct)}`}
+            style={{
+              flex: 1,
+              maxWidth: "48px",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "flex-end",
+              height: "100%",
+              gap: "4px",
+            }}
+          >
+            <span style={{ fontSize: "11px", fontWeight: "700", color: NAVY }}>
+              {pct(q.pct)}
+            </span>
+            <div
+              style={{
+                width: "100%",
+                height: `${Math.max(value, 2)}%`,
+                backgroundColor: barColor(q.pct),
+                borderRadius: "6px 6px 0 0",
+              }}
+            />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function Analytics() {
-  const [activeTab, setActiveTab] = useState("overview");
-  const [courses, setCourses] = useState([]);
-  const [summary, setSummary] = useState({
-    totalCount: 0,
-    completedCount: 0,
-    overallProgress: 0,
-    totalHandouts: 0,
-    completedHandouts: 0,
-    courseCount: 0,
-    completedCourseCount: 0,
-  });
-  const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState("overview");
+  const [data, setData] = useState(null);
   const [error, setError] = useState("");
+  const [courseId, setCourseId] = useState(null);
 
   useEffect(() => {
-    const loadProgress = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) throw new Error("Sign in to view your progress.");
-
-        const { data: student, error: studentError } = await supabase
-          .from("student")
-          .select("id")
-          .eq("auth_id", user.id)
-          .maybeSingle();
-
-        if (studentError) throw new Error(studentError.message);
-        if (!student) throw new Error("No student profile is linked to this account.");
-
-        const result = await getStudentCourseProgress(Number(student.id));
-        setCourses(result.courses);
-        setSummary(result.summary);
-      } catch (loadError) {
-        setError(loadError.message ?? "Unable to load progress.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadProgress();
+    supabase
+      .rpc("get_my_analytics")
+      .then(({ data: report, error: loadError }) => {
+        if (loadError) {
+          setError(loadError.message);
+          return;
+        }
+        setData(report);
+        setCourseId(report?.courses?.[0]?.course_id ?? null);
+      });
   }, []);
+
+  const summary = data?.summary;
+  const course = data?.courses?.find((c) => c.course_id === courseId) ?? null;
 
   return (
     <div className="dashboard-layout">
@@ -54,195 +224,418 @@ export default function Analytics() {
       <div className="dashboard-main">
         <UserTopbar title="Analytics" />
 
-        <div className="dashboard-content" style={{ flexDirection: "column", gap: "20px" }}>
-          
-          {/* Header & Tabs */}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div
+          className="dashboard-content"
+          style={{ flexDirection: "column", gap: "20px" }}
+        >
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: "12px",
+            }}
+          >
             <div>
-              <h2 style={{ fontSize: "20px", fontWeight: "700", color: "#1a1a2e", margin: 0 }}>
-                Review Progress & Analytics
+              <h2
+                style={{
+                  fontSize: "20px",
+                  fontWeight: "700",
+                  color: "#1a1a2e",
+                  margin: 0,
+                }}
+              >
+                My Performance
               </h2>
               <p style={{ fontSize: "13px", color: "#666", margin: "4px 0 0" }}>
-                Track your learning milestones, drill performance, and study time distribution.
+                Your course progress, quiz scores, and the topics to review
+                next.
               </p>
             </div>
-
-            <div style={{ display: "flex", gap: "8px", background: "#eef2ff", padding: "4px", borderRadius: "8px" }}>
-              {["overview", "courses", "performance"].map((tab) => (
+            <div
+              role="tablist"
+              style={{
+                display: "flex",
+                gap: "8px",
+                background: "#eef2ff",
+                padding: "4px",
+                borderRadius: "8px",
+              }}
+            >
+              {[
+                ["overview", "Overview"],
+                ["course", "By Course"],
+              ].map(([key, label]) => (
                 <button
-                  key={tab}
+                  key={key}
                   type="button"
-                  onClick={() => setActiveTab(tab)}
+                  role="tab"
+                  aria-selected={tab === key}
+                  onClick={() => setTab(key)}
                   style={{
                     border: "none",
-                    background: activeTab === tab ? "#0D2A94" : "transparent",
-                    color: activeTab === tab ? "#fff" : "#555",
+                    background: tab === key ? NAVY : "transparent",
+                    color: tab === key ? "#fff" : "#555",
                     padding: "6px 14px",
                     borderRadius: "6px",
                     fontSize: "12px",
                     fontWeight: "600",
                     cursor: "pointer",
-                    textTransform: "capitalize",
-                    transition: "all 0.2s ease"
+                    fontFamily: "inherit",
                   }}
                 >
-                  {tab}
+                  {label}
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Metric Overview Cards */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "16px" }}>
-            
-            <div className="card" style={{ display: "flex", alignItems: "center", gap: "16px", padding: "16px" }}>
-              <div style={{ background: "#e8f5e9", padding: "12px", borderRadius: "10px", color: "#2e7d32", display: "flex" }}>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-                  <polyline points="22 4 12 14.01 9 11.01"></polyline>
-                </svg>
-              </div>
-              <div>
-                <div style={{ fontSize: "12px", color: "#777", fontWeight: "500" }}>Overall Completion</div>
-                <div style={{ fontSize: "20px", fontWeight: "700", color: "#1a1a2e" }}>{summary.overallProgress}%</div>
-              </div>
-            </div>
-
-            <div className="card" style={{ display: "flex", alignItems: "center", gap: "16px", padding: "16px" }}>
-              <div style={{ background: "#e0f2fe", padding: "12px", borderRadius: "10px", color: "#0284c7", display: "flex" }}>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="10"></circle>
-                  <circle cx="12" cy="12" r="6"></circle>
-                  <circle cx="12" cy="12" r="2"></circle>
-                </svg>
-              </div>
-              <div>
-                <div style={{ fontSize: "12px", color: "#777", fontWeight: "500" }}>Handouts Completed</div>
-                <div style={{ fontSize: "20px", fontWeight: "700", color: "#1a1a2e" }}>{summary.completedHandouts}/{summary.totalHandouts}</div>
-              </div>
-            </div>
-
-            <div className="card" style={{ display: "flex", alignItems: "center", gap: "16px", padding: "16px" }}>
-              <div style={{ background: "#fef3c7", padding: "12px", borderRadius: "10px", color: "#d97706", display: "flex" }}>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="10"></circle>
-                  <polyline points="12 6 12 12 16 14"></polyline>
-                </svg>
-              </div>
-              <div>
-                <div style={{ fontSize: "12px", color: "#777", fontWeight: "500" }}>Courses Completed</div>
-                <div style={{ fontSize: "20px", fontWeight: "700", color: "#1a1a2e" }}>{summary.completedCourseCount}/{summary.courseCount}</div>
-              </div>
-            </div>
-
-            <div className="card" style={{ display: "flex", alignItems: "center", gap: "16px", padding: "16px" }}>
-              <div style={{ background: "#f3e8ff", padding: "12px", borderRadius: "10px", color: "#9333ea", display: "flex" }}>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="8" r="7"></circle>
-                  <polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"></polyline>
-                </svg>
-              </div>
-              <div>
-                <div style={{ fontSize: "12px", color: "#777", fontWeight: "500" }}>Materials Completed</div>
-                <div style={{ fontSize: "20px", fontWeight: "700", color: "#1a1a2e" }}>{summary.completedCount}/{summary.totalCount}</div>
-              </div>
-            </div>
-
-          </div>
-
-          {/* Detailed Analytics Grid */}
-          <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "20px" }}>
-            
-            {/* Course Progress Breakdown */}
+          {error ? (
+            <p role="alert" style={{ color: "#c0392b", fontSize: "13px" }}>
+              {error}
+            </p>
+          ) : !data ? (
             <div className="card">
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0D2A94" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
-                    <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
-                  </svg>
-                  <span style={{ fontSize: "15px", fontWeight: "700", color: "#1a1a2e" }}>Course Breakdown</span>
+              <p style={{ fontSize: "13px", color: "#888", margin: 0 }}>
+                Loading your performance...
+              </p>
+            </div>
+          ) : tab === "overview" ? (
+            <>
+              <div className="card">
+                <CardTitle
+                  icon={Award}
+                  title="Road to LPT Passer"
+                  subtitle="Your progress across all courses"
+                />
+                <div
+                  style={{ display: "flex", alignItems: "center", gap: "12px" }}
+                >
+                  <div
+                    style={{
+                      flex: 1,
+                      height: "10px",
+                      backgroundColor: "#E0E0E0",
+                      borderRadius: "5px",
+                      overflow: "hidden",
+                    }}
+                  >
+                    <div
+                      style={{
+                        height: "100%",
+                        width: `${summary.completion ?? 0}%`,
+                        backgroundColor: NAVY,
+                        borderRadius: "5px",
+                      }}
+                    />
+                  </div>
+                  <span
+                    style={{ fontSize: "14px", fontWeight: "700", color: NAVY }}
+                  >
+                    {pct(summary.completion ?? 0)}
+                  </span>
                 </div>
               </div>
 
-              {error && <p role="alert" style={{ color: "#c0392b", fontSize: "13px" }}>{error}</p>}
-              {loading ? (
-                <p style={{ fontSize: "13px", color: "#888" }}>Loading course progress...</p>
-              ) : courses.length === 0 ? (
-                <p style={{ fontSize: "13px", color: "#888" }}>No courses available.</p>
-              ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-                {courses.map((course) => (
-                  <div key={course.id} style={{ borderBottom: "1px solid #f0f0f0", paddingBottom: "12px" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
-                      <span style={{ fontSize: "14px", fontWeight: "600", color: "#333" }}>{course.name}</span>
-                      <span style={{ fontSize: "12px", fontWeight: "700", color: "#0D2A94" }}>{course.progress}%</span>
-                    </div>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                  gap: "16px",
+                }}
+              >
+                <StatCard
+                  icon={Target}
+                  tint="#e8f5e9"
+                  color={GREEN}
+                  label="Average Score"
+                  value={pct(summary.avgScore)}
+                  note={`${summary.quizzesTaken} ${summary.quizzesTaken === 1 ? "quiz" : "quizzes"}`}
+                />
+                <StatCard
+                  icon={BookOpen}
+                  tint="#e0f2fe"
+                  color="#0284c7"
+                  label="Completed Courses"
+                  value={`${summary.completedCourses} / ${summary.totalCourses}`}
+                />
+                <StatCard
+                  icon={CalendarCheck}
+                  tint="#f3e8ff"
+                  color="#9333ea"
+                  label="Review Frequency"
+                  value={`${summary.activeDays} ${summary.activeDays === 1 ? "day" : "days"}`}
+                  note="active this week"
+                />
+              </div>
 
-                    <div style={{ height: "8px", width: "100%", backgroundColor: "#eef2ff", borderRadius: "4px", overflow: "hidden", marginBottom: "8px" }}>
-                      <div
-                        style={{
-                          height: "100%",
-                          width: `${course.progress}%`,
-                          backgroundColor: course.progress === 100 ? "#4caf50" : "#0D2A94",
-                          borderRadius: "4px",
-                          transition: "width 0.4s ease"
-                        }}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+                  gap: "20px",
+                  alignItems: "start",
+                }}
+              >
+                <div className="card">
+                  <CardTitle
+                    icon={BarChart3}
+                    title="Overall Performance by Course"
+                  />
+                  {data.courses.length === 0 ? (
+                    <Empty text="No courses yet." />
+                  ) : (
+                    data.courses.map((c) => (
+                      <BarRow
+                        key={c.course_id}
+                        label={c.courseName}
+                        value={c.percent}
                       />
-                    </div>
+                    ))
+                  )}
+                </div>
 
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#777" }}>
-                      <span>Materials completed: <strong>{course.completedCount}/{course.totalCount}</strong></span>
-                    </div>
-                  </div>
-                ))}
+                <div className="card">
+                  <CardTitle
+                    icon={TrendingDown}
+                    title="Focus Next"
+                    subtitle="Your weakest topics so far"
+                  />
+                  {data.focus.length === 0 ? (
+                    <Empty
+                      text={
+                        data.topics.length === 0
+                          ? "Take a quiz to see your strengths and weak areas."
+                          : "Great work! No topic is below 75%."
+                      }
+                    />
+                  ) : (
+                    data.focus.map((t) => (
+                      <BarRow
+                        key={t.topicName}
+                        label={t.topicName}
+                        value={t.mastery}
+                        note={t.majorName}
+                      />
+                    ))
+                  )}
+                </div>
               </div>
+
+              <div className="card">
+                <CardTitle title="Recent Quiz Results" />
+                {data.recent.length === 0 ? (
+                  <Empty text="No quizzes taken yet." />
+                ) : (
+                  <div style={{ overflowX: "auto" }}>
+                    <table
+                      style={{
+                        width: "100%",
+                        borderCollapse: "collapse",
+                        fontSize: "13px",
+                      }}
+                    >
+                      <thead>
+                        <tr
+                          style={{
+                            textAlign: "left",
+                            color: "#95A5A6",
+                            fontSize: "11px",
+                          }}
+                        >
+                          <th
+                            style={{
+                              padding: "0 8px 8px 0",
+                              borderBottom: "1px solid #eee",
+                            }}
+                          >
+                            Course
+                          </th>
+                          <th
+                            style={{
+                              padding: "0 8px 8px",
+                              borderBottom: "1px solid #eee",
+                            }}
+                          >
+                            Quiz Title
+                          </th>
+                          <th
+                            style={{
+                              padding: "0 8px 8px",
+                              borderBottom: "1px solid #eee",
+                              textAlign: "center",
+                            }}
+                          >
+                            Grade
+                          </th>
+                          <th
+                            style={{
+                              padding: "0 0 8px 8px",
+                              borderBottom: "1px solid #eee",
+                              textAlign: "right",
+                            }}
+                          >
+                            Date Taken
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {data.recent.map((q, i) => (
+                          <tr
+                            key={i}
+                            style={{ borderBottom: "1px solid #f5f5f5" }}
+                          >
+                            <td
+                              style={{
+                                padding: "10px 8px 10px 0",
+                                color: NAVY,
+                              }}
+                            >
+                              {q.courseName}
+                            </td>
+                            <td
+                              style={{ padding: "10px 8px", color: "#34495E" }}
+                            >
+                              {q.title}
+                            </td>
+                            <td
+                              style={{
+                                padding: "10px 8px",
+                                textAlign: "center",
+                                fontWeight: "700",
+                                color: NAVY,
+                              }}
+                            >
+                              {pct(q.pct)}
+                            </td>
+                            <td
+                              style={{
+                                padding: "10px 0 10px 8px",
+                                textAlign: "right",
+                                color: "#888",
+                              }}
+                            >
+                              {shortDate(q.date)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            <>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+                {data.courses.map((c) => {
+                  const active = c.course_id === courseId;
+                  return (
+                    <button
+                      key={c.course_id}
+                      type="button"
+                      aria-pressed={active}
+                      onClick={() => setCourseId(c.course_id)}
+                      style={{
+                        padding: "7px 14px",
+                        borderRadius: "20px",
+                        border: `1px solid ${NAVY}`,
+                        backgroundColor: active ? NAVY : "#fff",
+                        color: active ? "#fff" : NAVY,
+                        fontSize: "12px",
+                        fontWeight: "600",
+                        cursor: "pointer",
+                        fontFamily: "inherit",
+                      }}
+                    >
+                      {c.courseName}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {course && (
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+                    gap: "20px",
+                    alignItems: "start",
+                  }}
+                >
+                  <div className="card">
+                    <CardTitle
+                      icon={BarChart3}
+                      title={`${course.courseName} Performance Trend`}
+                      subtitle="Your latest score per quiz"
+                    />
+                    {course.quizzes.length === 0 ? (
+                      <Empty text="No quizzes taken in this course yet." />
+                    ) : (
+                      <>
+                        <ColumnChart quizzes={course.quizzes} />
+                        <div
+                          style={{
+                            display: "flex",
+                            gap: "10px",
+                            padding: "4px 4px 10px",
+                          }}
+                        >
+                          {course.quizzes.map((_, i) => (
+                            <span
+                              key={i}
+                              style={{
+                                flex: 1,
+                                maxWidth: "48px",
+                                textAlign: "center",
+                                fontSize: "11px",
+                                color: "#888",
+                              }}
+                            >
+                              Q{i + 1}
+                            </span>
+                          ))}
+                        </div>
+                        {course.quizzes.map((q, i) => (
+                          <div
+                            key={i}
+                            style={{
+                              fontSize: "12px",
+                              color: "#777",
+                              marginTop: "4px",
+                            }}
+                          >
+                            Q{i + 1} · {q.title}
+                            {q.attempts > 1 ? ` (${q.attempts} attempts)` : ""}
+                          </div>
+                        ))}
+                      </>
+                    )}
+                  </div>
+
+                  <div className="card">
+                    <CardTitle
+                      icon={TrendingDown}
+                      title="Topics Needing Review"
+                      subtitle="Lowest scores first"
+                    />
+                    {course.topics.length === 0 ? (
+                      <Empty text="Topic results appear after your first quiz in this course." />
+                    ) : (
+                      course.topics.map((t) => (
+                        <BarRow
+                          key={t.topicName}
+                          label={t.topicName}
+                          value={t.mastery}
+                        />
+                      ))
+                    )}
+                  </div>
+                </div>
               )}
-            </div>
-
-            {/* Sidebar Insights */}
-            <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-              
-              <div className="card">
-                <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0D2A94" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
-                    <polyline points="17 6 23 6 23 12"></polyline>
-                  </svg>
-                  <span style={{ fontSize: "15px", fontWeight: "700", color: "#1a1a2e" }}>Insights & Recommendation</span>
-                </div>
-                <div style={{ fontSize: "13px", color: "#555", lineHeight: "1.5" }}>
-                  <p style={{ marginTop: 0 }}>
-                    🎯 <strong>Course completion:</strong> {summary.completedCount} of {summary.totalCount} materials completed.
-                  </p>
-                  <p style={{ marginBottom: 0 }}>
-                    💡 <strong>Courses complete:</strong> {summary.completedCourseCount} of {summary.courseCount}.
-                  </p>
-                </div>
-              </div>
-
-              <div className="card">
-                <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0D2A94" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="12" y1="20" x2="12" y2="10"></line>
-                    <line x1="18" y1="20" x2="18" y2="4"></line>
-                    <line x1="6" y1="20" x2="6" y2="16"></line>
-                  </svg>
-                  <span style={{ fontSize: "15px", fontWeight: "700", color: "#1a1a2e" }}>Study Goal</span>
-                </div>
-                <div style={{ fontSize: "13px", color: "#555" }}>
-                  Material completion
-                  <div style={{ height: "8px", width: "100%", backgroundColor: "#eef2ff", borderRadius: "4px", margin: "8px 0" }}>
-                    <div style={{ height: "100%", width: `${summary.overallProgress}%`, backgroundColor: "#f5a623", borderRadius: "4px" }} />
-                  </div>
-                  <span style={{ fontSize: "11px", color: "#888" }}>{summary.overallProgress}% complete</span>
-                </div>
-              </div>
-
-            </div>
-
-          </div>
-
+            </>
+          )}
         </div>
       </div>
     </div>

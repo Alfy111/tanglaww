@@ -66,6 +66,30 @@ export const channelDetails = (name) =>
 const CURRICULUM_IDS = { BEEd: 1, BSEd: 2 };
 const TAKER_TYPE_IDS = { "First time taker": 1, Retaker: 2 };
 
+export const CURRICULUM_NAMES = {
+  BEEd: "Bachelor of Elementary Education (BEEd)",
+  BSEd: "Bachelor of Secondary Education (BSEd)",
+};
+
+export async function getSpecializations() {
+  const { data, error } = await supabase
+    .from("specialization")
+    .select("specialization_id, specializationName, curriculum_id")
+    .order("specialization_id");
+  if (error) {
+    console.error("specialization:", error.message);
+    return [];
+  }
+  return (data ?? []).map((r) => ({
+    id: Number(r.specialization_id),
+    name: String(r.specializationName),
+    curriculumId: Number(r.curriculum_id),
+  }));
+}
+
+export const specializationsFor = (all, curriculum) =>
+  all.filter((s) => s.curriculumId === CURRICULUM_IDS[curriculum]);
+
 export async function getPaymentChannels() {
   const { data, error } = await supabase.from("payment_channel").select("*");
   if (error) {
@@ -167,7 +191,8 @@ export async function submitEnrollment(data) {
 
   const enrollmentFields = {
     curriculum_id: CURRICULUM_IDS[data.curriculum],
-    specialization_id: SPECIALIZATIONS.indexOf(data.specialization) + 1,
+    specialization_id:
+      data.specializationId ?? SPECIALIZATIONS.indexOf(data.specialization) + 1,
     typeOfTaker_id: TAKER_TYPE_IDS[data.takerType],
     promo_id: data.promoId ?? null,
     enrollmentDate: now,

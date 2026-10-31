@@ -1,5 +1,5 @@
 import * as DocumentPicker from "expo-document-picker";
-import { File, Paths } from "expo-file-system";
+import * as LegacyFileSystem from "expo-file-system/legacy";
 import { readFileBytes } from "../lib/readFileBytes";
 import { supabase } from "../lib/supabase";
 
@@ -29,6 +29,7 @@ export async function getMaterialsByModule(
     .select("*")
     .eq("module_id", moduleId)
     .eq("materialType", type)
+    // The order the admin set by dragging (new uploads go to the end)
     .order("position", { ascending: true, nullsFirst: false })
     .order("uploadedAt", { ascending: false });
 
@@ -38,6 +39,7 @@ export async function getMaterialsByModule(
   return (data ?? []) as LearningMaterial[];
 }
 
+// All materials of one type across every module of a course
 export async function getMaterialsByCourse(
   courseId: number,
   type: MaterialType,
@@ -47,6 +49,7 @@ export async function getMaterialsByCourse(
     .select("*, module!inner(course_id)")
     .eq("module.course_id", courseId)
     .eq("materialType", type)
+    // The order the admin set by dragging (new uploads go to the end)
     .order("position", { ascending: true, nullsFirst: false })
     .order("uploadedAt", { ascending: false });
 
@@ -76,6 +79,9 @@ export async function uploadHandout(
     const file = result.assets[0];
     const ext = file.name.split(".").pop()?.toLowerCase() ?? "pdf";
     const storagePath = `module_${moduleId}/${Date.now()}_${file.name}`;
+
+    // Read the picked file as bytes (avoids empty uploads and the
+    // File API's "missing READ permission" error)
     const bytes = await readFileBytes(file.uri);
 
     const { error: storageError } = await supabase.storage
@@ -154,50 +160,53 @@ export async function deleteMaterial(
   return { success: true };
 }
 
+const MIME_TYPES: Record<string, string> = {
+  pdf: "application/pdf",
+  doc: "application/msword",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  ppt: "application/vnd.ms-powerpoint",
+  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+};
+
+export function materialMimeType(material: LearningMaterial): string {
+  return (
+    MIME_TYPES[material.fileType?.toLowerCase()] ?? "application/octet-stream"
+  );
+}
+
+export function materialFileName(material: LearningMaterial): string {
+  const ext = (material.fileType || "pdf").toLowerCase();
+  const base = material.title
+    .replace(new RegExp(`\\.${ext}$`, "i"), "")
+    .replace(/[^a-zA-Z0-9._-]/g, "_")
+    .replace(/_+/g, "_");
+  return `${base}.${ext}`;
+}
+
 export async function downloadMaterial(
   material: LearningMaterial,
 ): Promise<{ success: boolean; uri?: string; error?: string }> {
   try {
     const { data, error } = await supabase.storage
       .from("learning-materials")
-      .download(material.storagePath!);
-
-    if (error) throw new Error(error.message);
-    if (!data) throw new Error("No data returned");
-
-    const base64 = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const result = reader.result as string;
-        resolve(result.split(",")[1]);
-      };
-      reader.onerror = () => reject(new Error("FileReader failed"));
-      reader.readAsDataURL(data);
-    });
-
-    const safeTitle = material.title
-      .replace(/[^a-zA-Z0-9._-]/g, "_")
-      .replace(/_+/g, "_");
-
-    const docDir = Paths.document.uri ?? Paths.document.toString();
-    const localFile = new File(docDir + safeTitle);
-
-    const binaryString = atob(base64);
-    const bytes = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
+      .createSignedUrl(material.storagePath!, 300);
+    if (error || !data?.signedUrl) {
+      throw new Error(error?.message ?? "Could not get the download link.");
     }
 
-    const writer = localFile.writableStream().getWriter();
-    await writer.write(bytes);
-    await writer.close();
+    const target = `${LegacyFileSystem.cacheDirectory}${materialFileName(material)}`;
+    const result = await LegacyFileSystem.downloadAsync(data.signedUrl, target);
+    if (result.status !== 200) {
+      throw new Error(`Download failed (status ${result.status}).`);
+    }
 
-    return { success: true, uri: localFile.uri };
+    return { success: true, uri: result.uri };
   } catch (err: any) {
     return { success: false, error: err.message };
   }
 }
 
+// The course a module belongs to (for screens opened with only a moduleId)
 export async function getCourseIdForModule(
   moduleId: number,
 ): Promise<number | null> {
@@ -218,7 +227,7 @@ export async function getModulesByCourse(courseId: number) {
     .from("module")
     .select("module_id, moduleName, description")
     .eq("course_id", courseId)
-    .eq("is_diagnostic", false)
+    .eq("is_diagnostic", false) // the diagnostic module has its own card
     .order("module_id");
 
   if (error) {
@@ -226,6 +235,10 @@ export async function getModulesByCourse(courseId: number) {
   }
   return data ?? [];
 }
+
+// ------------------------------------------------------------------
+// Completion tracking (students only; the database ignores admins)
+// ------------------------------------------------------------------
 
 export async function markMaterialOpened(materialId: number): Promise<void> {
   const { error } = await supabase.rpc("mark_material_opened", {
@@ -277,6 +290,7 @@ export interface SectionProgress {
 
 export interface CourseProgress {
   percent: number;
+  // null = unlocked; "access" = no enrollment/access; "previous" = earlier course not finished
   lockReason: "access" | "previous" | "payment" | "not_applicable" | null;
   previousCourseName: string | null;
   handouts: SectionProgress;

@@ -439,7 +439,11 @@ export default function AdminHandouts() {
                         <Eye size={14} /> View
                       </a>
                       {item.isDownloadable && (
-                        <a href={item.fileUrl} download style={actionButton}>
+                        <a
+                          href={`${item.fileUrl}${item.fileUrl.includes("?") ? "&" : "?"}download=`}
+                          download
+                          style={actionButton}
+                        >
                           <Download size={14} /> Download
                         </a>
                       )}

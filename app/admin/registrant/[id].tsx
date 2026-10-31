@@ -347,11 +347,34 @@ export default function RegistrantDetails() {
     const student = enrollment?.student;
     const url: string | undefined = student?.formalPhotoUrl;
     if (!url) return;
+
+    const ext =
+      url
+        .split("?")[0]
+        .match(/\.(jpe?g|png|webp|heic)$/i)?.[1]
+        ?.toLowerCase() ?? "jpg";
+    const fileName = `${student.lastName}_${student.firstName}_formal_photo`
+      .replace(/[^A-Za-z0-9_-]+/g, "_")
+      .toUpperCase();
+
+    const downloadViaBrowser = () => {
+      const separator = url.includes("?") ? "&" : "?";
+      Linking.openURL(
+        `${url}${separator}download=${encodeURIComponent(`${fileName}.${ext}`)}`,
+      );
+    };
+
     setSavingPhoto(true);
     try {
-      const { granted } = await MediaLibrary.requestPermissionsAsync(true, [
-        "photo",
-      ]);
+      let granted = false;
+      try {
+        ({ granted } = await MediaLibrary.requestPermissionsAsync(true, [
+          "photo",
+        ]));
+      } catch {
+        downloadViaBrowser();
+        return;
+      }
       if (!granted) {
         Alert.alert(
           "Permission needed",
@@ -359,14 +382,6 @@ export default function RegistrantDetails() {
         );
         return;
       }
-      const ext =
-        url
-          .split("?")[0]
-          .match(/\.(jpe?g|png|webp|heic)$/i)?.[1]
-          ?.toLowerCase() ?? "jpg";
-      const fileName = `${student.lastName}_${student.firstName}_formal_photo`
-        .replace(/[^A-Za-z0-9_-]+/g, "_")
-        .toUpperCase();
       const { uri, status } = await FileSystem.downloadAsync(
         url,
         `${FileSystem.cacheDirectory}${fileName}.${ext}`,
