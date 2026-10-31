@@ -1,50 +1,398 @@
-import { Plus, Trash2, X } from "lucide-react";
+import {
+  CheckSquare,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  ExternalLink,
+  Link2,
+  Plus,
+  Square,
+  Trash2,
+  X,
+} from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import AdminSidebar from "../../components/admin/AdminSidebar";
 import AdminTopbar from "../../components/admin/AdminTopbar";
 import { supabase } from "../../lib/supabase";
 
+const NAVY = "#2F459B";
+const DARK_NAVY = "#0D2A94";
+const YELLOW = "#FFD75E";
+const TODO_DOT = "#FFB800";
+const FONT = "Poppins, sans-serif";
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+const MONTHS = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
 
-function getDaysInMonth(y, m) { return new Date(y, m + 1, 0).getDate(); }
-function getFirstDayOfMonth(y, m) { const d = new Date(y, m, 1).getDay(); return d === 0 ? 6 : d - 1; }
-const formatDate = (str) => new Date(str).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-const formatTime = (str) => new Date(str).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+const formatDate = (iso) =>
+  new Date(iso).toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+const formatTime = (iso) =>
+  new Date(iso).toLocaleTimeString("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+const sameDay = (iso, year, month, day) => {
+  const d = new Date(iso);
+  return (
+    d.getFullYear() === year && d.getMonth() === month && d.getDate() === day
+  );
+};
+const toUrl = (link) => (/^https?:\/\//i.test(link) ? link : `https://${link}`);
+
+const card = {
+  backgroundColor: "#fff",
+  borderRadius: "16px",
+  border: "1px solid #eee",
+  padding: "20px",
+  boxSizing: "border-box",
+};
+const overlay = {
+  position: "fixed",
+  inset: 0,
+  zIndex: 1000,
+  backgroundColor: "rgba(0,0,0,0.45)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: "16px",
+  fontFamily: FONT,
+};
+const labelStyle = {
+  display: "block",
+  fontSize: "13px",
+  fontWeight: "700",
+  color: "#555",
+  margin: "0 0 6px",
+};
+const inputStyle = {
+  width: "100%",
+  boxSizing: "border-box",
+  padding: "11px 12px",
+  borderRadius: "8px",
+  border: "1px solid #DCDFE3",
+  fontSize: "14px",
+  fontFamily: FONT,
+  color: "#333",
+  outline: "none",
+};
+
+function useEscape(handler) {
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === "Escape") handler();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [handler]);
+}
+
+function FormModal({ title, onClose, onSubmit, saving, error, children }) {
+  useEscape(onClose);
+  return (
+    <div
+      role="presentation"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      style={overlay}
+    >
+      <form
+        onSubmit={onSubmit}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        style={{
+          width: "100%",
+          maxWidth: "460px",
+          maxHeight: "90vh",
+          overflowY: "auto",
+          backgroundColor: "#fff",
+          borderRadius: "16px",
+          padding: "24px",
+          boxSizing: "border-box",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: "16px",
+          }}
+        >
+          <h3
+            style={{
+              margin: 0,
+              fontSize: "18px",
+              fontWeight: "700",
+              color: "#1A1A2E",
+            }}
+          >
+            {title}
+          </h3>
+          <button
+            type="button"
+            aria-label="Close"
+            onClick={onClose}
+            style={{
+              border: 0,
+              background: "none",
+              cursor: "pointer",
+              display: "flex",
+            }}
+          >
+            <X size={22} color="#555" />
+          </button>
+        </div>
+        {children}
+        {error && (
+          <p
+            role="alert"
+            style={{ color: "#E74C3C", fontSize: "13px", margin: "10px 0 0" }}
+          >
+            {error}
+          </p>
+        )}
+        <div style={{ display: "flex", gap: "10px", marginTop: "18px" }}>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              flex: 1,
+              padding: "12px",
+              borderRadius: "8px",
+              border: "1px solid #ddd",
+              backgroundColor: "#fff",
+              fontSize: "14px",
+              cursor: "pointer",
+              fontFamily: FONT,
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={saving}
+            style={{
+              flex: 2,
+              padding: "12px",
+              borderRadius: "8px",
+              border: 0,
+              backgroundColor: NAVY,
+              color: "#fff",
+              fontSize: "14px",
+              fontWeight: "700",
+              cursor: saving ? "wait" : "pointer",
+              opacity: saving ? 0.7 : 1,
+              fontFamily: FONT,
+            }}
+          >
+            {saving ? "Saving..." : "Save"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function EventDetails({ events, onClose, onDelete }) {
+  useEscape(onClose);
+  return (
+    <div
+      role="presentation"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      style={overlay}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Event details"
+        style={{
+          width: "100%",
+          maxWidth: "460px",
+          maxHeight: "85vh",
+          overflowY: "auto",
+          backgroundColor: "#fff",
+          borderRadius: "20px",
+          padding: "24px",
+          boxSizing: "border-box",
+        }}
+      >
+        {events.map((ev, i) => (
+          <div
+            key={ev.event_id}
+            style={{
+              borderTop: i > 0 ? "1px solid #eee" : 0,
+              paddingTop: i > 0 ? "16px" : 0,
+              marginTop: i > 0 ? "16px" : 0,
+            }}
+          >
+            <div
+              style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}
+            >
+              <h3
+                style={{
+                  flex: 1,
+                  margin: "0 0 8px",
+                  fontSize: "19px",
+                  fontWeight: "700",
+                  color: "#1A1A2E",
+                  wordBreak: "break-word",
+                }}
+              >
+                {ev.title}
+              </h3>
+              {i === 0 && (
+                <button
+                  type="button"
+                  aria-label="Close"
+                  onClick={onClose}
+                  style={{
+                    border: 0,
+                    background: "none",
+                    cursor: "pointer",
+                    display: "flex",
+                  }}
+                >
+                  <X size={22} color="#555" />
+                </button>
+              )}
+            </div>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                marginBottom: "12px",
+                fontSize: "13px",
+                color: "#666",
+              }}
+            >
+              <Clock size={16} color={DARK_NAVY} /> {formatDate(ev.event_date)}{" "}
+              · {formatTime(ev.event_date)}
+            </div>
+            {ev.description && (
+              <div
+                style={{
+                  backgroundColor: "#F8F9FA",
+                  borderRadius: "10px",
+                  padding: "12px",
+                  marginBottom: "12px",
+                  fontSize: "14px",
+                  color: "#444",
+                  lineHeight: 1.45,
+                  whiteSpace: "pre-wrap",
+                }}
+              >
+                {ev.description}
+              </div>
+            )}
+            {ev.link && (
+              <a
+                href={toUrl(ev.link)}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  backgroundColor: "#EEF1FF",
+                  borderRadius: "8px",
+                  padding: "10px",
+                  color: DARK_NAVY,
+                  fontSize: "13px",
+                  textDecoration: "none",
+                  marginBottom: "12px",
+                }}
+              >
+                <Link2 size={16} />
+                <span
+                  style={{
+                    flex: 1,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {ev.link}
+                </span>
+                <ExternalLink size={14} />
+              </a>
+            )}
+            <button
+              type="button"
+              onClick={() => onDelete(ev)}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                padding: "8px 14px",
+                borderRadius: "8px",
+                border: "1px solid #E74C3C",
+                backgroundColor: "#fff",
+                color: "#E74C3C",
+                fontSize: "13px",
+                fontWeight: "600",
+                cursor: "pointer",
+                fontFamily: FONT,
+              }}
+            >
+              <Trash2 size={14} /> Delete event
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function AdminCalendar() {
   const today = new Date();
-  const [current, setCurrent] = useState({ year: today.getFullYear(), month: today.getMonth() });
-  const [activeTab, setActiveTab] = useState("upcoming");
+  const [current, setCurrent] = useState({
+    year: today.getFullYear(),
+    month: today.getMonth(),
+  });
+  const [tab, setTab] = useState("upcoming");
   const [events, setEvents] = useState([]);
   const [todos, setTodos] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showAddEvent, setShowAddEvent] = useState(false);
-  const [showAddTodo, setShowAddTodo] = useState(false);
-  const [newEvent, setNewEvent] = useState({ title: "", description: "", event_date: "", link: "" });
-  const [newTodo, setNewTodo] = useState({ title: "", description: "", duedate: "" });
+  const [error, setError] = useState("");
   const [adminId, setAdminId] = useState(null);
-
-  const { year, month } = current;
-  const daysInMonth = getDaysInMonth(year, month);
-  const firstDay = getFirstDayOfMonth(year, month);
-  const cells = [...Array(firstDay).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)];
-  const isToday = (d) => d === today.getDate() && month === today.getMonth() && year === today.getFullYear();
-  const hasEvent = (d) => events.some((e) => { const dt = new Date(e.event_date); return dt.getDate() === d && dt.getMonth() === month && dt.getFullYear() === year; });
-  const hasTodo = (d) => todos.some((t) => { if (!t.duedate) return false; const dt = new Date(t.duedate); return dt.getDate() === d && dt.getMonth() === month && dt.getFullYear() === year; });
+  const [openEvents, setOpenEvents] = useState(null);
+  const [modal, setModal] = useState(null);
+  const [form, setForm] = useState({});
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState("");
 
   const fetchData = useCallback(async () => {
-    setLoading(true);
-    const { data: { user } } = await supabase.auth.getUser();
-
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     const { data: eventData, error: eventError } = await supabase
       .from("calendar_events")
       .select("*")
       .order("event_date", { ascending: true });
-    if (eventError) console.error("Events error:", eventError.message);
+    if (eventError) setError(`Could not load events: ${eventError.message}`);
     setEvents(eventData ?? []);
-
     if (user) {
       setAdminId(user.id);
       const { data: todoData, error: todoError } = await supabase
@@ -52,300 +400,710 @@ export default function AdminCalendar() {
         .select("*")
         .eq("admin_id", user.id)
         .order("duedate", { ascending: true });
-      if (todoError) console.error("Todo error:", todoError.message);
+      if (todoError)
+        setError(`Could not load your to dos: ${todoError.message}`);
       setTodos(todoData ?? []);
     }
-
     setLoading(false);
   }, []);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
-  const addEvent = async () => {
-    if (!newEvent.title || !newEvent.event_date) return;
-    const { data: { user } } = await supabase.auth.getUser();
-    const { data: adminData } = await supabase
-      .from("admin")
-      .select("admin_id")
-      .eq("admin_id", user.id)
-      .maybeSingle();
-    if (!adminData) { alert("Admin record not found."); return; }
-    const { error } = await supabase.from("calendar_events").insert({
-      title: newEvent.title,
-      description: newEvent.description || null,
-      event_date: new Date(newEvent.event_date).toISOString(),
-      link: newEvent.link || null,
-      admin_id: adminData.admin_id,
+  const { year, month } = current;
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const firstDay = new Date(year, month, 1).getDay();
+  const offset = firstDay === 0 ? 6 : firstDay - 1;
+  const prevMonth = () =>
+    setCurrent(({ year: y, month: m }) =>
+      m === 0 ? { year: y - 1, month: 11 } : { year: y, month: m - 1 },
+    );
+  const nextMonth = () =>
+    setCurrent(({ year: y, month: m }) =>
+      m === 11 ? { year: y + 1, month: 0 } : { year: y, month: m + 1 },
+    );
+
+  const openForm = (kind) => {
+    setForm({ title: "", description: "", link: "", date: "", time: "" });
+    setFormError("");
+    setModal(kind);
+  };
+
+  const combine = (date, time) =>
+    date ? new Date(`${date}T${time || "00:00"}`).toISOString() : null;
+
+  const saveEvent = async (e) => {
+    e.preventDefault();
+    if (!form.title.trim() || !form.date || !form.time) {
+      setFormError("Please fill in the title, date, and time.");
+      return;
+    }
+    setSaving(true);
+    const { error: saveError } = await supabase.from("calendar_events").insert({
+      title: form.title.trim(),
+      description: form.description.trim() || null,
+      link: form.link.trim() || null,
+      event_date: combine(form.date, form.time),
+      admin_id: adminId,
     });
-    if (error) { alert("Error: " + error.message); return; }
-    setNewEvent({ title: "", description: "", event_date: "", link: "" });
-    setShowAddEvent(false);
+    setSaving(false);
+    if (saveError) {
+      setFormError(saveError.message);
+      return;
+    }
+    setModal(null);
     fetchData();
   };
 
-  const deleteEvent = async (id) => {
-    await supabase.from("calendar_events").delete().eq("event_id", id);
-    fetchData();
-  };
-
-  const addTodo = async () => {
-    if (!newTodo.title) return;
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { alert("Not logged in."); return; }
-    const { error } = await supabase.from("admin_todo").insert({
-      title: newTodo.title,
-      description: newTodo.description || null,
-      duedate: newTodo.duedate ? new Date(newTodo.duedate).toISOString() : null,
-      admin_id: user.id,
+  const saveTodo = async (e) => {
+    e.preventDefault();
+    if (!form.title.trim()) {
+      setFormError("Please enter a title.");
+      return;
+    }
+    if (form.time && !form.date) {
+      setFormError("Please pick a due date for the time.");
+      return;
+    }
+    setSaving(true);
+    const { error: saveError } = await supabase.from("admin_todo").insert({
+      title: form.title.trim(),
+      description: form.description.trim() || null,
+      duedate: combine(form.date, form.time),
+      admin_id: adminId,
     });
-    if (error) { alert("Error: " + error.message); return; }
-    setNewTodo({ title: "", description: "", duedate: "" });
-    setShowAddTodo(false);
+    setSaving(false);
+    if (saveError) {
+      setFormError(saveError.message);
+      return;
+    }
+    setModal(null);
     fetchData();
   };
 
- const toggleTodo = async (todo) => {
-    await supabase.from("admin_todo").update({
-      iscompleted: !todo.iscompleted,
-    }).eq("id", todo.id);
+  const deleteEvent = async (ev) => {
+    if (
+      !window.confirm(`Delete "${ev.title}"? Students will no longer see it.`)
+    )
+      return;
+    const { error: deleteError } = await supabase
+      .from("calendar_events")
+      .delete()
+      .eq("event_id", ev.event_id);
+    if (deleteError) {
+      setError(deleteError.message);
+      return;
+    }
+    setOpenEvents((list) => {
+      const rest = (list ?? []).filter((x) => x.event_id !== ev.event_id);
+      return rest.length ? rest : null;
+    });
     fetchData();
   };
 
-  const deleteTodo = async (id) => {
-    await supabase.from("admin_todo").delete().eq("id", id);
-    fetchData();
+  const toggleTodo = async (todo) => {
+    const next = !todo.iscompleted;
+    setTodos((prev) =>
+      prev.map((t) => (t.id === todo.id ? { ...t, iscompleted: next } : t)),
+    );
+    const { error: updateError } = await supabase
+      .from("admin_todo")
+      .update({ iscompleted: next })
+      .eq("id", todo.id);
+    if (updateError) {
+      setError(updateError.message);
+      setTodos((prev) =>
+        prev.map((t) => (t.id === todo.id ? { ...t, iscompleted: !next } : t)),
+      );
+    }
   };
 
-  const inputStyle = {
-    width: "100%", padding: "10px 14px", borderRadius: "8px",
-    border: "1px solid #ddd", fontSize: "14px",
-    fontFamily: "Poppins, sans-serif", boxSizing: "border-box", outline: "none",
+  const deleteTodo = async (todo) => {
+    if (!window.confirm(`Delete "${todo.title}"?`)) return;
+    const { error: deleteError } = await supabase
+      .from("admin_todo")
+      .delete()
+      .eq("id", todo.id);
+    if (deleteError) setError(deleteError.message);
+    else setTodos((prev) => prev.filter((t) => t.id !== todo.id));
   };
 
-  const labelStyle = {
-    fontSize: "13px", fontWeight: "600", color: "#222",
-    display: "block", marginBottom: "4px",
-  };
+  const field = (key, label, props = {}) => (
+    <div style={{ marginBottom: "12px", flex: props.flex }}>
+      <label htmlFor={`cal-${key}`} style={labelStyle}>
+        {label}
+      </label>
+      {props.textarea ? (
+        <textarea
+          id={`cal-${key}`}
+          value={form[key]}
+          onChange={(e) => setForm({ ...form, [key]: e.target.value })}
+          placeholder={props.placeholder}
+          style={{ ...inputStyle, minHeight: "70px", resize: "vertical" }}
+        />
+      ) : (
+        <input
+          id={`cal-${key}`}
+          type={props.type ?? "text"}
+          value={form[key]}
+          onChange={(e) => setForm({ ...form, [key]: e.target.value })}
+          placeholder={props.placeholder}
+          style={inputStyle}
+        />
+      )}
+    </div>
+  );
 
   return (
-    <div className="dashboard-layout admin-layout">
+    <div
+      style={{
+        display: "flex",
+        minHeight: "100vh",
+        fontFamily: FONT,
+        backgroundColor: "#f5f6fa",
+      }}
+    >
       <AdminSidebar />
-      <div className="dashboard-main">
+      <div style={{ marginLeft: "240px", flex: 1, minWidth: 0 }}>
         <AdminTopbar title="Calendar" />
+        <div
+          style={{
+            padding: "32px 40px",
+            maxWidth: "1100px",
+            boxSizing: "border-box",
+          }}
+        >
+          {error && (
+            <p
+              role="alert"
+              style={{ color: "#c0392b", fontSize: "13px", marginTop: 0 }}
+            >
+              {error}
+            </p>
+          )}
 
-        <div style={{ padding: "32px 40px" }}>
-
-          {/* Month Navigation */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "32px", marginBottom: "20px" }}>
-            <button
-              onClick={() => setCurrent(({ year, month }) => month === 0 ? { year: year - 1, month: 11 } : { year, month: month - 1 })}
-              style={{ background: "none", border: "none", fontSize: "22px", cursor: "pointer", color: "#1a1a6e", fontWeight: "700" }}
-            >&#8249;</button>
-            <span style={{ fontSize: "20px", fontWeight: "700", color: "#1a1a6e" }}>{MONTH_NAMES[month]} {year}</span>
-            <button
-              onClick={() => setCurrent(({ year, month }) => month === 11 ? { year: year + 1, month: 0 } : { year, month: month + 1 })}
-              style={{ background: "none", border: "none", fontSize: "22px", cursor: "pointer", color: "#1a1a6e", fontWeight: "700" }}
-            >&#8250;</button>
-          </div>
-
-          {/* Calendar Grid */}
-          <div style={{ backgroundColor: "#fff", borderRadius: "16px", overflow: "hidden", border: "1px solid #eee", marginBottom: "16px" }}>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)" }}>
-              {DAYS.map((d) => (
-                <div key={d} style={{ textAlign: "center", padding: "12px 0", fontSize: "12px", fontWeight: "600", color: "#aaa" }}>{d}</div>
-              ))}
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)" }}>
-              {cells.map((d, i) => (
-                <div key={i} style={{ textAlign: "center", padding: "8px 0", borderTop: "1px solid #f5f5f5" }}>
-                  {d && (
-                    <>
-                      <div style={{
-                        width: "36px", height: "36px", borderRadius: "50%",
-                        backgroundColor: isToday(d) ? "#f5a623" : "transparent",
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        margin: "0 auto",
-                        color: isToday(d) ? "#fff" : "#1a1a6e",
-                        fontWeight: isToday(d) ? "700" : "400",
-                        fontSize: "14px",
-                      }}>{d}</div>
-                      <div style={{ display: "flex", justifyContent: "center", gap: "3px", marginTop: "3px" }}>
-                        {hasEvent(d) && <div style={{ width: "5px", height: "5px", borderRadius: "50%", backgroundColor: "#1a1a6e" }} />}
-                        {hasTodo(d) && <div style={{ width: "5px", height: "5px", borderRadius: "50%", backgroundColor: "#f5a623" }} />}
-                      </div>
-                    </>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Legend */}
-          <div style={{ display: "flex", gap: "16px", marginBottom: "20px", justifyContent: "center" }}>
-            {[["#1a1a6e", "Event"], ["#f5a623", "To do"]].map(([color, label]) => (
-              <div key={label} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "#555" }}>
-                <div style={{ width: "8px", height: "8px", borderRadius: "50%", backgroundColor: color }} /> {label}
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: "20px",
+              alignItems: "flex-start",
+            }}
+          >
+            <section style={{ ...card, flex: "1 1 380px", minWidth: 0 }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "24px",
+                  marginBottom: "16px",
+                }}
+              >
+                <button
+                  type="button"
+                  aria-label="Previous month"
+                  onClick={prevMonth}
+                  style={{
+                    border: 0,
+                    background: "none",
+                    cursor: "pointer",
+                    display: "flex",
+                    color: DARK_NAVY,
+                  }}
+                >
+                  <ChevronLeft size={22} />
+                </button>
+                <span
+                  style={{
+                    minWidth: "160px",
+                    textAlign: "center",
+                    fontSize: "18px",
+                    fontWeight: "700",
+                    color: DARK_NAVY,
+                  }}
+                >
+                  {MONTHS[month]} {year}
+                </span>
+                <button
+                  type="button"
+                  aria-label="Next month"
+                  onClick={nextMonth}
+                  style={{
+                    border: 0,
+                    background: "none",
+                    cursor: "pointer",
+                    display: "flex",
+                    color: DARK_NAVY,
+                  }}
+                >
+                  <ChevronRight size={22} />
+                </button>
               </div>
-            ))}
-          </div>
 
-          {/* Tabs */}
-          <div style={{
-            display: "flex", backgroundColor: "#f5a623",
-            borderRadius: "12px", marginBottom: "16px", padding: "4px", gap: "4px",
-          }}>
-            {["upcoming", "todo"].map((tab) => (
-              <div key={tab} onClick={() => setActiveTab(tab)} style={{
-                flex: 1, textAlign: "center", padding: "12px",
-                fontSize: "14px", fontWeight: "600", cursor: "pointer",
-                color: activeTab === tab ? "#f5a623" : "#1a1a6e",
-                backgroundColor: activeTab === tab ? "#fff" : "transparent",
-                borderRadius: "10px",
-                transition: "all 0.15s",
-              }}>
-                {tab === "upcoming" ? "Upcoming Events" : "To Do List"}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
+                  rowGap: "2px",
+                }}
+              >
+                {DAYS.map((d) => (
+                  <div
+                    key={d}
+                    style={{
+                      textAlign: "center",
+                      fontSize: "12px",
+                      fontWeight: "600",
+                      color: "#BDC3C7",
+                      paddingBottom: "8px",
+                    }}
+                  >
+                    {d}
+                  </div>
+                ))}
+                {Array.from({ length: offset }, (_, i) => (
+                  <div key={`e-${i}`} />
+                ))}
+                {Array.from({ length: daysInMonth }, (_, i) => {
+                  const day = i + 1;
+                  const dayEvents = events.filter((e) =>
+                    sameDay(e.event_date, year, month, day),
+                  );
+                  const dayTodo = todos.some(
+                    (t) => t.duedate && sameDay(t.duedate, year, month, day),
+                  );
+                  const isToday =
+                    day === today.getDate() &&
+                    month === today.getMonth() &&
+                    year === today.getFullYear();
+                  return (
+                    <button
+                      key={day}
+                      type="button"
+                      aria-label={`${MONTHS[month]} ${day}${dayEvents.length ? `, ${dayEvents.length} event${dayEvents.length > 1 ? "s" : ""}` : ""}`}
+                      onClick={() =>
+                        dayEvents.length && setOpenEvents(dayEvents)
+                      }
+                      style={{
+                        height: "50px",
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        border: 0,
+                        background: "none",
+                        padding: 0,
+                        cursor: dayEvents.length ? "pointer" : "default",
+                        fontFamily: FONT,
+                      }}
+                    >
+                      <span
+                        style={{
+                          width: "34px",
+                          height: "34px",
+                          borderRadius: "50%",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          backgroundColor: isToday ? YELLOW : "transparent",
+                          color: NAVY,
+                          fontSize: "14px",
+                          fontWeight: isToday ? "700" : "400",
+                        }}
+                      >
+                        {day}
+                      </span>
+                      <span
+                        style={{
+                          display: "flex",
+                          gap: "2px",
+                          height: "5px",
+                          marginTop: "2px",
+                        }}
+                      >
+                        {dayEvents.length > 0 && (
+                          <span
+                            style={{
+                              width: "5px",
+                              height: "5px",
+                              borderRadius: "50%",
+                              backgroundColor: DARK_NAVY,
+                            }}
+                          />
+                        )}
+                        {dayTodo && (
+                          <span
+                            style={{
+                              width: "5px",
+                              height: "5px",
+                              borderRadius: "50%",
+                              backgroundColor: TODO_DOT,
+                            }}
+                          />
+                        )}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
-            ))}
-          </div>
 
-          {/* List */}
-          {loading ? (
-            <p style={{ color: "#aaa", textAlign: "center" }}>Loading...</p>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-              {activeTab === "upcoming" ? (
-                events.length === 0
-                  ? <p style={{ color: "#aaa", fontStyle: "italic", textAlign: "center" }}>No upcoming events.</p>
-                  : events.map((e) => (
-                    <div key={e.event_id} style={{
-                      backgroundColor: "#fff", borderRadius: "12px",
-                      padding: "16px 20px", border: "1px solid #eee",
-                      display: "flex", justifyContent: "space-between", alignItems: "flex-start",
-                    }}>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: "15px", fontWeight: "700", color: "#1a1a2e" }}>{e.title}</div>
-                        {e.description && <div style={{ fontSize: "13px", color: "#888", marginTop: "2px" }}>{e.description}</div>}
-                        {e.link && <a href={e.link} target="_blank" rel="noreferrer" style={{ fontSize: "12px", color: "#1a1a6e" }}>{e.link}</a>}
-                      </div>
-                      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "8px" }}>
-                        <div style={{ textAlign: "right" }}>
-                          <div style={{ fontSize: "12px", fontWeight: "600", color: "#1a1a2e" }}>{formatDate(e.event_date)}</div>
-                          <div style={{ fontSize: "12px", color: "#888" }}>{formatTime(e.event_date)}</div>
-                        </div>
-                        <button onClick={() => deleteEvent(e.event_id)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}>
-                          <Trash2 size={16} color="#e53935" />
-                        </button>
-                      </div>
-                    </div>
-                  ))
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "center",
+                  gap: "20px",
+                  marginTop: "10px",
+                }}
+              >
+                {[
+                  [DARK_NAVY, "Event"],
+                  [TODO_DOT, "To Do"],
+                ].map(([color, label]) => (
+                  <span
+                    key={label}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "5px",
+                      fontSize: "12px",
+                      color: "#666",
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: "6px",
+                        height: "6px",
+                        borderRadius: "50%",
+                        backgroundColor: color,
+                      }}
+                    />{" "}
+                    {label}
+                  </span>
+                ))}
+              </div>
+            </section>
+
+            <section style={{ ...card, flex: "1 1 380px", minWidth: 0 }}>
+              <div
+                role="tablist"
+                style={{
+                  display: "flex",
+                  backgroundColor: DARK_NAVY,
+                  borderRadius: "12px",
+                  overflow: "hidden",
+                  marginBottom: "16px",
+                }}
+              >
+                {[
+                  ["upcoming", "Upcoming Events"],
+                  ["todo", "To Do List"],
+                ].map(([key, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    role="tab"
+                    aria-selected={tab === key}
+                    onClick={() => setTab(key)}
+                    style={{
+                      flex: 1,
+                      padding: "12px 8px",
+                      border: 0,
+                      borderBottom: `4px solid ${tab === key ? "#fff" : "transparent"}`,
+                      background: "none",
+                      color: tab === key ? "#fff" : "rgba(255,255,255,0.6)",
+                      fontSize: "14px",
+                      fontWeight: "700",
+                      cursor: "pointer",
+                      fontFamily: FONT,
+                    }}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => openForm(tab === "upcoming" ? "event" : "todo")}
+                style={{
+                  width: "100%",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "6px",
+                  padding: "11px",
+                  marginBottom: "14px",
+                  borderRadius: "10px",
+                  border: 0,
+                  backgroundColor: tab === "upcoming" ? NAVY : TODO_DOT,
+                  color: "#fff",
+                  fontSize: "14px",
+                  fontWeight: "700",
+                  cursor: "pointer",
+                  fontFamily: FONT,
+                }}
+              >
+                <Plus size={18} />{" "}
+                {tab === "upcoming" ? "Add event" : "Add to do"}
+              </button>
+
+              {loading ? (
+                <p style={{ color: "#999", textAlign: "center" }}>Loading...</p>
+              ) : tab === "upcoming" ? (
+                events.length === 0 ? (
+                  <p
+                    style={{
+                      color: "#999",
+                      fontStyle: "italic",
+                      textAlign: "center",
+                    }}
+                  >
+                    No events yet.
+                  </p>
+                ) : (
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "10px",
+                    }}
+                  >
+                    {events.map((ev) => (
+                      <button
+                        key={ev.event_id}
+                        type="button"
+                        onClick={() => setOpenEvents([ev])}
+                        style={{
+                          display: "flex",
+                          gap: "12px",
+                          width: "100%",
+                          textAlign: "left",
+                          padding: "14px",
+                          borderRadius: "10px",
+                          border: "1px solid #DCDFE3",
+                          backgroundColor: "#fff",
+                          cursor: "pointer",
+                          fontFamily: FONT,
+                        }}
+                      >
+                        <span style={{ flex: 1, minWidth: 0 }}>
+                          <span
+                            style={{
+                              display: "block",
+                              fontSize: "15px",
+                              fontWeight: "700",
+                              color: "#444",
+                              wordBreak: "break-word",
+                            }}
+                          >
+                            {ev.title}
+                          </span>
+                          {ev.description && (
+                            <span
+                              style={{
+                                display: "block",
+                                fontSize: "12px",
+                                color: "#777",
+                                marginTop: "3px",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              {ev.description}
+                            </span>
+                          )}
+                        </span>
+                        <span style={{ textAlign: "right", flexShrink: 0 }}>
+                          <span
+                            style={{
+                              display: "block",
+                              fontSize: "12px",
+                              color: "#7F8C8D",
+                            }}
+                          >
+                            {formatDate(ev.event_date)}
+                          </span>
+                          <span
+                            style={{
+                              display: "block",
+                              fontSize: "12px",
+                              fontWeight: "700",
+                              color: "#7F8C8D",
+                            }}
+                          >
+                            {formatTime(ev.event_date)}
+                          </span>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )
+              ) : todos.length === 0 ? (
+                <p
+                  style={{
+                    color: "#999",
+                    fontStyle: "italic",
+                    textAlign: "center",
+                  }}
+                >
+                  No to dos yet.
+                </p>
               ) : (
-                todos.length === 0
-                  ? <p style={{ color: "#aaa", fontStyle: "italic", textAlign: "center" }}>No tasks yet.</p>
-                  : todos.map((t) => (
-                    <div key={t.id} style={{
-                      backgroundColor: "#fff", borderRadius: "12px",
-                      padding: "16px 20px", border: "1px solid #eee",
-                      display: "flex", alignItems: "center", gap: "12px",
-                    }}>
-                     <input type="checkbox" checked={t.iscompleted ?? false} onChange={() => toggleTodo(t)}
-                        style={{ width: "18px", height: "18px", cursor: "pointer", accentColor: "#f5a623" }} />
-                      <div style={{ flex: 1 }}>
-                 <div style={{ fontSize: "14px", fontWeight: "600", color: t.iscompleted ? "#aaa" : "#1a1a2e", textDecoration: t.iscompleted ? "line-through" : "none" }}>{t.title}</div>
-                        {t.description && <div style={{ fontSize: "12px", color: "#888" }}>{t.description}</div>}
-                        {t.duedate && <div style={{ fontSize: "12px", color: "#aaa", marginTop: "2px" }}>Due: {formatDate(t.duedate)}</div>}
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "10px",
+                  }}
+                >
+                  {todos.map((todo) => (
+                    <div
+                      key={todo.id}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "10px",
+                        padding: "14px",
+                        borderRadius: "10px",
+                        border: "1px solid #DCDFE3",
+                        backgroundColor: todo.iscompleted ? "#f9f9f9" : "#fff",
+                        opacity: todo.iscompleted ? 0.6 : 1,
+                      }}
+                    >
+                      <button
+                        type="button"
+                        role="checkbox"
+                        aria-checked={!!todo.iscompleted}
+                        aria-label={`Mark "${todo.title}" as ${todo.iscompleted ? "not done" : "done"}`}
+                        onClick={() => toggleTodo(todo)}
+                        style={{
+                          border: 0,
+                          background: "none",
+                          cursor: "pointer",
+                          display: "flex",
+                          padding: 0,
+                          color: DARK_NAVY,
+                        }}
+                      >
+                        {todo.iscompleted ? (
+                          <CheckSquare size={22} />
+                        ) : (
+                          <Square size={22} />
+                        )}
+                      </button>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div
+                          style={{
+                            fontSize: "15px",
+                            fontWeight: "700",
+                            color: todo.iscompleted ? "#999" : "#444",
+                            textDecoration: todo.iscompleted
+                              ? "line-through"
+                              : "none",
+                            wordBreak: "break-word",
+                          }}
+                        >
+                          {todo.title}
+                        </div>
+                        {todo.description && (
+                          <div
+                            style={{
+                              fontSize: "12px",
+                              color: "#777",
+                              marginTop: "3px",
+                            }}
+                          >
+                            {todo.description}
+                          </div>
+                        )}
+                        {todo.duedate && (
+                          <div
+                            style={{
+                              fontSize: "12px",
+                              color: "#7F8C8D",
+                              marginTop: "3px",
+                            }}
+                          >
+                            Due: {formatDate(todo.duedate)}{" "}
+                            {formatTime(todo.duedate)}
+                          </div>
+                        )}
                       </div>
-                      <button onClick={() => deleteTodo(t.id)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}>
-                        <Trash2 size={16} color="#e53935" />
+                      <button
+                        type="button"
+                        aria-label={`Delete "${todo.title}"`}
+                        onClick={() => deleteTodo(todo)}
+                        style={{
+                          border: 0,
+                          background: "none",
+                          cursor: "pointer",
+                          display: "flex",
+                          padding: 0,
+                        }}
+                      >
+                        <Trash2 size={18} color="#e74c3c" />
                       </button>
                     </div>
-                  ))
+                  ))}
+                </div>
               )}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* FAB */}
-      <div style={{ position: "fixed", bottom: "32px", right: "40px", zIndex: 200 }}>
-        {activeTab === "upcoming" && (
-          <button onClick={() => setShowAddEvent(true)} style={{
-            width: "52px", height: "52px", borderRadius: "50%",
-            backgroundColor: "#f5a623", border: "none", cursor: "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
-          }}>
-            <Plus size={24} color="#fff" />
-          </button>
-        )}
-        {activeTab === "todo" && (
-          <button onClick={() => setShowAddTodo(true)} style={{
-            width: "52px", height: "52px", borderRadius: "50%",
-            backgroundColor: "#f5a623", border: "none", cursor: "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
-          }}>
-            <Plus size={24} color="#fff" />
-          </button>
-        )}
-      </div>
-
-      {/* Add Event Modal */}
-      {showAddEvent && (
-        <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 999 }}>
-          <div style={{ backgroundColor: "#fff", borderRadius: "16px", padding: "32px", width: "440px", fontFamily: "Poppins, sans-serif" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-              <h3 style={{ fontSize: "16px", fontWeight: "700", color: "#1a1a2e", margin: 0 }}>Add Event</h3>
-              <button onClick={() => setShowAddEvent(false)} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={18} color="#aaa" /></button>
-            </div>
-            {[
-              { label: "Title*", key: "title", placeholder: "Event title" },
-              { label: "Description", key: "description", placeholder: "Optional" },
-              { label: "Link", key: "link", placeholder: "https://..." },
-            ].map(({ label, key, placeholder }) => (
-              <div key={key} style={{ marginBottom: "12px" }}>
-                <label style={labelStyle}>{label}</label>
-                <input value={newEvent[key]} onChange={(e) => setNewEvent({ ...newEvent, [key]: e.target.value })} style={inputStyle} placeholder={placeholder} />
-              </div>
-            ))}
-            <div style={{ marginBottom: "12px" }}>
-              <label style={labelStyle}>Date & Time*</label>
-              <input type="datetime-local" value={newEvent.event_date} onChange={(e) => setNewEvent({ ...newEvent, event_date: e.target.value })} style={inputStyle} />
-            </div>
-            <div style={{ display: "flex", gap: "10px", marginTop: "16px" }}>
-              <button onClick={() => setShowAddEvent(false)} style={{ flex: 1, padding: "12px", borderRadius: "8px", border: "1px solid #ddd", backgroundColor: "#fff", fontSize: "14px", cursor: "pointer", fontFamily: "Poppins, sans-serif" }}>Cancel</button>
-              <button onClick={addEvent} style={{ flex: 1, padding: "12px", borderRadius: "8px", border: "none", backgroundColor: "#f5a623", color: "#fff", fontSize: "14px", fontWeight: "600", cursor: "pointer", fontFamily: "Poppins, sans-serif" }}>Add</button>
-            </div>
+            </section>
           </div>
         </div>
+      </div>
+
+      {openEvents && (
+        <EventDetails
+          events={openEvents}
+          onClose={() => setOpenEvents(null)}
+          onDelete={deleteEvent}
+        />
       )}
 
-      {/* Add Todo Modal */}
-      {showAddTodo && (
-        <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 999 }}>
-          <div style={{ backgroundColor: "#fff", borderRadius: "16px", padding: "32px", width: "440px", fontFamily: "Poppins, sans-serif" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-              <h3 style={{ fontSize: "16px", fontWeight: "700", color: "#1a1a2e", margin: 0 }}>Add To Do</h3>
-              <button onClick={() => setShowAddTodo(false)} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={18} color="#aaa" /></button>
-            </div>
-            {[
-              { label: "Task*", key: "title", placeholder: "Task title" },
-              { label: "Description", key: "description", placeholder: "Optional" },
-            ].map(({ label, key, placeholder }) => (
-              <div key={key} style={{ marginBottom: "12px" }}>
-                <label style={labelStyle}>{label}</label>
-                <input value={newTodo[key]} onChange={(e) => setNewTodo({ ...newTodo, [key]: e.target.value })} style={inputStyle} placeholder={placeholder} />
-              </div>
-            ))}
-            <div style={{ marginBottom: "12px" }}>
-              <label style={labelStyle}>Due Date & Time</label>
-              <input type="datetime-local" value={newTodo.duedate} onChange={(e) => setNewTodo({ ...newTodo, duedate: e.target.value })} style={inputStyle} />
-            </div>
-            <div style={{ display: "flex", gap: "10px", marginTop: "16px" }}>
-              <button onClick={() => setShowAddTodo(false)} style={{ flex: 1, padding: "12px", borderRadius: "8px", border: "1px solid #ddd", backgroundColor: "#fff", fontSize: "14px", cursor: "pointer", fontFamily: "Poppins, sans-serif" }}>Cancel</button>
-              <button onClick={addTodo} style={{ flex: 1, padding: "12px", borderRadius: "8px", border: "none", backgroundColor: "#f5a623", color: "#fff", fontSize: "14px", fontWeight: "600", cursor: "pointer", fontFamily: "Poppins, sans-serif" }}>Add</button>
-            </div>
+      {modal === "event" && (
+        <FormModal
+          title="Add Event"
+          onClose={() => setModal(null)}
+          onSubmit={saveEvent}
+          saving={saving}
+          error={formError}
+        >
+          {field("title", "Title *", {
+            placeholder: "e.g. LEPT Express - Online Session",
+          })}
+          {field("description", "Description", {
+            placeholder: "Optional",
+            textarea: true,
+          })}
+          {field("link", "Link", { placeholder: "https://zoom.us/j/..." })}
+          <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+            {field("date", "Date *", { type: "date", flex: "1 1 150px" })}
+            {field("time", "Time *", { type: "time", flex: "1 1 120px" })}
           </div>
-        </div>
+        </FormModal>
+      )}
+
+      {modal === "todo" && (
+        <FormModal
+          title="Add To Do"
+          onClose={() => setModal(null)}
+          onSubmit={saveTodo}
+          saving={saving}
+          error={formError}
+        >
+          {field("title", "Title *", { placeholder: "Title of item" })}
+          {field("description", "Short details", {
+            placeholder: "Optional",
+            textarea: true,
+          })}
+          <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+            {field("date", "Due date", { type: "date", flex: "1 1 150px" })}
+            {field("time", "Time", { type: "time", flex: "1 1 120px" })}
+          </div>
+        </FormModal>
       )}
     </div>
   );

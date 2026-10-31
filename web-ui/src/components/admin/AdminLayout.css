@@ -1,0 +1,179 @@
+/* Shared admin layout rules. Imported by AdminSidebar, so every admin page gets them. */
+
+.admin-sidebar {
+  transition: transform 0.2s ease;
+}
+
+.admin-menu-toggle,
+.admin-sidebar-backdrop,
+.admin-sidebar-close {
+  display: none;
+}
+
+/* Sign-out dialog (also used by pages that don't load Dashboard.css) */
+.signout-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(20, 25, 40, 0.48);
+}
+
+.signout-modal {
+  width: min(100%, 400px);
+  padding: 28px;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 18px 56px rgba(18, 25, 45, 0.24);
+  box-sizing: border-box;
+  font-family: Poppins, sans-serif;
+}
+
+.signout-modal h2 {
+  margin: 0;
+  color: #1a1a2e;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.signout-modal p {
+  margin: 10px 0 24px;
+  color: #626778;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.signout-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.signout-modal-actions button {
+  min-height: 40px;
+  padding: 0 16px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.signout-modal-cancel {
+  color: #3d4352;
+  background: #fff;
+  border-color: #d9dce4 !important;
+}
+
+.signout-modal-confirm {
+  color: #fff;
+  background: #c93636;
+}
+
+/* Tablets and phones: the sidebar slides in from the left */
+@media (max-width: 900px) {
+  .admin-sidebar {
+    transform: translateX(-100%);
+    box-shadow: none;
+  }
+
+  .admin-sidebar.admin-sidebar-open {
+    transform: translateX(0);
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.18);
+  }
+
+  .admin-menu-toggle {
+    position: fixed;
+    top: 9px;
+    left: 12px;
+    z-index: 120;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    height: 42px;
+    padding: 0;
+    color: #1a1a2e;
+    background: rgba(255, 255, 255, 0.55);
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    border-radius: 8px;
+    cursor: pointer;
+  }
+
+  .admin-sidebar-close {
+    display: inline-flex;
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    border: 0;
+    background: rgba(255, 255, 255, 0.6);
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: #1a1a2e;
+  }
+
+  .admin-sidebar-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 90;
+    padding: 0;
+    border: 0;
+    background: rgba(13, 22, 48, 0.45);
+  }
+
+  /* Admin pages offset their content by the 240px sidebar; remove that on small screens */
+  [style*="margin-left: 240px"],
+  .admin-layout .dashboard-main {
+    margin-left: 0 !important;
+    width: 100% !important;
+    min-width: 0;
+  }
+
+  .admin-topbar {
+    padding: 0 14px 0 66px !important;
+    gap: 10px;
+  }
+
+  .admin-topbar h1 {
+    font-size: 18px !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+  }
+
+  /* Wide tables scroll inside their card instead of stretching the page */
+  [style*="margin-left: 240px"] table,
+  .admin-layout table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+  }
+}
+
+/* Phones */
+@media (max-width: 600px) {
+  [style*="padding: 32px 40px"],
+  [style*="padding: 28px 32px"] {
+    padding: 18px 14px !important;
+  }
+
+  [style*="margin-left: 240px"] img,
+  .admin-layout img {
+    max-width: 100%;
+  }
+
+  .admin-topbar-actions button {
+    padding-left: 10px !important;
+    padding-right: 10px !important;
+  }
+}

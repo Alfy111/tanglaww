@@ -1359,7 +1359,7 @@ export default function EnrollmentScreen() {
               {fieldError("paymentType")}
               {dataTypes.paymentType === "downpayment" && (
                 <Text style={styles.payTypeNote}>
-                  With a downpayment, you can access the courses up to LET
+                  With a downpayment, you can access the courses up to LEPT
                   Express. Upload your remaining balance receipt later in your
                   Profile to unlock the rest.
                 </Text>

@@ -380,7 +380,7 @@ export default function Step3Personal({
               {error("paymentType")}
               {data.paymentType === "downpayment" && (
                 <p style={noteStyle}>
-                  With a downpayment, you can access the courses up to LET
+                  With a downpayment, you can access the courses up to LEPT
                   Express. Upload your remaining balance receipt later in your
                   Profile to unlock the rest.
                 </p>

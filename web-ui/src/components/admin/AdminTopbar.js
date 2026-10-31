@@ -3,6 +3,7 @@ import NotificationBell from "../NotificationBell";
 export default function AdminTopbar({ title, actions }) {
   return (
     <div
+      className="admin-topbar"
       style={{
         backgroundColor: "#FFD75E",
         padding: "0 32px",
@@ -13,6 +14,7 @@ export default function AdminTopbar({ title, actions }) {
         position: "sticky",
         top: 0,
         zIndex: 50,
+        boxSizing: "border-box",
       }}
     >
       <h1
@@ -25,7 +27,15 @@ export default function AdminTopbar({ title, actions }) {
       >
         {title}
       </h1>
-      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+      <div
+        className="admin-topbar-actions"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "12px",
+          flexShrink: 0,
+        }}
+      >
         {actions}
         <NotificationBell />
       </div>

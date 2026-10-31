@@ -90,7 +90,7 @@ export default function AddEventScreen() {
         <Text style={styles.label}>Event Title:</Text>
         <TextInput
           style={styles.input}
-          placeholder="e.g. LET Express - Online Session"
+          placeholder="e.g. LEPT Express - Online Session"
           placeholderTextColor="#9AA0A6"
           value={title}
           onChangeText={setTitle}

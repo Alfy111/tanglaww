@@ -8,12 +8,19 @@ import {
   Info,
   LayoutDashboard,
   LogOut,
+  Menu,
   UserCog,
   Users,
+  X,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
+import "./AdminLayout.css";
+
+const isActivePath = (pathname, path) =>
+  pathname === path ||
+  (path !== "/admin/dashboard" && pathname.startsWith(`${path}/`));
 
 const OVERVIEW = [
   {
@@ -70,6 +77,16 @@ export default function AdminSidebar() {
     role: "admin",
   });
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [location.pathname]);
+
+  const go = (path) => {
+    setMenuOpen(false);
+    navigate(path);
+  };
 
   useEffect(() => {
     let active = true;
@@ -133,29 +150,51 @@ export default function AdminSidebar() {
       return;
     }
 
-    navigate("/admin/signin");
+    navigate("/admin/signin", { replace: true });
   };
 
-  const linkStyle = (path) => ({
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: "12px 24px",
-    cursor: "pointer",
-    fontSize: "14px",
-    fontWeight: "500",
-    color: location.pathname === path ? "#1a1a6e" : "#555",
-    backgroundColor: location.pathname === path ? "#fff8e1" : "transparent",
-    borderLeft:
-      location.pathname === path
-        ? "3px solid #f5a623"
-        : "3px solid transparent",
-    transition: "all 0.15s",
-  });
+  const linkStyle = (path) => {
+    const active = isActivePath(location.pathname, path);
+    return {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      padding: "12px 24px",
+      cursor: "pointer",
+      fontSize: "14px",
+      fontWeight: "500",
+      color: active ? "#2F459B" : "#555",
+      backgroundColor: active ? "#EEF1FF" : "transparent",
+      borderLeft: active ? "3px solid #2F459B" : "3px solid transparent",
+      transition: "all 0.15s",
+    };
+  };
 
   return (
     <>
+      {!menuOpen && (
+        <button
+          type="button"
+          className="admin-menu-toggle"
+          aria-label="Open navigation menu"
+          aria-expanded={false}
+          aria-controls="admin-sidebar"
+          onClick={() => setMenuOpen(true)}
+        >
+          <Menu size={22} />
+        </button>
+      )}
+      {menuOpen && (
+        <button
+          type="button"
+          className="admin-sidebar-backdrop"
+          aria-label="Close navigation menu"
+          onClick={() => setMenuOpen(false)}
+        />
+      )}
       <aside
+        id="admin-sidebar"
+        className={`admin-sidebar${menuOpen ? " admin-sidebar-open" : ""}`}
         style={{
           width: "240px",
           backgroundColor: "#fff",
@@ -171,7 +210,21 @@ export default function AdminSidebar() {
         }}
       >
         {/* Admin Profile Header */}
-        <div style={{ backgroundColor: "#FFD75E", padding: "24px 20px 20px" }}>
+        <div
+          style={{
+            position: "relative",
+            backgroundColor: "#FFD75E",
+            padding: "24px 20px 20px",
+          }}
+        >
+          <button
+            type="button"
+            className="admin-sidebar-close"
+            aria-label="Close navigation menu"
+            onClick={() => setMenuOpen(false)}
+          >
+            <X size={18} />
+          </button>
           <div
             style={{
               width: "56px",
@@ -229,8 +282,16 @@ export default function AdminSidebar() {
           {OVERVIEW.map((item) => (
             <div
               key={item.path}
+              role="link"
+              tabIndex={0}
+              aria-current={
+                isActivePath(location.pathname, item.path) ? "page" : undefined
+              }
               style={linkStyle(item.path)}
-              onClick={() => navigate(item.path)}
+              onClick={() => go(item.path)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") go(item.path);
+              }}
             >
               <div
                 style={{ display: "flex", alignItems: "center", gap: "12px" }}
@@ -270,8 +331,16 @@ export default function AdminSidebar() {
           ].map((item) => (
             <div
               key={item.path}
+              role="link"
+              tabIndex={0}
+              aria-current={
+                isActivePath(location.pathname, item.path) ? "page" : undefined
+              }
               style={linkStyle(item.path)}
-              onClick={() => navigate(item.path)}
+              onClick={() => go(item.path)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") go(item.path);
+              }}
             >
               <div
                 style={{ display: "flex", alignItems: "center", gap: "12px" }}
@@ -318,8 +387,16 @@ export default function AdminSidebar() {
           {CONFIG.map((item) => (
             <div
               key={item.path}
+              role="link"
+              tabIndex={0}
+              aria-current={
+                isActivePath(location.pathname, item.path) ? "page" : undefined
+              }
               style={linkStyle(item.path)}
-              onClick={() => navigate(item.path)}
+              onClick={() => go(item.path)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") go(item.path);
+              }}
             >
               <div
                 style={{ display: "flex", alignItems: "center", gap: "12px" }}
@@ -342,8 +419,16 @@ export default function AdminSidebar() {
           {BOTTOM.map((item) => (
             <div
               key={item.path}
+              role="link"
+              tabIndex={0}
+              aria-current={
+                isActivePath(location.pathname, item.path) ? "page" : undefined
+              }
               style={linkStyle(item.path)}
-              onClick={() => navigate(item.path)}
+              onClick={() => go(item.path)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") go(item.path);
+              }}
             >
               <div
                 style={{ display: "flex", alignItems: "center", gap: "12px" }}
@@ -354,7 +439,15 @@ export default function AdminSidebar() {
             </div>
           ))}
           <div
-            onClick={() => setShowSignOutConfirm(true)}
+            role="button"
+            tabIndex={0}
+            onClick={() => {
+              setMenuOpen(false);
+              setShowSignOutConfirm(true);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") setShowSignOutConfirm(true);
+            }}
             style={{
               display: "flex",
               alignItems: "center",
