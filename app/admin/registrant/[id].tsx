@@ -1,6 +1,8 @@
 import { useAdmin } from "@/context/AdminContext";
 import { supabase } from "@/lib/supabase";
 import { Ionicons } from "@expo/vector-icons";
+import * as FileSystem from "expo-file-system/legacy";
+import * as MediaLibrary from "expo-media-library";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import { useEffect, useState } from "react";
@@ -60,6 +62,7 @@ export default function RegistrantDetails() {
 
   const [allowReenrollment, setAllowReenrollment] = useState(false);
   const [toggleLoading, setToggleLoading] = useState(false);
+  const [savingPhoto, setSavingPhoto] = useState(false);
 
   const displayName =
     typeof name === "string" ? name.toUpperCase() : "REGISTRANT";
@@ -338,6 +341,44 @@ export default function RegistrantDetails() {
         },
       },
     ]);
+  };
+
+  const handleSavePhoto = async () => {
+    const student = enrollment?.student;
+    const url: string | undefined = student?.formalPhotoUrl;
+    if (!url) return;
+    setSavingPhoto(true);
+    try {
+      const { granted } = await MediaLibrary.requestPermissionsAsync(true, [
+        "photo",
+      ]);
+      if (!granted) {
+        Alert.alert(
+          "Permission needed",
+          "Allow photo access so the photo can be saved to your gallery.",
+        );
+        return;
+      }
+      const ext =
+        url
+          .split("?")[0]
+          .match(/\.(jpe?g|png|webp|heic)$/i)?.[1]
+          ?.toLowerCase() ?? "jpg";
+      const fileName = `${student.lastName}_${student.firstName}_formal_photo`
+        .replace(/[^A-Za-z0-9_-]+/g, "_")
+        .toUpperCase();
+      const { uri, status } = await FileSystem.downloadAsync(
+        url,
+        `${FileSystem.cacheDirectory}${fileName}.${ext}`,
+      );
+      if (status !== 200) throw new Error("Could not download the photo.");
+      await MediaLibrary.saveToLibraryAsync(uri);
+      Alert.alert("Saved", "The photo was saved to your gallery.");
+    } catch (err: any) {
+      Alert.alert("Error", err.message ?? "Could not save the photo.");
+    } finally {
+      setSavingPhoto(false);
+    }
   };
 
   const handleResendEmail = async () => {
@@ -772,6 +813,22 @@ export default function RegistrantDetails() {
               </Text>
             </View>
           )}
+          {previewTitle === "Graduation or Formal Photo" && previewUrl && (
+            <TouchableOpacity
+              style={[styles.savePhotoBtn, savingPhoto && { opacity: 0.6 }]}
+              onPress={handleSavePhoto}
+              disabled={savingPhoto}
+            >
+              {savingPhoto ? (
+                <ActivityIndicator size="small" color="#2F459B" />
+              ) : (
+                <Ionicons name="download-outline" size={18} color="#2F459B" />
+              )}
+              <Text style={styles.savePhotoText}>
+                {savingPhoto ? "Saving..." : "Save Photo to Gallery"}
+              </Text>
+            </TouchableOpacity>
+          )}
           <TouchableOpacity
             style={styles.openBrowserBtn}
             onPress={() =>
@@ -1025,6 +1082,18 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   openBrowserText: { color: "white", fontWeight: "600", fontSize: 14 },
+  savePhotoBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1.5,
+    borderColor: "#2F459B",
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 15,
+    gap: 8,
+  },
+  savePhotoText: { color: "#2F459B", fontWeight: "600", fontSize: 14 },
 
   modalOverlay: {
     flex: 1,
