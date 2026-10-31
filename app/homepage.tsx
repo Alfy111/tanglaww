@@ -34,6 +34,69 @@ export default function Homepage() {
   const [notifCount, setNotifCount] = useState(0);
   const [refresh, setRefresh] = useState(false);
   const [carouselKey, setCarouselKey] = useState(0);
+  const [lastMaterial, setLastMaterial] = useState<{
+    title: string;
+    kind: "handout" | "recorded_session";
+    courseId: number;
+    courseName: string;
+  } | null>(null);
+
+  const fetchLastMaterial = useCallback(async () => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return;
+    const { data: me } = await supabase
+      .from("student")
+      .select("id")
+      .eq("auth_id", user.id)
+      .maybeSingle();
+    if (!me) return;
+
+    const { data } = await supabase
+      .from("material_progress")
+      .select(
+        `lastAccessedAt, learning_material ( title, "materialType", module ( course_id, course ( "courseName" ) ) )`,
+      )
+      .eq("student_id", me.id)
+      .order("lastAccessedAt", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const first = (v: any) => (Array.isArray(v) ? v[0] : v);
+    const material = first(data?.learning_material);
+    const module = first(material?.module);
+    if (!material || !module) {
+      setLastMaterial(null);
+      return;
+    }
+    setLastMaterial({
+      title: material.title,
+      kind:
+        material.materialType === "recorded_session"
+          ? "recorded_session"
+          : "handout",
+      courseId: module.course_id,
+      courseName: first(module.course)?.courseName ?? "",
+    });
+  }, []);
+
+  const openLastMaterial = () => {
+    if (!lastMaterial) {
+      router.push("/courses");
+      return;
+    }
+    router.push({
+      pathname:
+        lastMaterial.kind === "recorded_session"
+          ? "/materials/recorded-sessions"
+          : "/materials/handout",
+      params: {
+        courseId: String(lastMaterial.courseId),
+        courseTitle: lastMaterial.courseName,
+      },
+    } as any);
+  };
 
   const fetchAnnouncements = useCallback(async () => {
     const { data } = await supabase
@@ -106,8 +169,14 @@ export default function Homepage() {
     await fetchAnnouncements();
     await fetchAffirmations();
     await fetchNotifCount();
+    await fetchLastMaterial();
     setRefresh(false);
-  }, [fetchAnnouncements, fetchAffirmations, fetchNotifCount]);
+  }, [
+    fetchAnnouncements,
+    fetchAffirmations,
+    fetchNotifCount,
+    fetchLastMaterial,
+  ]);
 
   useEffect(() => {
     const fetchStudent = async () => {
@@ -134,7 +203,8 @@ export default function Homepage() {
   useFocusEffect(
     useCallback(() => {
       fetchNotifCount();
-    }, [fetchNotifCount]),
+      fetchLastMaterial();
+    }, [fetchNotifCount, fetchLastMaterial]),
   );
 
   return (
@@ -213,11 +283,17 @@ export default function Homepage() {
         <TouchableOpacity
           style={styles.continueCard}
           activeOpacity={0.7}
-          onPress={() => router.push("/courses")}
+          onPress={openLastMaterial}
         >
           <View style={styles.cardInfo}>
-            <Text style={styles.sessionLabel}>Recorded Session</Text>
-            <Text style={styles.courseTitle}>LET Express</Text>
+            <Text style={styles.sessionLabel} numberOfLines={1}>
+              {lastMaterial
+                ? `${lastMaterial.kind === "recorded_session" ? "Recorded Session" : "Handout"}${lastMaterial.courseName ? ` · ${lastMaterial.courseName}` : ""}`
+                : "Get started"}
+            </Text>
+            <Text style={styles.courseTitle} numberOfLines={2}>
+              {lastMaterial?.title ?? "Go to your courses"}
+            </Text>
           </View>
           <Ionicons name="arrow-forward" size={24} color="#2F459B" />
         </TouchableOpacity>
@@ -262,31 +338,17 @@ export default function Homepage() {
           )}
         </View>
 
-        <View style={styles.infoCard}>
+        <View style={[styles.infoCard, styles.affirmationCard]}>
           <View style={styles.cardHeader}>
-            <Ionicons name="heart-outline" size={22} color="#2F459B" />
-            <Text style={styles.cardTitle}>Daily Affirmation</Text>
+            <Ionicons name="sparkles" size={18} color="#FFD700" />
+            <Text style={styles.affirmationTitle}>Daily Affirmation</Text>
           </View>
-          {affirmations.length === 0 ? (
-            <Text style={styles.cardBody}>No affirmation yet.</Text>
-          ) : (
-            affirmations.map((a, i) => (
-              <View key={a.id ?? i}>
-                <Text
-                  style={[
-                    styles.cardBody,
-                    {
-                      fontStyle: "italic",
-                      fontWeight: "bold",
-                      textAlign: "center",
-                    },
-                  ]}
-                >
-                  {a.content}
-                </Text>
-              </View>
-            ))
-          )}
+          <View style={styles.affirmationRow}>
+            <FontAwesome5 name="quote-left" size={18} color="#FFD700" />
+            <Text style={styles.affirmationText}>
+              {affirmations[0]?.content ?? "No affirmation yet."}
+            </Text>
+          </View>
         </View>
       </ScrollView>
 
@@ -428,6 +490,21 @@ const styles = StyleSheet.create({
     marginLeft: 10,
   },
   cardBody: { fontSize: 14, color: "#555", lineHeight: 20 },
+  affirmationCard: { backgroundColor: "#0D2A94" },
+  affirmationTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "white",
+    marginLeft: 8,
+  },
+  affirmationRow: { flexDirection: "row", gap: 10, marginTop: 4 },
+  affirmationText: {
+    flex: 1,
+    fontSize: 14,
+    lineHeight: 21,
+    fontStyle: "italic",
+    color: "#E0E7FF",
+  },
   bottomNav: {
     position: "absolute",
     bottom: 0,

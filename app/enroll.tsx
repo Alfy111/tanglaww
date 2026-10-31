@@ -276,14 +276,33 @@ export default function EnrollmentScreen() {
     { id: 2, name: "Bachelor of Secondary Education (BSEd)" },
   ];
 
-  const majorshipOptions = [
-    { id: 1, name: "English" },
-    { id: 2, name: "Filipino" },
-    { id: 3, name: "Mathematics" },
-    { id: 4, name: "Science" },
-    { id: 5, name: "Social Values" },
-    { id: 6, name: "Values Education" },
-  ];
+  const [specializations, setSpecializations] = useState<
+    { id: number; name: string; curriculumId: number }[]
+  >([]);
+
+  useEffect(() => {
+    supabase
+      .from("specialization")
+      .select("specialization_id, specializationName, curriculum_id")
+      .order("specialization_id")
+      .then(({ data, error }) => {
+        if (error) {
+          console.error("specialization:", error.message);
+          return;
+        }
+        setSpecializations(
+          (data ?? []).map((r: any) => ({
+            id: Number(r.specialization_id),
+            name: String(r.specializationName),
+            curriculumId: Number(r.curriculum_id),
+          })),
+        );
+      });
+  }, []);
+
+  const majorshipOptions = specializations.filter(
+    (o) => o.curriculumId === dataTypes.curriculumId,
+  );
 
   const promoOptions = [
     {
@@ -1026,6 +1045,11 @@ export default function EnrollmentScreen() {
                 curriculumOptions.map((o) => ({ value: o.id, name: o.name })),
                 dataTypes.curriculumId,
                 (id) => {
+                  if (id !== dataTypes.curriculumId) {
+                    setField("specialization", "");
+                    setField("specializationId", null);
+                    setIsMajorOpen(false);
+                  }
                   setField("curriculumId", id);
                   setField(
                     "curriculum",
@@ -1041,12 +1065,17 @@ export default function EnrollmentScreen() {
                   styles.dropdown,
                   !!errors.specialization && styles.inputError,
                 ]}
-                onPress={() => setIsMajorOpen(!isMajorOpen)}
+                onPress={() =>
+                  dataTypes.curriculumId && setIsMajorOpen(!isMajorOpen)
+                }
               >
                 <Text
                   style={{ color: dataTypes.specialization ? "#000" : "#999" }}
                 >
-                  {dataTypes.specialization || "Select Specialization"}
+                  {dataTypes.specialization ||
+                    (dataTypes.curriculumId
+                      ? "Select Specialization"
+                      : "Select a curriculum first")}
                 </Text>
                 <Ionicons name="chevron-down" size={20} color="#666" />
               </TouchableOpacity>

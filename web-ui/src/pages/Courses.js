@@ -1,442 +1,427 @@
 import {
-  BookOpen,
+  CheckCircle2,
   ChevronDown,
+  ChevronRight,
   ChevronUp,
-  Clock,
+  ClipboardList,
   FileText,
   Image,
-  Search,
-  TrendingUp,
-  Video
+  Lightbulb,
+  Lock,
+  Share2,
+  Video,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import finalCoaching from "../assets/images/final-coaching.jpg";
 import integrative from "../assets/images/integrative.jpg";
 import letAdvanced from "../assets/images/let-advanced.jpg";
 import letExpress from "../assets/images/let-express.jpg";
 import letOnBoarding from "../assets/images/let-on-boarding.jpg";
-import NotificationBell from "../components/NotificationBell";
+import testHighlights from "../assets/images/test-highlights.jpg";
 import Sidebar from "../components/Sidebar";
-import { getStudentCourseProgress } from "../lib/materialProgress";
+import {
+  ProfileCard,
+  ReviewProgressCard,
+  UpcomingSessionsCard,
+  getMyCourseProgress,
+  getMyStudent,
+  summarizeProgress,
+} from "../components/StudentSidePanel";
+import UserTopbar from "../components/UserTopbar";
 import { supabase } from "../lib/supabase";
 import "./Dashboard.css";
+
+const NAVY = "#2F459B";
 
 const courseImages = {
   1: letOnBoarding,
   2: letExpress,
   3: letAdvanced,
   4: integrative,
+  5: finalCoaching,
+  6: testHighlights,
+  7: finalCoaching,
 };
 
-const fallbackCourses = [
-  {
-    id: 1,
-    name: "LET On Boarding (Concept-Driven)",
-    instructor: "Mr. Ruel Atun",
-    progress: 0,
-    color: "#aab2c0",
-    totalCount: 0,
-    contents: [
-      { id: "m101", title: "Orientation & Blueprint Overview", type: "video" },
-      { id: "m102", title: "General Education Diagnostic Drill", type: "handout" },
-    ],
-  },
-  {
-    id: 2,
-    name: "LET Express",
-    instructor: "Mr. Ruel Atun",
-    progress: 0,
-    color: "#aab2c0",
-    totalCount: 0,
-    contents: [
-      { id: "m201", title: "High-Yield Professional Education Drill", type: "video" },
-      { id: "m202", title: "LET Express Formula & Key Terms.pdf", type: "handout" },
-      { id: "m203", title: "Recorded Intensive Review Session", type: "video" },
-    ],
-  },
-  {
-    id: 3,
-    name: "LET Advance",
-    instructor: "Mr. Ruel Atun",
-    progress: 0,
-    color: "#aab2c0",
-    totalCount: 0,
-    contents: [
-      { id: "m301", title: "Advanced Pedagogy & Assessment Module", type: "handout" },
-      { id: "m302", title: "Curriculum Development Deep Dive", type: "video" },
-    ],
-  },
-  {
-    id: 4,
-    name: "Integrative",
-    instructor: "Mr. Ruel Atun",
-    progress: 0,
-    color: "#aab2c0",
-    totalCount: 0,
-    contents: [
-      { id: "m401", title: "Integrative Mock Board Examination Q&A", type: "handout" },
-    ],
-  },
+const SECTIONS = [
+  { key: "handouts", label: "Learning Modules", icon: FileText },
+  { key: "sessions", label: "Recorded Sessions", icon: Video },
+  { key: "quizzes", label: "Quiz", icon: Lightbulb },
+  { key: "online", label: "Online Session Link", icon: Share2 },
 ];
 
-function mapCourseData(courseData) {
-  const coursesById = new Map(courseData.map((course) => [course.id, course]));
+const lockMessage = (status) => {
+  switch (status?.lockReason) {
+    case "payment":
+      return "Please settle the remaining balance to access the remaining courses";
+    case "access":
+      return "Your enrollment is not active. Please contact the admin.";
+    default:
+      return `Complete ${status?.previousCourseName ?? "the previous course"} to unlock`;
+  }
+};
 
-  return fallbackCourses.map((course) => {
-    const liveCourse = coursesById.get(course.id);
-    const progress = liveCourse?.progress ?? 0;
-    const liveContents = liveCourse?.materials.map((material) => ({
-      id: material.material_id,
-      title: material.title,
-      type: material.materialType === "recorded_session" ? "video" : "handout",
-    }));
-
-    return {
-      ...course,
-      progress,
-      totalCount: liveCourse?.totalCount ?? 0,
-      color: progress === 100 ? "#4caf50" : progress > 0 ? "#f5a623" : "#aab2c0",
-      contents: liveContents?.length ? liveContents : course.contents,
-    };
-  });
-}
-
-const deadlines = [
-  { title: "LET Express - Online Session", date: "Oct 23, 2025", time: "10:00AM", link: "zoom.us/join" },
-  { title: "LET Advance - Online Session", date: "Oct 24, 2025", time: "10:00AM", link: "zoom.us/join" },
-];
-
-const leaderboard = [
-  { rank: 3, height: 60, color: "#f5a623" },
-  { rank: 2, height: 80, color: "#f5a623" },
-  { rank: 1, height: 110, color: "#4caf50" },
-];
-
-function LeaderboardChart() {
+function SectionCheck({ done, total }) {
+  if (!total) return null;
   return (
-    <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "center", gap: "12px", height: "130px", marginTop: "8px" }}>
-      {leaderboard.map((b, i) => (
-        <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" }}>
-          <div style={{
-            width: "40px",
-            height: `${b.height}px`,
-            backgroundColor: b.color,
-            borderRadius: "6px 6px 0 0",
-          }} />
-        </div>
-      ))}
-    </div>
+    <CheckCircle2
+      size={18}
+      color={done >= total ? "#1E9E5A" : "#C4C9D2"}
+      style={{ marginLeft: "auto", flexShrink: 0 }}
+    />
   );
 }
 
 export default function Courses() {
   const navigate = useNavigate();
+  const [student, setStudent] = useState(null);
   const [courses, setCourses] = useState([]);
+  const [progress, setProgress] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
-  const [expandedCourseId, setExpandedCourseId] = useState(null);
+  const [expandedId, setExpandedId] = useState(null);
+  const [diagnostic, setDiagnostic] = useState(null);
 
   useEffect(() => {
-    const loadCourses = async () => {
+    getMyStudent().then(setStudent);
+    supabase.rpc("get_diagnostic_quiz").then(({ data }) => {
+      if (data?.assessment_id && data?.isPublished) setDiagnostic(data);
+    });
+
+    const load = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
-          setCourses(fallbackCourses);
-          return;
-        }
-
-        const { data: student, error: studentError } = await supabase
-          .from("student")
-          .select("id")
-          .eq("auth_id", user.id)
-          .maybeSingle();
-
-        if (studentError) throw new Error(studentError.message);
-        if (!student) throw new Error("No student profile is linked to this account.");
-
-        const result = await getStudentCourseProgress(Number(student.id));
-        setCourses(mapCourseData(result.courses));
-      } catch (error) {
-        setLoadError(error.message ?? "Unable to load courses.");
+        const [{ data, error }, progressRows] = await Promise.all([
+          supabase
+            .from("course")
+            .select("course_id, courseName, instructor, sort_order")
+            .order("sort_order")
+            .order("course_id"),
+          getMyCourseProgress(),
+        ]);
+        if (error) throw new Error(error.message);
+        setCourses(data ?? []);
+        setProgress(progressRows);
+      } catch (err) {
+        setLoadError(err.message ?? "Unable to load courses.");
       } finally {
         setLoading(false);
       }
     };
-
-    loadCourses();
+    load();
   }, []);
 
-  const toggleAccordion = (courseId, e) => {
-    e.stopPropagation();
-    setExpandedCourseId((prev) => (prev === courseId ? null : courseId));
+  const progressById = new Map(progress.map((p) => [p.course_id, p]));
+  const visibleCourses = courses.filter(
+    (c) => progressById.get(c.course_id)?.lockReason !== "not_applicable",
+  );
+
+  const openSection = (course, section) => {
+    navigate(`/dashboard/courses/${course.course_id}?section=${section}`, {
+      state: { courseTitle: course.courseName },
+    });
   };
-
-  const handleCourseClick = (courseId) => {
-    navigate(`/dashboard/courses/${courseId}`);
-  };
-
-  const handleContentClick = (e, courseId) => {
-    e.stopPropagation();
-    navigate(`/dashboard/courses/${courseId}`);
-  };
-
-  const renderCourseCard = (c) => {
-    const isExpanded = expandedCourseId === c.id;
-
-    return (
-      <div
-        key={c.id}
-        style={{
-          border: isExpanded ? "1px solid #0D2A94" : "1px solid #eee",
-          borderRadius: "10px",
-          overflow: "hidden",
-          backgroundColor: "#fff",
-          transition: "all 0.2s ease",
-        }}
-      >
-        {/* Thumbnail Header - Navigates to Course View */}
-        <div
-          onClick={() => handleCourseClick(c.id)}
-          style={{
-            backgroundColor: "#e8eaf6",
-            height: "120px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            position: "relative",
-            overflow: "hidden",
-            color: "#bbb",
-            cursor: "pointer",
-          }}
-        >
-          <div style={{
-            position: "absolute",
-            top: "10px",
-            left: "10px",
-            backgroundColor: "#fff",
-            borderRadius: "20px",
-            padding: "3px 12px",
-            fontSize: "12px",
-            fontWeight: "700",
-            display: "flex",
-            alignItems: "center",
-            gap: "6px",
-            boxShadow: "0 1px 4px rgba(0,0,0,0.1)",
-            zIndex: 2
-          }}>
-            <div style={{ width: "10px", height: "10px", borderRadius: "50%", backgroundColor: c.color }} />
-            {c.progress}%
-          </div>
-
-          {courseImages[c.id] ? (
-            <img src={courseImages[c.id]} alt={c.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-          ) : (
-            <Image size={28} color="#bbb" />
-          )}
-
-        </div>
-
-        {/* Title Bar & Chevron Trigger */}
-        <div
-          style={{
-            padding: "12px 16px",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            userSelect: "none",
-          }}
-        >
-          <div
-            onClick={() => handleCourseClick(c.id)}
-            style={{ cursor: "pointer", flexGrow: 1 }}
-          >
-            <div style={{ fontSize: "14px", fontWeight: "600", color: "#1a1a2e" }}>{c.name}</div>
-            <div style={{ fontSize: "12px", color: "#888", marginTop: "2px" }}>{c.instructor}</div>
-          </div>
-
-          <button
-            type="button"
-            onClick={(e) => toggleAccordion(c.id, e)}
-            aria-label="Toggle contents"
-            style={{
-              background: "#f0f3ff",
-              border: "none",
-              borderRadius: "50%",
-              width: "32px",
-              height: "32px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: "pointer",
-              marginLeft: "12px",
-              flexShrink: 0
-            }}
-          >
-            {isExpanded ? <ChevronUp size={18} color="#0D2A94" /> : <ChevronDown size={18} color="#777" />}
-          </button>
-        </div>
-
-        {/* Expandable Inner Content List */}
-        {isExpanded && (
-          <div style={{
-            padding: "0 16px 16px",
-            borderTop: "1px dashed #e0e0e0",
-            backgroundColor: "#fafafa"
-          }}>
-            <div style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "6px",
-              fontSize: "12px",
-              fontWeight: "700",
-              color: "#0D2A94",
-              margin: "12px 0 8px"
-            }}>
-              <BookOpen size={14} />
-              <span>Course Contents Overview</span>
-            </div>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-              {c.contents && c.contents.length > 0 ? (
-                c.contents.map((item) => (
-                  <div
-                    key={item.id}
-                    onClick={(e) => handleContentClick(e, c.id)}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      padding: "10px 12px",
-                      backgroundColor: "#fff",
-                      borderRadius: "8px",
-                      border: "1px solid #e0e0e0",
-                      cursor: "pointer",
-                      transition: "all 0.15s ease",
-                    }}
-                    onMouseEnter={(e) => (e.currentTarget.style.borderColor = "#0D2A94")}
-                    onMouseLeave={(e) => (e.currentTarget.style.borderColor = "#e0e0e0")}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                      {item.type === "video" ? (
-                        <Video size={16} color="#0D2A94" />
-                      ) : (
-                        <FileText size={16} color="#0D2A94" />
-                      )}
-                      <span style={{ fontSize: "13px", fontWeight: "500", color: "#333" }}>
-                        {item.title}
-                      </span>
-                    </div>
-                    <span style={{ fontSize: "12px", color: "#0D2A94", fontWeight: "600" }}>
-                      Open →
-                    </span>
-                  </div>
-                ))
-              ) : (
-                <div style={{ fontSize: "12px", color: "#888", fontStyle: "italic" }}>
-                  No materials uploaded yet.
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  const inProgressCourses = courses.filter((course) => course.progress < 100);
-  const completedCourses = courses.filter((course) => course.totalCount > 0 && course.progress === 100);
 
   return (
     <div className="dashboard-layout">
       <Sidebar />
       <div className="dashboard-main">
+        <UserTopbar title="Courses" />
 
-        {/* Topbar */}
-        <div className="topbar">
-          <div className="topbar-search">
-            <Search size={16} color="#aaa" />
-            <input placeholder="Enter search terms" />
-          </div>
-          <div className="topbar-right">
-            <NotificationBell />
-          </div>
-        </div>
-
-        {/* Content */}
         <div className="dashboard-content">
-
-          {/* LEFT - Segregated Course Lists */}
           <div className="dashboard-left">
-            {loadError && <p role="alert" style={{ color: "#c0392b", fontSize: "13px" }}>{loadError}</p>}
-            <div className="card" style={{ marginBottom: "16px" }}>
-              <div className="card-title">In Progress Courses</div>
-              <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-                {loading ? (
-                  <div style={{ fontSize: "13px", color: "#888" }}>Loading courses...</div>
-                ) : inProgressCourses.length > 0 ? (
-                  inProgressCourses.map(renderCourseCard)
-                ) : (
-                  <div style={{ fontSize: "13px", color: "#888" }}>No active courses in progress.</div>
-                )}
-              </div>
-            </div>
+            {loadError && (
+              <p
+                role="alert"
+                style={{ color: "#c0392b", fontSize: "13px", margin: 0 }}
+              >
+                {loadError}
+              </p>
+            )}
 
-            <div className="card">
-              <div className="card-title">Completed Courses</div>
-              <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-                {loading ? (
-                  <div style={{ fontSize: "13px", color: "#888" }}>Loading courses...</div>
-                ) : completedCourses.length > 0 ? (
-                  completedCourses.map(renderCourseCard)
-                ) : (
-                  <div style={{ fontSize: "13px", color: "#888" }}>No completed courses yet.</div>
-                )}
+            {diagnostic && (
+              <button
+                type="button"
+                onClick={() =>
+                  navigate(`/dashboard/quiz/${diagnostic.assessment_id}`)
+                }
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "12px",
+                  width: "100%",
+                  textAlign: "left",
+                  padding: "15px",
+                  borderRadius: "12px",
+                  border: 0,
+                  borderLeft: "4px solid #FFB800",
+                  backgroundColor: "#fff",
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                }}
+              >
+                <span
+                  style={{
+                    width: "44px",
+                    height: "44px",
+                    borderRadius: "50%",
+                    backgroundColor: "#EEF1FF",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                  }}
+                >
+                  <ClipboardList size={22} color={NAVY} />
+                </span>
+                <span style={{ flex: 1 }}>
+                  <span
+                    style={{
+                      display: "block",
+                      fontSize: "15px",
+                      fontWeight: "700",
+                      color: "#333",
+                    }}
+                  >
+                    {diagnostic.title || "Diagnostic Examination"}
+                  </span>
+                  <span
+                    style={{
+                      display: "block",
+                      fontSize: "12px",
+                      color: "#7F8C8D",
+                      marginTop: "2px",
+                    }}
+                  >
+                    Diagnostic Examination
+                  </span>
+                </span>
+                <ChevronRight size={20} color="#BDC3C7" />
+              </button>
+            )}
+
+            {loading ? (
+              <div className="card">
+                <p style={{ fontSize: "13px", color: "#888", margin: 0 }}>
+                  Loading courses...
+                </p>
               </div>
-            </div>
+            ) : visibleCourses.length === 0 ? (
+              <div className="card">
+                <p style={{ fontSize: "13px", color: "#888", margin: 0 }}>
+                  No courses available.
+                </p>
+              </div>
+            ) : (
+              visibleCourses.map((course) => {
+                const status = progressById.get(course.course_id);
+                const isLocked = !!status?.lockReason;
+                const isExpanded = expandedId === course.course_id;
+                const percent = status?.percent ?? 0;
+                const toggle = () =>
+                  !isLocked &&
+                  setExpandedId(isExpanded ? null : course.course_id);
+
+                return (
+                  <div
+                    key={course.course_id}
+                    style={{
+                      backgroundColor: "#fff",
+                      borderRadius: "12px",
+                      overflow: "hidden",
+                      boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+                      border: isExpanded
+                        ? "1px solid #0D2A94"
+                        : "1px solid transparent",
+                    }}
+                  >
+                    <div
+                      role="button"
+                      tabIndex={isLocked ? -1 : 0}
+                      aria-expanded={isLocked ? undefined : isExpanded}
+                      onClick={toggle}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") toggle();
+                      }}
+                      style={{ cursor: isLocked ? "default" : "pointer" }}
+                    >
+                      <div
+                        style={{
+                          position: "relative",
+                          height: "180px",
+                          backgroundColor: "#F2F4F7",
+                          overflow: "hidden",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        {courseImages[course.course_id] ? (
+                          <img
+                            src={courseImages[course.course_id]}
+                            alt=""
+                            style={{
+                              width: "100%",
+                              height: "100%",
+                              objectFit: "cover",
+                            }}
+                          />
+                        ) : (
+                          <Image size={28} color="#bbb" />
+                        )}
+
+                        <div
+                          style={{
+                            position: "absolute",
+                            top: "10px",
+                            left: "10px",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "5px",
+                            backgroundColor: "#fff",
+                            border: "1px solid #EEE",
+                            borderRadius: "12px",
+                            padding: "4px 10px",
+                            fontSize: "11px",
+                            fontWeight: "700",
+                            color: "#555",
+                            zIndex: 2,
+                          }}
+                        >
+                          <span
+                            style={{
+                              width: "10px",
+                              height: "10px",
+                              borderRadius: "50%",
+                              border: `2px solid ${percent >= 100 ? "#2ECC71" : "#BDC3C7"}`,
+                            }}
+                          />
+                          {percent}%
+                        </div>
+
+                        {isLocked && (
+                          <div
+                            style={{
+                              position: "absolute",
+                              inset: 0,
+                              backgroundColor: "rgba(0,0,0,0.25)",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              zIndex: 1,
+                            }}
+                          >
+                            <Lock size={36} color="#fff" />
+                          </div>
+                        )}
+                      </div>
+
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          padding: "15px 18px",
+                        }}
+                      >
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div
+                            style={{
+                              fontSize: "15px",
+                              fontWeight: "700",
+                              color: "#333",
+                            }}
+                          >
+                            {course.courseName}
+                          </div>
+                          <div style={{ fontSize: "12px", color: "#7F8C8D" }}>
+                            {course.instructor ?? "—"}
+                          </div>
+                          {isLocked && (
+                            <div
+                              style={{
+                                fontSize: "11px",
+                                color: "#E74C3C",
+                                marginTop: "4px",
+                              }}
+                            >
+                              {lockMessage(status)}
+                            </div>
+                          )}
+                        </div>
+                        {!isLocked &&
+                          (isExpanded ? (
+                            <ChevronUp size={22} color="#BDC3C7" />
+                          ) : (
+                            <ChevronDown size={22} color="#BDC3C7" />
+                          ))}
+                      </div>
+                    </div>
+
+                    {isExpanded && !isLocked && (
+                      <div
+                        style={{
+                          backgroundColor: "#F0F2F8",
+                          padding: "4px 18px 8px",
+                        }}
+                      >
+                        {SECTIONS.map(({ key, label, icon: Icon }, i) => {
+                          const done = Number(status?.[`${key}Done`]) || 0;
+                          const total = Number(status?.[`${key}Total`]) || 0;
+                          return (
+                            <button
+                              key={key}
+                              type="button"
+                              onClick={() => openSection(course, key)}
+                              style={{
+                                width: "100%",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "14px",
+                                padding: "12px 0",
+                                border: 0,
+                                borderBottom:
+                                  i < SECTIONS.length - 1
+                                    ? "1px solid #E0E0E0"
+                                    : 0,
+                                background: "none",
+                                cursor: "pointer",
+                                fontFamily: "inherit",
+                                textAlign: "left",
+                              }}
+                            >
+                              <Icon size={20} color={NAVY} />
+                              <span
+                                style={{
+                                  fontSize: "14px",
+                                  fontWeight: "500",
+                                  color: NAVY,
+                                  textDecoration: "underline",
+                                }}
+                              >
+                                {label}
+                              </span>
+                              {key !== "online" && (
+                                <SectionCheck done={done} total={total} />
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
           </div>
 
-          {/* RIGHT */}
           <div className="dashboard-right">
-
-            {/* Profile */}
-            <div className="card">
-              <div className="profile-banner" />
-              <div className="profile-avatar" style={{ fontSize: "28px" }}>
-                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#9e9e9e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-              </div>
-              <div className="profile-name">JOHN DOE</div>
-              <div className="profile-degree">Bachelor of Elementary Education</div>
-              <div className="profile-email">johndoejacat10@gmail.com</div>
-            </div>
-
-            {/* Leaderboards */}
-            <div className="card">
-              <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "4px" }}>
-                <TrendingUp size={16} color="#1a1a6e" />
-                <span style={{ fontSize: "14px", fontWeight: "700", color: "#1a1a2e" }}>Leaderboards</span>
-              </div>
-              <LeaderboardChart />
-            </div>
-
-            {/* Deadlines */}
-            <div className="card">
-              <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "12px" }}>
-                <Clock size={16} color="#1a1a6e" />
-                <span style={{ fontSize: "14px", fontWeight: "700", color: "#1a1a2e" }}>Deadlines</span>
-              </div>
-              {deadlines.map((d, i) => (
-                <div key={i} className="deadline-item">
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                    <div className="deadline-title">{d.title}</div>
-                    <div style={{ fontSize: "11px", color: "#aaa", whiteSpace: "nowrap", marginLeft: "8px" }}>
-                      {d.date}<br />{d.time}
-                    </div>
-                  </div>
-                  <div className="deadline-link">{d.link}</div>
-                </div>
-              ))}
-            </div>
-
+            <ProfileCard student={student} />
+            <ReviewProgressCard
+              summary={loading ? null : summarizeProgress(progress)}
+              loading={loading}
+            />
+            <UpcomingSessionsCard />
           </div>
         </div>
       </div>

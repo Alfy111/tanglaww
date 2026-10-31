@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { applyUserTheme, getUserThemePreference } from "./lib/userTheme";
 import About from "./pages/About";
+import ActivationSuccess from "./pages/ActivationSuccess";
 import AdminAbout from "./pages/admin/AdminAbout";
 import AdminActivate from "./pages/admin/AdminActivate";
 import AdminAnalytics from "./pages/admin/AdminAnalytics";
@@ -13,6 +14,7 @@ import AdminCourses from "./pages/admin/AdminCourses";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminHandouts from "./pages/admin/AdminHandouts";
 import AdminHelp from "./pages/admin/AdminHelp";
+import AdminManageAdmins from "./pages/admin/AdminManageAdmins";
 import AdminOnlineSession from "./pages/admin/AdminOnlineSession";
 import AdminPolicies from "./pages/admin/AdminPolicies";
 import AdminQuiz from "./pages/admin/AdminQuiz";
@@ -20,10 +22,10 @@ import AdminQuizEditor from "./pages/admin/AdminQuizEditor";
 import AdminRecordedSessions from "./pages/admin/AdminRecordedSessions";
 import AdminSignIn from "./pages/admin/AdminSignIn";
 import AdminStudentRegistry from "./pages/admin/AdminStudentRegistry";
-import Analytics from "./pages/Analytics"; // <-- 1. ADD THIS IMPORT
+import Analytics from "./pages/Analytics";
 import Calendar from "./pages/Calendar";
 import ChangePassword from "./pages/ChangePassword";
-import CourseDetail from "./pages/CourseDetails";
+import CourseMaterials from "./pages/CourseMaterials";
 import Courses from "./pages/Courses";
 import Dashboard from "./pages/Dashboard";
 import Enroll from "./pages/Enroll";
@@ -32,6 +34,9 @@ import Home from "./pages/Home";
 import Notifications from "./pages/Notifications";
 import PasswordRecovery from "./pages/PasswordRecovery";
 import Profile from "./pages/Profile";
+import QuizDetails from "./pages/quiz/QuizDetails";
+import QuizReview from "./pages/quiz/QuizReview";
+import QuizTake from "./pages/quiz/QuizTake";
 import Settings from "./pages/Settings";
 import SignIn from "./pages/SignIn";
 import SignInWithCode from "./pages/SignInWithCode";
@@ -52,12 +57,17 @@ export default function App() {
       />
       <Route path="/signin/code" element={<SignInWithCode />} />
       <Route path="/dashboard" element={<Dashboard />} />
-      <Route path="/dashboard/Analytics" element={<Analytics />} />{" "}
-      {/* <-- 2. ADD THIS ROUTE */}
+      <Route path="/dashboard/Analytics" element={<Analytics />} />
       <Route path="/dashboard/courses" element={<Courses />} />
       <Route
         path="/dashboard/courses/:courseId"
-        element={<CourseDetail isAdmin={false} />}
+        element={<CourseMaterials />}
+      />
+      <Route path="/dashboard/quiz/:assessmentId" element={<QuizDetails />} />
+      <Route path="/dashboard/quiz/attempt/:attemptId" element={<QuizTake />} />
+      <Route
+        path="/dashboard/quiz/review/:attemptId"
+        element={<QuizReview />}
       />
       <Route path="/dashboard/calendar" element={<Calendar />} />
       <Route path="/dashboard/profile" element={<Profile />} />
@@ -96,7 +106,10 @@ export default function App() {
         path="/admin/courses/:courseId/handouts"
         element={<AdminHandouts />}
       />
-      <Route path="/our-courses" element={<Navigate to="/#courses" replace />} />
+      <Route
+        path="/our-courses"
+        element={<Navigate to="/#courses" replace />}
+      />
       <Route path="/about-us" element={<Navigate to="/#about" replace />} />
       <Route path="/helpdesk" element={<Navigate to="/#helpdesk" replace />} />
       <Route
@@ -112,6 +125,8 @@ export default function App() {
         path="/admin/courses/:courseId/online-session"
         element={<AdminOnlineSession />}
       />
+      <Route path="/admin/manage-admins" element={<AdminManageAdmins />} />
+      <Route path="/signin/success" element={<ActivationSuccess />} />
     </Routes>
   );
 }

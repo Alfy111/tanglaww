@@ -12,7 +12,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import DiagnosticCard from "../../components/DiagnosticCard";
 import { supabase } from "../../lib/supabase";
 import { getModulesByCourse } from "../../services/materialService";
 import AdminHamburger from "./hamburger";
@@ -36,6 +35,7 @@ const courseImages: Record<number, any> = {
   4: require("../../assets/images/integrative.jpg"),
   5: require("../../assets/images/final-coaching.jpg"),
   6: require("../../assets/images/test-highlights.jpg"),
+  7: require("../../assets/images/final-coaching.jpg"),
 };
 
 const CourseCard = React.memo(
@@ -140,11 +140,19 @@ const CourseCard = React.memo(
               <Text style={styles.dropText}>Quiz</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.dropItem, { borderBottomWidth: 0 }]}
+              style={styles.dropItem}
               onPress={() => navigateTo("session-links")}
             >
               <Ionicons name="share-outline" size={20} color="#2F459B" />
               <Text style={styles.dropText}>Online Session Link</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.dropItem, { borderBottomWidth: 0 }]}
+            >
+              <Ionicons name="add-circle-outline" size={20} color="#BDC3C7" />
+              <Text style={[styles.dropText, { color: "#BDC3C7" }]}>
+                Add new section
+              </Text>
             </TouchableOpacity>
           </View>
         )}
@@ -168,7 +176,8 @@ export default function AdminCourses() {
   const fetchCourses = async () => {
     const { data, error } = await supabase
       .from("course")
-      .select("course_id, courseName, instructor")
+      .select("course_id, courseName, instructor, sort_order")
+      .order("sort_order")
       .order("course_id");
 
     if (error) {
@@ -207,8 +216,9 @@ export default function AdminCourses() {
           <Text style={styles.headerTitle}>Courses</Text>
         </View>
 
+        {/* Opens the admin analytics dashboard */}
         <TouchableOpacity
-          onPress={() => router.push("/admin/analytics" as any)}
+          onPress={() => router.push("/admin-analytics" as any)}
           activeOpacity={0.7}
           style={styles.analyticsButton}
         >
@@ -237,7 +247,6 @@ export default function AdminCourses() {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          <DiagnosticCard isAdmin />
           {courses.map((course) => (
             <CourseCard
               key={course.course_id}

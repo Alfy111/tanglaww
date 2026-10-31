@@ -48,6 +48,7 @@ const courseImages: Record<number, any> = {
   4: require("../assets/images/integrative.jpg"),
   5: require("../assets/images/final-coaching.jpg"),
   6: require("../assets/images/test-highlights.jpg"),
+  7: require("../assets/images/final-coaching.jpg"),
 };
 
 export default function CoursesScreen() {
@@ -77,7 +78,8 @@ export default function CoursesScreen() {
 
     const { data, error } = await supabase
       .from("course")
-      .select("course_id, courseName, instructor")
+      .select("course_id, courseName, instructor, sort_order")
+      .order("sort_order")
       .order("course_id");
 
     if (error) {
@@ -188,139 +190,155 @@ export default function CoursesScreen() {
         >
           <DiagnosticCard isAdmin={false} />
 
-          {courses.map((course) => {
-            const status = progressMap.get(course.course_id);
-            const isLocked = !!status?.lockReason;
-            const lockMessage =
-              status?.lockReason === "payment"
-                ? "Please settle the remaining balance to access the remaining courses"
-                : status?.lockReason === "not_applicable"
-                  ? "Not part of the BEEd curriculum"
-                  : status?.lockReason === "access"
-                    ? "Your enrollment is not active. Please contact the admin."
-                    : `Complete ${
-                        status?.previousCourseName ?? "the previous course"
-                      } to unlock`;
-            const isExpanded = expandedId === course.course_id;
-            const progress = getProgress(course.course_id);
+          {courses
+            .filter(
+              (course) =>
+                progressMap.get(course.course_id)?.lockReason !==
+                "not_applicable",
+            )
+            .map((course) => {
+              const status = progressMap.get(course.course_id);
+              const isLocked = !!status?.lockReason;
+              const lockMessage =
+                status?.lockReason === "payment"
+                  ? "Please settle the remaining balance to access the remaining courses"
+                  : status?.lockReason === "not_applicable"
+                    ? "Not part of the BEEd curriculum"
+                    : status?.lockReason === "access"
+                      ? "Your enrollment is not active. Please contact the admin."
+                      : `Complete ${
+                          status?.previousCourseName ?? "the previous course"
+                        } to unlock`;
+              const isExpanded = expandedId === course.course_id;
+              const progress = getProgress(course.course_id);
 
-            return (
-              <View key={course.course_id} style={styles.cardContainer}>
-                <TouchableOpacity
-                  style={styles.courseCard}
-                  onPress={() => !isLocked && toggleDropdown(course.course_id)}
-                  activeOpacity={0.9}
-                >
-                  <View style={styles.imageSection}>
-                    {courseImages[course.course_id] ? (
-                      <Image
-                        source={courseImages[course.course_id]}
-                        style={{ width: "100%", height: "100%" }}
-                        resizeMode="cover"
-                      />
-                    ) : (
-                      <View style={{ flex: 1, backgroundColor: "#F2F4F7" }} />
-                    )}
+              return (
+                <View key={course.course_id} style={styles.cardContainer}>
+                  <TouchableOpacity
+                    style={styles.courseCard}
+                    onPress={() =>
+                      !isLocked && toggleDropdown(course.course_id)
+                    }
+                    activeOpacity={0.9}
+                  >
+                    <View style={styles.imageSection}>
+                      {courseImages[course.course_id] ? (
+                        <Image
+                          source={courseImages[course.course_id]}
+                          style={{ width: "100%", height: "100%" }}
+                          resizeMode="cover"
+                        />
+                      ) : (
+                        <View style={{ flex: 1, backgroundColor: "#F2F4F7" }} />
+                      )}
 
-                    <View style={styles.progressBadge}>
-                      <View
-                        style={[
-                          styles.progressCircle,
-                          {
-                            borderColor:
-                              Number(progress) >= 100 ? "#2ECC71" : "#BDC3C7",
-                          },
-                        ]}
-                      />
-                      <Text style={styles.progressText}>{progress}%</Text>
-                    </View>
-                    {isLocked && (
-                      <View style={styles.lockOverlay}>
-                        <Ionicons name="lock-closed" size={36} color="white" />
+                      <View style={styles.progressBadge}>
+                        <View
+                          style={[
+                            styles.progressCircle,
+                            {
+                              borderColor:
+                                Number(progress) >= 100 ? "#2ECC71" : "#BDC3C7",
+                            },
+                          ]}
+                        />
+                        <Text style={styles.progressText}>{progress}%</Text>
                       </View>
-                    )}
-                  </View>
-
-                  <View style={styles.infoSection}>
-                    <View style={styles.textContainer}>
-                      <Text style={styles.courseTitleText}>
-                        {course.courseName}
-                      </Text>
-                      <Text style={styles.instructorText}>
-                        {course.instructor ?? "—"}
-                      </Text>
                       {isLocked && (
-                        <Text style={styles.lockedNote}>{lockMessage}</Text>
+                        <View style={styles.lockOverlay}>
+                          <Ionicons
+                            name="lock-closed"
+                            size={36}
+                            color="white"
+                          />
+                        </View>
                       )}
                     </View>
-                    {!isLocked && (
-                      <Ionicons
-                        name={isExpanded ? "chevron-up" : "chevron-down"}
-                        size={24}
-                        color="#BDC3C7"
-                      />
-                    )}
-                  </View>
-                </TouchableOpacity>
 
-                {isExpanded && !isLocked && (
-                  <View style={styles.dropdownContent}>
-                    <TouchableOpacity
-                      style={styles.dropItem}
-                      onPress={() => navigateTo("handout", course)}
-                    >
-                      <Ionicons
-                        name="document-text-outline"
-                        size={20}
-                        color="#2F459B"
-                      />
-                      <Text style={styles.dropText}>Learning Modules</Text>
-                      <SectionCheck
-                        section={progressMap.get(course.course_id)?.handouts}
-                      />
-                    </TouchableOpacity>
+                    <View style={styles.infoSection}>
+                      <View style={styles.textContainer}>
+                        <Text style={styles.courseTitleText}>
+                          {course.courseName}
+                        </Text>
+                        <Text style={styles.instructorText}>
+                          {course.instructor ?? "—"}
+                        </Text>
+                        {isLocked && (
+                          <Text style={styles.lockedNote}>{lockMessage}</Text>
+                        )}
+                      </View>
+                      {!isLocked && (
+                        <Ionicons
+                          name={isExpanded ? "chevron-up" : "chevron-down"}
+                          size={24}
+                          color="#BDC3C7"
+                        />
+                      )}
+                    </View>
+                  </TouchableOpacity>
 
-                    <TouchableOpacity
-                      style={styles.dropItem}
-                      onPress={() => navigateTo("recorded-sessions", course)}
-                    >
-                      <Ionicons
-                        name="videocam-outline"
-                        size={20}
-                        color="#2F459B"
-                      />
-                      <Text style={styles.dropText}>Recorded Sessions</Text>
-                      <SectionCheck
-                        section={progressMap.get(course.course_id)?.sessions}
-                      />
-                    </TouchableOpacity>
+                  {isExpanded && !isLocked && (
+                    <View style={styles.dropdownContent}>
+                      <TouchableOpacity
+                        style={styles.dropItem}
+                        onPress={() => navigateTo("handout", course)}
+                      >
+                        <Ionicons
+                          name="document-text-outline"
+                          size={20}
+                          color="#2F459B"
+                        />
+                        <Text style={styles.dropText}>Learning Modules</Text>
+                        <SectionCheck
+                          section={progressMap.get(course.course_id)?.handouts}
+                        />
+                      </TouchableOpacity>
 
-                    <TouchableOpacity
-                      style={styles.dropItem}
-                      onPress={() => navigateTo("quiz", course)}
-                    >
-                      <Ionicons name="bulb-outline" size={20} color="#2F459B" />
-                      <Text style={styles.dropText}>Quiz</Text>
-                      <SectionCheck
-                        section={progressMap.get(course.course_id)?.quizzes}
-                      />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.dropItem}
-                      onPress={() => navigateTo("session-links", course)}
-                    >
-                      <Ionicons
-                        name="share-outline"
-                        size={20}
-                        color="#2F459B"
-                      />
-                      <Text style={styles.dropText}>Online Session Link</Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
-              </View>
-            );
-          })}
+                      <TouchableOpacity
+                        style={styles.dropItem}
+                        onPress={() => navigateTo("recorded-sessions", course)}
+                      >
+                        <Ionicons
+                          name="videocam-outline"
+                          size={20}
+                          color="#2F459B"
+                        />
+                        <Text style={styles.dropText}>Recorded Sessions</Text>
+                        <SectionCheck
+                          section={progressMap.get(course.course_id)?.sessions}
+                        />
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={styles.dropItem}
+                        onPress={() => navigateTo("quiz", course)}
+                      >
+                        <Ionicons
+                          name="bulb-outline"
+                          size={20}
+                          color="#2F459B"
+                        />
+                        <Text style={styles.dropText}>Quiz</Text>
+                        <SectionCheck
+                          section={progressMap.get(course.course_id)?.quizzes}
+                        />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.dropItem}
+                        onPress={() => navigateTo("session-links", course)}
+                      >
+                        <Ionicons
+                          name="share-outline"
+                          size={20}
+                          color="#2F459B"
+                        />
+                        <Text style={styles.dropText}>Online Session Link</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+              );
+            })}
         </ScrollView>
       )}
 

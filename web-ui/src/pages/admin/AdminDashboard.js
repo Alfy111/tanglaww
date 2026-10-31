@@ -2,11 +2,12 @@ import {
   Check,
   CheckCircle2,
   ChevronRight,
-  Heart,
   Image,
   Megaphone,
   Pencil,
   Plus,
+  Quote,
+  Sparkles,
   Trash2,
   User,
   X,
@@ -531,50 +532,97 @@ function AffirmationCard({ affirmation, loading, onSave }) {
   };
 
   return (
-    <div style={card}>
-      <CardHeader
-        icon={<Heart size={20} color={NAVY} />}
-        title="Daily Affirmation"
+    <div
+      style={{
+        ...card,
+        border: "none",
+        background: "linear-gradient(135deg, #0D2A94 0%, #1a3ab8 100%)",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "8px",
+          marginBottom: "12px",
+        }}
       >
-        {!editing ? (
-          <button
-            type="button"
-            onClick={() => {
-              setDraft(affirmation?.content ?? "");
-              setError("");
-              setEditing(true);
-            }}
-            style={linkButton}
-          >
-            <Pencil size={13} /> Edit
-          </button>
-        ) : (
-          <>
+        <Sparkles size={18} color="#ffd700" />
+        <span style={{ fontSize: "15px", fontWeight: "700", color: "#fff" }}>
+          Daily Affirmation
+        </span>
+        <div
+          style={{
+            marginLeft: "auto",
+            display: "flex",
+            gap: "8px",
+            alignItems: "center",
+          }}
+        >
+          {!editing ? (
             <button
               type="button"
               onClick={() => {
                 setDraft(affirmation?.content ?? "");
-                setEditing(false);
                 setError("");
+                setEditing(true);
               }}
-              style={outlineButton}
+              style={{ ...linkButton, color: "#fff" }}
             >
-              <X size={12} /> Cancel
+              <Pencil size={13} /> Edit
             </button>
-            <button
-              type="button"
-              onClick={save}
-              disabled={saving}
-              style={{ ...solidButton, cursor: saving ? "wait" : "pointer" }}
-            >
-              <Check size={12} /> {saving ? "Saving..." : "Save"}
-            </button>
-          </>
-        )}
-      </CardHeader>
-      <ErrorText>{error}</ErrorText>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  setDraft(affirmation?.content ?? "");
+                  setEditing(false);
+                  setError("");
+                }}
+                style={{
+                  ...outlineButton,
+                  backgroundColor: "transparent",
+                  color: "#fff",
+                  border: "1px solid rgba(255,255,255,0.7)",
+                }}
+              >
+                <X size={12} /> Cancel
+              </button>
+              <button
+                type="button"
+                onClick={save}
+                disabled={saving}
+                style={{
+                  ...solidButton,
+                  backgroundColor: "#FFD75E",
+                  color: "#1a1a2e",
+                  cursor: saving ? "wait" : "pointer",
+                }}
+              >
+                <Check size={12} /> {saving ? "Saving..." : "Save"}
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+      {error && (
+        <p
+          role="alert"
+          style={{
+            color: "#fff",
+            backgroundColor: "rgba(231,76,60,0.35)",
+            borderRadius: "6px",
+            padding: "6px 10px",
+            fontSize: "12px",
+            margin: "0 0 8px",
+          }}
+        >
+          {error}
+        </p>
+      )}
       {loading ? (
-        <p style={{ color: "#888", fontSize: "13px", margin: 0 }}>
+        <p style={{ color: "#c7d2fe", fontSize: "13px", margin: 0 }}>
           Loading affirmation...
         </p>
       ) : editing ? (
@@ -586,27 +634,30 @@ function AffirmationCard({ affirmation, loading, onSave }) {
             ...inputStyle,
             fontSize: "13px",
             fontStyle: "italic",
-            borderColor: NAVY,
+            borderColor: "#fff",
             minHeight: "80px",
             resize: "vertical",
           }}
         />
       ) : (
-        <p
-          style={{
-            fontSize: "14px",
-            color: "#444",
-            fontStyle: "italic",
-            fontWeight: "600",
-            textAlign: "center",
-            lineHeight: "1.6",
-            margin: "8px 0",
-          }}
-        >
-          {affirmation?.content
-            ? `"${affirmation.content}"`
-            : "No affirmation yet."}
-        </p>
+        <div style={{ display: "flex", gap: "10px" }}>
+          <Quote
+            size={20}
+            color="#ffd700"
+            style={{ transform: "rotate(180deg)", flexShrink: 0 }}
+          />
+          <p
+            style={{
+              fontSize: "14px",
+              color: "#e0e7ff",
+              fontStyle: "italic",
+              lineHeight: "1.6",
+              margin: 0,
+            }}
+          >
+            {affirmation?.content ?? "No affirmation yet."}
+          </p>
+        </div>
       )}
     </div>
   );
@@ -623,11 +674,7 @@ function ApprovalStream({ pending, pendingCount, onOpen, onSeeAll }) {
             : "Approval Stream"
         }
       >
-        <button
-          type="button"
-          onClick={onSeeAll}
-          style={{ ...linkButton, color: "#f5a623" }}
-        >
+        <button type="button" onClick={onSeeAll} style={linkButton}>
           See all
         </button>
       </CardHeader>

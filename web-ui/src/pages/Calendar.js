@@ -1,77 +1,547 @@
-import { Clock, Plus, Trash2, TrendingUp, X } from "lucide-react";
+import {
+  CheckSquare,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  ExternalLink,
+  Link2,
+  Plus,
+  Square,
+  Trash2,
+  X,
+} from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import Sidebar from "../components/Sidebar";
+import {
+  ProfileCard,
+  ReviewProgressCard,
+  UpcomingSessionsCard,
+  getMyCourseProgress,
+  getMyStudent,
+  summarizeProgress,
+} from "../components/StudentSidePanel";
 import UserTopbar from "../components/UserTopbar";
 import { supabase } from "../lib/supabase";
 import "./Dashboard.css";
 
+const NAVY = "#0D2A94";
+const BLUE = "#2F459B";
+const YELLOW = "#FFD75E";
+const TODO_DOT = "#FFB800";
+const FONT = "Poppins, sans-serif";
+
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
-
-function getDaysInMonth(year, month) { return new Date(year, month + 1, 0).getDate(); }
-function getFirstDayOfMonth(year, month) { const d = new Date(year, month, 1).getDay(); return d === 0 ? 6 : d - 1; }
-const formatDate = (str) => new Date(str).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-const formatTime = (str) => new Date(str).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
-
-const leaderboard = [
-  { height: 60, color: "#f5a623" },
-  { height: 80, color: "#f5a623" },
-  { height: 110, color: "#4caf50" },
+const MONTHS = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
 ];
+
+const formatDate = (iso) =>
+  new Date(iso).toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+const formatTime = (iso) =>
+  new Date(iso).toLocaleTimeString("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+const sameDay = (iso, year, month, day) => {
+  const d = new Date(iso);
+  return (
+    d.getFullYear() === year && d.getMonth() === month && d.getDate() === day
+  );
+};
+const toUrl = (link) => (/^https?:\/\//i.test(link) ? link : `https://${link}`);
+
+const overlay = {
+  position: "fixed",
+  inset: 0,
+  zIndex: 1000,
+  backgroundColor: "rgba(0,0,0,0.5)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: "20px",
+  fontFamily: FONT,
+};
+const labelStyle = {
+  display: "block",
+  fontSize: "14px",
+  fontWeight: "700",
+  color: "#555",
+  marginBottom: "8px",
+};
+const inputStyle = {
+  width: "100%",
+  boxSizing: "border-box",
+  border: "1px solid #BDC3C7",
+  borderRadius: "8px",
+  padding: "12px",
+  fontSize: "14px",
+  fontFamily: FONT,
+  color: "#333",
+  outline: "none",
+};
+
+function useEscape(handler) {
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === "Escape") handler();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [handler]);
+}
+
+function EventModal({ events, onClose }) {
+  useEscape(onClose);
+  return (
+    <div
+      role="presentation"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      style={overlay}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Event details"
+        style={{
+          width: "100%",
+          maxWidth: "460px",
+          maxHeight: "85vh",
+          overflowY: "auto",
+          backgroundColor: "#fff",
+          borderRadius: "20px",
+          padding: "24px",
+          boxSizing: "border-box",
+        }}
+      >
+        {events.map((ev, i) => (
+          <div
+            key={ev.event_id}
+            style={{
+              borderTop: i > 0 ? "1px solid #eee" : 0,
+              paddingTop: i > 0 ? "16px" : 0,
+              marginTop: i > 0 ? "16px" : 0,
+            }}
+          >
+            <div
+              style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}
+            >
+              <h3
+                style={{
+                  flex: 1,
+                  margin: "0 0 8px",
+                  fontSize: "20px",
+                  fontWeight: "700",
+                  color: "#1A1A2E",
+                }}
+              >
+                {ev.title}
+              </h3>
+              {i === 0 && (
+                <button
+                  type="button"
+                  aria-label="Close"
+                  onClick={onClose}
+                  style={{
+                    border: 0,
+                    background: "none",
+                    cursor: "pointer",
+                    display: "flex",
+                    padding: 2,
+                  }}
+                >
+                  <X size={24} color="#555" />
+                </button>
+              )}
+            </div>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                marginBottom: "14px",
+                fontSize: "13px",
+                color: "#666",
+              }}
+            >
+              <Clock size={16} color={NAVY} /> {formatDate(ev.event_date)} ·{" "}
+              {formatTime(ev.event_date)}
+            </div>
+            {ev.description && (
+              <div
+                style={{
+                  backgroundColor: "#F8F9FA",
+                  borderRadius: "10px",
+                  padding: "12px",
+                  marginBottom: "14px",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: "11px",
+                    fontWeight: "700",
+                    color: NAVY,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.5px",
+                    marginBottom: "4px",
+                  }}
+                >
+                  Description
+                </div>
+                <div
+                  style={{
+                    fontSize: "14px",
+                    color: "#444",
+                    lineHeight: 1.45,
+                    whiteSpace: "pre-wrap",
+                  }}
+                >
+                  {ev.description}
+                </div>
+              </div>
+            )}
+            {ev.link && (
+              <a
+                href={toUrl(ev.link)}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  backgroundColor: "#EEF1FF",
+                  borderRadius: "8px",
+                  padding: "10px",
+                  color: NAVY,
+                  fontSize: "13px",
+                  textDecoration: "none",
+                }}
+              >
+                <Link2 size={16} />
+                <span
+                  style={{
+                    flex: 1,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {ev.link}
+                </span>
+                <ExternalLink size={14} />
+              </a>
+            )}
+          </div>
+        ))}
+        <button
+          type="button"
+          onClick={onClose}
+          style={{
+            width: "100%",
+            marginTop: "20px",
+            padding: "13px",
+            borderRadius: "10px",
+            border: 0,
+            backgroundColor: NAVY,
+            color: "#fff",
+            fontSize: "14px",
+            fontWeight: "700",
+            cursor: "pointer",
+            fontFamily: FONT,
+          }}
+        >
+          Close
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function AddTodoModal({ studentId, onClose, onSaved }) {
+  const [title, setTitle] = useState("");
+  const [date, setDate] = useState("");
+  const [time, setTime] = useState("");
+  const [description, setDescription] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  useEscape(onClose);
+
+  const save = async (e) => {
+    e.preventDefault();
+    if (!title.trim()) {
+      setError("Please enter a title.");
+      return;
+    }
+    if (time && !date) {
+      setError("Please pick a deadline date for the time.");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    const dueDate = date
+      ? new Date(`${date}T${time || "00:00"}`).toISOString()
+      : null;
+    const { error: saveError } = await supabase.from("to_do").insert({
+      student_id: studentId,
+      title: title.trim(),
+      description: description.trim() || null,
+      dueDate,
+      isCompleted: false,
+    });
+    setSaving(false);
+    if (saveError) {
+      setError(saveError.message);
+      return;
+    }
+    onSaved();
+    onClose();
+  };
+
+  return (
+    <div
+      role="presentation"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      style={overlay}
+    >
+      <form
+        onSubmit={save}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="add-todo-title"
+        style={{
+          width: "100%",
+          maxWidth: "440px",
+          backgroundColor: "#fff",
+          borderRadius: "16px",
+          overflow: "hidden",
+          boxSizing: "border-box",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            backgroundColor: NAVY,
+            color: "#fff",
+            padding: "16px 20px",
+          }}
+        >
+          <h3
+            id="add-todo-title"
+            style={{ margin: 0, fontSize: "17px", fontWeight: "700" }}
+          >
+            Add new to do
+          </h3>
+          <button
+            type="button"
+            aria-label="Close"
+            onClick={onClose}
+            style={{
+              border: 0,
+              background: "none",
+              cursor: "pointer",
+              display: "flex",
+              color: "#fff",
+            }}
+          >
+            <X size={22} />
+          </button>
+        </div>
+        <div style={{ padding: "24px" }}>
+          <label htmlFor="todo-title" style={labelStyle}>
+            Title:
+          </label>
+          <input
+            id="todo-title"
+            autoFocus
+            style={{ ...inputStyle, marginBottom: "18px" }}
+            placeholder="Title of item"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+          />
+
+          <div style={{ display: "flex", gap: "12px", marginBottom: "18px" }}>
+            <div style={{ flex: 1 }}>
+              <label htmlFor="todo-date" style={labelStyle}>
+                Deadline:
+              </label>
+              <input
+                id="todo-date"
+                type="date"
+                style={inputStyle}
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+              />
+            </div>
+            <div style={{ flex: 1 }}>
+              <label htmlFor="todo-time" style={labelStyle}>
+                Time:
+              </label>
+              <input
+                id="todo-time"
+                type="time"
+                style={inputStyle}
+                value={time}
+                onChange={(e) => setTime(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <label htmlFor="todo-details" style={labelStyle}>
+            Short details:
+          </label>
+          <textarea
+            id="todo-details"
+            style={{ ...inputStyle, minHeight: "80px", resize: "vertical" }}
+            placeholder="Write a brief description of your task"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+          />
+
+          {error && (
+            <p
+              role="alert"
+              style={{ color: "#E74C3C", fontSize: "13px", margin: "12px 0 0" }}
+            >
+              {error}
+            </p>
+          )}
+
+          <button
+            type="submit"
+            disabled={saving}
+            style={{
+              width: "100%",
+              marginTop: "24px",
+              padding: "14px",
+              borderRadius: "8px",
+              border: 0,
+              backgroundColor: NAVY,
+              color: "#fff",
+              fontSize: "16px",
+              fontWeight: "700",
+              cursor: saving ? "wait" : "pointer",
+              opacity: saving ? 0.7 : 1,
+              fontFamily: FONT,
+            }}
+          >
+            {saving ? "Saving..." : "Save"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
 
 export default function Calendar() {
   const today = new Date();
-  const [current, setCurrent] = useState({ year: today.getFullYear(), month: today.getMonth() });
-  const [activeTab, setActiveTab] = useState("upcoming");
+  const [current, setCurrent] = useState({
+    year: today.getFullYear(),
+    month: today.getMonth(),
+  });
+  const [tab, setTab] = useState("upcoming");
+  const [student, setStudent] = useState(null);
+  const [summary, setSummary] = useState(null);
   const [events, setEvents] = useState([]);
   const [todos, setTodos] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [studentId, setStudentId] = useState(null);
-  const [showAddTodo, setShowAddTodo] = useState(false);
-  const [newTodo, setNewTodo] = useState({ title: "", description: "", dueDate: "" });
+  const [error, setError] = useState("");
+  const [openEvents, setOpenEvents] = useState(null);
+  const [adding, setAdding] = useState(false);
 
-  const { year, month } = current;
-  const daysInMonth = getDaysInMonth(year, month);
-  const firstDay = getFirstDayOfMonth(year, month);
-  const cells = [...Array(firstDay).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)];
-  const isToday = (d) => d === today.getDate() && month === today.getMonth() && year === today.getFullYear();
-  const hasEvent = (d) => events.some((e) => { const dt = new Date(e.event_date); return dt.getDate() === d && dt.getMonth() === month && dt.getFullYear() === year; });
-  const hasTodo = (d) => todos.some((t) => { if (!t.dueDate) return false; const dt = new Date(t.dueDate); return dt.getDate() === d && dt.getMonth() === month && dt.getFullYear() === year; });
-
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    const { data: { user } } = await supabase.auth.getUser();
-    const { data: eventData } = await supabase.from("calendar_events").select("*").order("event_date", { ascending: true });
-    setEvents(eventData ?? []);
-    if (user) {
-      const { data: studentData } = await supabase.from("student").select("id").eq("auth_id", user.id).maybeSingle();
-      if (studentData) {
-        setStudentId(studentData.id);
-        const { data: todoData } = await supabase.from("to_do").select("*").eq("student_id", studentData.id).order("dueDate", { ascending: true });
-        setTodos(todoData ?? []);
-      }
-    }
-    setLoading(false);
+  const fetchTodos = useCallback(async (studentId) => {
+    const { data } = await supabase
+      .from("to_do")
+      .select("*")
+      .eq("student_id", studentId)
+      .order("dueDate", { ascending: true });
+    setTodos(data ?? []);
   }, []);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => {
+    const load = async () => {
+      const [me, eventResult] = await Promise.all([
+        getMyStudent(),
+        supabase
+          .from("calendar_events")
+          .select("*")
+          .order("event_date", { ascending: true }),
+      ]);
+      setStudent(me);
+      setEvents(eventResult.data ?? []);
+      if (eventResult.error) setError(eventResult.error.message);
+      if (me) await fetchTodos(me.id);
+      setLoading(false);
+    };
+    load();
+    getMyCourseProgress()
+      .then((rows) => setSummary(summarizeProgress(rows)))
+      .catch(() => setSummary(summarizeProgress([])));
+  }, [fetchTodos]);
 
-  const addTodo = async () => {
-    if (!newTodo.title || !studentId) return;
-    await supabase.from("to_do").insert({ title: newTodo.title, description: newTodo.description, dueDate: newTodo.dueDate || null, isCompleted: false, student_id: studentId });
-    setNewTodo({ title: "", description: "", dueDate: "" });
-    setShowAddTodo(false);
-    fetchData();
-  };
+  const { year, month } = current;
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const firstDay = new Date(year, month, 1).getDay();
+  const offset = firstDay === 0 ? 6 : firstDay - 1;
+
+  const prevMonth = () =>
+    setCurrent(({ year: y, month: m }) =>
+      m === 0 ? { year: y - 1, month: 11 } : { year: y, month: m - 1 },
+    );
+  const nextMonth = () =>
+    setCurrent(({ year: y, month: m }) =>
+      m === 11 ? { year: y + 1, month: 0 } : { year: y, month: m + 1 },
+    );
 
   const toggleTodo = async (todo) => {
-    await supabase.from("to_do").update({ isCompleted: !todo.isCompleted, completedAt: !todo.isCompleted ? new Date().toISOString() : null }).eq("todo_id", todo.todo_id);
-    fetchData();
+    const isCompleted = !todo.isCompleted;
+    setTodos((prev) =>
+      prev.map((t) => (t.todo_id === todo.todo_id ? { ...t, isCompleted } : t)),
+    );
+    const { error: updateError } = await supabase
+      .from("to_do")
+      .update({
+        isCompleted,
+        completedAt: isCompleted ? new Date().toISOString() : null,
+      })
+      .eq("todo_id", todo.todo_id);
+    if (updateError) {
+      setError(updateError.message);
+      setTodos((prev) =>
+        prev.map((t) =>
+          t.todo_id === todo.todo_id ? { ...t, isCompleted: !isCompleted } : t,
+        ),
+      );
+    }
   };
 
-  const deleteTodo = async (id) => {
-    await supabase.from("to_do").delete().eq("todo_id", id);
-    fetchData();
+  const deleteTodo = async (todo) => {
+    if (!window.confirm(`Delete "${todo.title}"?`)) return;
+    const { error: deleteError } = await supabase
+      .from("to_do")
+      .delete()
+      .eq("todo_id", todo.todo_id);
+    if (deleteError) setError(deleteError.message);
+    else setTodos((prev) => prev.filter((t) => t.todo_id !== todo.todo_id));
   };
 
   return (
@@ -79,176 +549,490 @@ export default function Calendar() {
       <Sidebar />
       <div className="dashboard-main">
         <UserTopbar title="Calendar" />
-
         <div className="dashboard-content">
-
-          {/* LEFT */}
           <div className="dashboard-left">
-
-            {/* Calendar Card */}
             <div className="card">
-              <div className="card-title">Calendar</div>
-
-              <div style={{ backgroundColor: "#1a1a6e", color: "#fff", borderRadius: "8px", padding: "12px 20px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "15px", fontWeight: "600" }}>
-                {MONTH_NAMES[month]} {year}
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "32px",
+                  padding: "4px 0 18px",
+                }}
+              >
+                <button
+                  type="button"
+                  aria-label="Previous month"
+                  onClick={prevMonth}
+                  style={{
+                    border: 0,
+                    background: "none",
+                    cursor: "pointer",
+                    display: "flex",
+                    color: NAVY,
+                  }}
+                >
+                  <ChevronLeft size={22} />
+                </button>
+                <span
+                  style={{
+                    minWidth: "170px",
+                    textAlign: "center",
+                    fontSize: "18px",
+                    fontWeight: "700",
+                    color: NAVY,
+                  }}
+                >
+                  {MONTHS[month]} {year}
+                </span>
+                <button
+                  type="button"
+                  aria-label="Next month"
+                  onClick={nextMonth}
+                  style={{
+                    border: 0,
+                    background: "none",
+                    cursor: "pointer",
+                    display: "flex",
+                    color: NAVY,
+                  }}
+                >
+                  <ChevronRight size={22} />
+                </button>
               </div>
 
-              <div style={{ border: "1px solid #eee", borderRadius: "0 0 8px 8px", overflow: "hidden" }}>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", backgroundColor: "#f9f9f9" }}>
-                  {DAYS.map((d) => <div key={d} style={{ textAlign: "center", padding: "10px 0", fontSize: "12px", fontWeight: "600", color: "#888" }}>{d}</div>)}
-                </div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)" }}>
-                  {cells.map((d, i) => (
-                    <div key={i} style={{ textAlign: "center", padding: "8px 0", fontSize: "13px", borderTop: "1px solid #f0f0f0" }}>
-                      {d && (
-                        <>
-                          <div style={{ width: "32px", height: "32px", borderRadius: "50%", backgroundColor: isToday(d) ? "#f5a623" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto", color: isToday(d) ? "#fff" : "#1a1a6e", fontWeight: isToday(d) ? "700" : "400" }}>{d}</div>
-                          <div style={{ display: "flex", justifyContent: "center", gap: "2px", marginTop: "2px" }}>
-                            {hasEvent(d) && <div style={{ width: "5px", height: "5px", borderRadius: "50%", backgroundColor: "#1a1a6e" }} />}
-                            {hasTodo(d) && <div style={{ width: "5px", height: "5px", borderRadius: "50%", backgroundColor: "#f5a623" }} />}
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div style={{ display: "flex", justifyContent: "space-between", marginTop: "12px" }}>
-                <button onClick={() => setCurrent(({ year, month }) => month === 0 ? { year: year - 1, month: 11 } : { year, month: month - 1 })} style={{ background: "none", border: "none", fontSize: "18px", cursor: "pointer", color: "#1a1a6e", fontWeight: "700" }}>‹</button>
-                <button onClick={() => setCurrent(({ year, month }) => month === 11 ? { year: year + 1, month: 0 } : { year, month: month + 1 })} style={{ background: "none", border: "none", fontSize: "18px", cursor: "pointer", color: "#1a1a6e", fontWeight: "700" }}>›</button>
-              </div>
-
-              {/* Legend */}
-              <div style={{ display: "flex", gap: "16px", marginTop: "10px" }}>
-                {[["#1a1a6e", "Event"], ["#f5a623", "To do"]].map(([color, label]) => (
-                  <div key={label} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "#555" }}>
-                    <div style={{ width: "8px", height: "8px", borderRadius: "50%", backgroundColor: color }} /> {label}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(7, 1fr)",
+                  rowGap: "4px",
+                }}
+              >
+                {DAYS.map((d) => (
+                  <div
+                    key={d}
+                    style={{
+                      textAlign: "center",
+                      fontSize: "13px",
+                      fontWeight: "500",
+                      color: "#BDC3C7",
+                      paddingBottom: "10px",
+                    }}
+                  >
+                    {d}
                   </div>
+                ))}
+                {Array.from({ length: offset }, (_, i) => (
+                  <div key={`empty-${i}`} />
+                ))}
+                {Array.from({ length: daysInMonth }, (_, i) => {
+                  const day = i + 1;
+                  const dayEvents = events.filter((e) =>
+                    sameDay(e.event_date, year, month, day),
+                  );
+                  const dayHasTodo = todos.some(
+                    (t) => t.dueDate && sameDay(t.dueDate, year, month, day),
+                  );
+                  const isToday =
+                    day === today.getDate() &&
+                    month === today.getMonth() &&
+                    year === today.getFullYear();
+                  return (
+                    <button
+                      key={day}
+                      type="button"
+                      aria-label={`${MONTHS[month]} ${day}${dayEvents.length ? `, ${dayEvents.length} event${dayEvents.length > 1 ? "s" : ""}` : ""}${dayHasTodo ? ", to do due" : ""}`}
+                      onClick={() =>
+                        dayEvents.length && setOpenEvents(dayEvents)
+                      }
+                      style={{
+                        height: "52px",
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        border: 0,
+                        background: "none",
+                        cursor: dayEvents.length ? "pointer" : "default",
+                        fontFamily: FONT,
+                        padding: 0,
+                      }}
+                    >
+                      <span
+                        style={{
+                          width: "36px",
+                          height: "36px",
+                          borderRadius: "50%",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          backgroundColor: isToday ? YELLOW : "transparent",
+                          color: BLUE,
+                          fontSize: "14px",
+                          fontWeight: isToday ? "700" : "400",
+                        }}
+                      >
+                        {day}
+                      </span>
+                      <span
+                        style={{
+                          display: "flex",
+                          gap: "2px",
+                          height: "5px",
+                          marginTop: "2px",
+                        }}
+                      >
+                        {dayEvents.length > 0 && (
+                          <span
+                            style={{
+                              width: "5px",
+                              height: "5px",
+                              borderRadius: "50%",
+                              backgroundColor: NAVY,
+                            }}
+                          />
+                        )}
+                        {dayHasTodo && (
+                          <span
+                            style={{
+                              width: "5px",
+                              height: "5px",
+                              borderRadius: "50%",
+                              backgroundColor: TODO_DOT,
+                            }}
+                          />
+                        )}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "center",
+                  gap: "20px",
+                  marginTop: "10px",
+                }}
+              >
+                {[
+                  [NAVY, "Event"],
+                  [TODO_DOT, "To Do"],
+                ].map(([color, label]) => (
+                  <span
+                    key={label}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "5px",
+                      fontSize: "12px",
+                      color: "#666",
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: "6px",
+                        height: "6px",
+                        borderRadius: "50%",
+                        backgroundColor: color,
+                      }}
+                    />{" "}
+                    {label}
+                  </span>
                 ))}
               </div>
             </div>
 
-            {/* Events / Todo Card */}
             <div className="card">
-              <div className="card-title">Upcoming Events</div>
-
-              <div style={{ display: "flex", backgroundColor: "#1a1a6e", borderRadius: "8px", marginBottom: "16px", overflow: "hidden" }}>
-                {["upcoming", "todo"].map((tab) => (
-                  <div key={tab} onClick={() => setActiveTab(tab)} style={{ flex: 1, textAlign: "center", padding: "10px", fontSize: "13px", fontWeight: "600", cursor: "pointer", color: activeTab === tab ? "#1a1a6e" : "#fff", backgroundColor: activeTab === tab ? "#fff" : "transparent", borderRadius: activeTab === tab ? "6px" : "0", margin: activeTab === tab ? "4px" : "0", transition: "all 0.15s" }}>
-                    {tab === "upcoming" ? "Upcoming Events" : "To Do List"}
-                  </div>
+              <div
+                role="tablist"
+                style={{
+                  display: "flex",
+                  backgroundColor: NAVY,
+                  borderRadius: "12px",
+                  overflow: "hidden",
+                  marginBottom: "18px",
+                }}
+              >
+                {[
+                  ["upcoming", "Upcoming Events"],
+                  ["todo", "To Do List"],
+                ].map(([key, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    role="tab"
+                    aria-selected={tab === key}
+                    onClick={() => setTab(key)}
+                    style={{
+                      flex: 1,
+                      padding: "13px",
+                      border: 0,
+                      borderBottom: `4px solid ${tab === key ? "#fff" : "transparent"}`,
+                      background: "none",
+                      color: tab === key ? "#fff" : "rgba(255,255,255,0.6)",
+                      fontSize: "14px",
+                      fontWeight: "700",
+                      cursor: "pointer",
+                      fontFamily: FONT,
+                    }}
+                  >
+                    {label}
+                  </button>
                 ))}
               </div>
 
-              {loading ? <p style={{ color: "#aaa", fontSize: "13px" }}>Loading...</p> : (
-                <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                  {activeTab === "upcoming" ? (
-                    events.length === 0 ? <p style={{ color: "#aaa", fontSize: "13px", fontStyle: "italic" }}>No upcoming events.</p> :
-                    events.map((e) => (
-                      <div key={e.event_id} style={{ border: "1px solid #eee", borderRadius: "8px", padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                        <div>
-                          <div style={{ fontSize: "13px", fontWeight: "600", color: "#1a1a2e" }}>{e.title}</div>
-                          {e.description && <div style={{ fontSize: "11px", color: "#888", marginTop: "2px" }}>{e.description}</div>}
-                          {e.link && <a href={e.link} target="_blank" rel="noreferrer" style={{ fontSize: "11px", color: "#1a1a6e" }}>{e.link}</a>}
-                        </div>
-                        <div style={{ fontSize: "11px", color: "#888", textAlign: "right", whiteSpace: "nowrap", marginLeft: "12px" }}>
-                          {formatDate(e.event_date)}<br />{formatTime(e.event_date)}
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <>
-                      {todos.length === 0 ? <p style={{ color: "#aaa", fontSize: "13px", fontStyle: "italic" }}>No tasks yet.</p> :
-                        todos.map((t) => (
-                          <div key={t.todo_id} style={{ border: "1px solid #eee", borderRadius: "8px", padding: "12px 16px", display: "flex", alignItems: "center", gap: "10px" }}>
-                            <input type="checkbox" checked={t.isCompleted} onChange={() => toggleTodo(t)} style={{ width: "16px", height: "16px", cursor: "pointer", accentColor: "#1a1a6e" }} />
-                            <div style={{ flex: 1 }}>
-                              <div style={{ fontSize: "13px", fontWeight: "600", color: t.isCompleted ? "#aaa" : "#1a1a2e", textDecoration: t.isCompleted ? "line-through" : "none" }}>{t.title}</div>
-                              {t.description && <div style={{ fontSize: "11px", color: "#888" }}>{t.description}</div>}
-                              {t.dueDate && <div style={{ fontSize: "11px", color: "#aaa" }}>Due: {formatDate(t.dueDate)}</div>}
-                            </div>
-                            <Trash2 size={13} color="#e53935" style={{ cursor: "pointer", flexShrink: 0 }} onClick={() => deleteTodo(t.todo_id)} />
-                          </div>
-                        ))
-                      }
-                      <button onClick={() => setShowAddTodo(true)} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", padding: "10px", border: "2px dashed #1a1a6e", borderRadius: "8px", backgroundColor: "transparent", color: "#1a1a6e", fontSize: "13px", fontWeight: "600", cursor: "pointer", fontFamily: "Poppins, sans-serif" }}>
-                        <Plus size={14} /> Add Task
+              {error && (
+                <p role="alert" style={{ color: "#c0392b", fontSize: "13px" }}>
+                  {error}
+                </p>
+              )}
+
+              {loading ? (
+                <p style={{ color: "#999", fontSize: "13px" }}>Loading...</p>
+              ) : tab === "upcoming" ? (
+                events.length === 0 ? (
+                  <p
+                    style={{
+                      color: "#999",
+                      fontStyle: "italic",
+                      textAlign: "center",
+                    }}
+                  >
+                    No upcoming events
+                  </p>
+                ) : (
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "12px",
+                    }}
+                  >
+                    {events.map((ev) => (
+                      <button
+                        key={ev.event_id}
+                        type="button"
+                        onClick={() => setOpenEvents([ev])}
+                        style={{
+                          display: "flex",
+                          gap: "12px",
+                          width: "100%",
+                          textAlign: "left",
+                          padding: "15px",
+                          borderRadius: "10px",
+                          border: "1px solid #DCDFE3",
+                          backgroundColor: "#fff",
+                          cursor: "pointer",
+                          fontFamily: FONT,
+                        }}
+                      >
+                        <span style={{ flex: 1, minWidth: 0 }}>
+                          <span
+                            style={{
+                              display: "block",
+                              fontSize: "15px",
+                              fontWeight: "700",
+                              color: "#555",
+                            }}
+                          >
+                            {ev.title}
+                          </span>
+                          {ev.description && (
+                            <span
+                              style={{
+                                display: "block",
+                                fontSize: "12px",
+                                color: "#777",
+                                marginTop: "3px",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              {ev.description}
+                            </span>
+                          )}
+                        </span>
+                        <span style={{ textAlign: "right", flexShrink: 0 }}>
+                          <span
+                            style={{
+                              display: "block",
+                              fontSize: "12px",
+                              color: "#7F8C8D",
+                            }}
+                          >
+                            {formatDate(ev.event_date)}
+                          </span>
+                          <span
+                            style={{
+                              display: "block",
+                              fontSize: "12px",
+                              fontWeight: "700",
+                              color: "#7F8C8D",
+                            }}
+                          >
+                            {formatTime(ev.event_date)}
+                          </span>
+                        </span>
                       </button>
-                    </>
+                    ))}
+                  </div>
+                )
+              ) : (
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "12px",
+                  }}
+                >
+                  {todos.length === 0 && (
+                    <p
+                      style={{
+                        color: "#999",
+                        fontStyle: "italic",
+                        textAlign: "center",
+                        margin: "4px 0",
+                      }}
+                    >
+                      No to dos yet. Click "Add to do" to add one!
+                    </p>
                   )}
+                  {todos.map((todo) => (
+                    <div
+                      key={todo.todo_id}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "10px",
+                        padding: "15px",
+                        borderRadius: "10px",
+                        border: "1px solid #DCDFE3",
+                        backgroundColor: todo.isCompleted ? "#f9f9f9" : "#fff",
+                        opacity: todo.isCompleted ? 0.6 : 1,
+                      }}
+                    >
+                      <button
+                        type="button"
+                        role="checkbox"
+                        aria-checked={!!todo.isCompleted}
+                        aria-label={`Mark "${todo.title}" as ${todo.isCompleted ? "not done" : "done"}`}
+                        onClick={() => toggleTodo(todo)}
+                        style={{
+                          border: 0,
+                          background: "none",
+                          cursor: "pointer",
+                          display: "flex",
+                          padding: 0,
+                          color: NAVY,
+                        }}
+                      >
+                        {todo.isCompleted ? (
+                          <CheckSquare size={24} />
+                        ) : (
+                          <Square size={24} />
+                        )}
+                      </button>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div
+                          style={{
+                            fontSize: "15px",
+                            fontWeight: "700",
+                            color: todo.isCompleted ? "#999" : "#555",
+                            textDecoration: todo.isCompleted
+                              ? "line-through"
+                              : "none",
+                          }}
+                        >
+                          {todo.title}
+                        </div>
+                        {todo.description && (
+                          <div
+                            style={{
+                              fontSize: "12px",
+                              color: "#777",
+                              marginTop: "3px",
+                            }}
+                          >
+                            {todo.description}
+                          </div>
+                        )}
+                        {todo.dueDate && (
+                          <div
+                            style={{
+                              fontSize: "12px",
+                              color: "#7F8C8D",
+                              marginTop: "4px",
+                            }}
+                          >
+                            Due: {formatDate(todo.dueDate)}{" "}
+                            {formatTime(todo.dueDate)}
+                          </div>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        aria-label={`Delete "${todo.title}"`}
+                        onClick={() => deleteTodo(todo)}
+                        style={{
+                          border: 0,
+                          background: "none",
+                          cursor: "pointer",
+                          display: "flex",
+                          padding: 0,
+                        }}
+                      >
+                        <Trash2 size={20} color="#e74c3c" />
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    disabled={!student}
+                    onClick={() => setAdding(true)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "6px",
+                      padding: "12px",
+                      borderRadius: "10px",
+                      border: 0,
+                      backgroundColor: TODO_DOT,
+                      color: "#fff",
+                      fontSize: "14px",
+                      fontWeight: "700",
+                      cursor: "pointer",
+                      fontFamily: FONT,
+                    }}
+                  >
+                    <Plus size={18} /> Add to do
+                  </button>
                 </div>
               )}
             </div>
-
           </div>
 
-          {/* RIGHT */}
           <div className="dashboard-right">
-            <div className="card">
-              <div className="profile-banner" />
-              <div className="profile-avatar" style={{ fontSize: "28px" }}>
-                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#9e9e9e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-              </div>
-              <div className="profile-name">JOHN DOE</div>
-              <div className="profile-degree">Bachelor of Elementary Education</div>
-              <div className="profile-email">johndoejacat10@gmail.com</div>
-            </div>
-
-            <div className="card">
-              <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "4px" }}>
-                <TrendingUp size={16} color="#1a1a6e" />
-                <span style={{ fontSize: "14px", fontWeight: "700", color: "#1a1a2e" }}>Leaderboards</span>
-              </div>
-              <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "center", gap: "12px", height: "130px", marginTop: "8px" }}>
-                {leaderboard.map((b, i) => (
-                  <div key={i} style={{ width: "40px", height: `${b.height}px`, backgroundColor: b.color, borderRadius: "6px 6px 0 0" }} />
-                ))}
-              </div>
-            </div>
-
-            <div className="card">
-              <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "12px" }}>
-                <Clock size={16} color="#1a1a6e" />
-                <span style={{ fontSize: "14px", fontWeight: "700", color: "#1a1a2e" }}>Deadlines</span>
-              </div>
-              {events.slice(0, 3).map((e, i) => (
-                <div key={i} className="deadline-item">
-                  <div style={{ display: "flex", justifyContent: "space-between" }}>
-                    <div className="deadline-title">{e.title}</div>
-                    <div style={{ fontSize: "11px", color: "#aaa", whiteSpace: "nowrap", marginLeft: "8px" }}>
-                      {formatDate(e.event_date)}<br />{formatTime(e.event_date)}
-                    </div>
-                  </div>
-                  {e.link && <a href={e.link} target="_blank" rel="noreferrer" className="deadline-link">{e.link}</a>}
-                </div>
-              ))}
-              {events.length === 0 && <p style={{ fontSize: "13px", color: "#aaa", fontStyle: "italic" }}>No deadlines.</p>}
-            </div>
+            <ProfileCard student={student} />
+            <ReviewProgressCard summary={summary} loading={!summary} />
+            <UpcomingSessionsCard />
           </div>
         </div>
       </div>
 
-      {/* Add Todo Modal */}
-      {showAddTodo && (
-        <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 999 }}>
-          <div style={{ backgroundColor: "#fff", borderRadius: "16px", padding: "32px", width: "400px", fontFamily: "Poppins, sans-serif" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-              <h3 style={{ fontSize: "16px", fontWeight: "700", color: "#1a1a2e", margin: 0 }}>Add Task</h3>
-              <button onClick={() => setShowAddTodo(false)} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={18} color="#aaa" /></button>
-            </div>
-            {[["Task*", "title", "text", "Task title"], ["Description", "description", "text", "Optional"], ["Due Date", "dueDate", "datetime-local", ""]].map(([label, key, type, placeholder]) => (
-              <div key={key} style={{ marginBottom: "12px" }}>
-                <label style={{ fontSize: "13px", fontWeight: "600", color: "#222", display: "block", marginBottom: "4px" }}>{label}</label>
-                <input type={type} value={newTodo[key]} onChange={(e) => setNewTodo({ ...newTodo, [key]: e.target.value })} placeholder={placeholder} style={{ width: "100%", padding: "10px 14px", borderRadius: "8px", border: "1px solid #ddd", fontSize: "14px", fontFamily: "Poppins, sans-serif", boxSizing: "border-box", outline: "none" }} />
-              </div>
-            ))}
-            <div style={{ display: "flex", gap: "10px", marginTop: "16px" }}>
-              <button onClick={() => setShowAddTodo(false)} style={{ flex: 1, padding: "12px", borderRadius: "8px", border: "1px solid #ddd", backgroundColor: "#fff", fontSize: "14px", cursor: "pointer", fontFamily: "Poppins, sans-serif" }}>Cancel</button>
-              <button onClick={addTodo} style={{ flex: 1, padding: "12px", borderRadius: "8px", border: "none", backgroundColor: "#1a1a6e", color: "#fff", fontSize: "14px", fontWeight: "600", cursor: "pointer", fontFamily: "Poppins, sans-serif" }}>Add</button>
-            </div>
-          </div>
-        </div>
+      {openEvents && (
+        <EventModal events={openEvents} onClose={() => setOpenEvents(null)} />
+      )}
+      {adding && student && (
+        <AddTodoModal
+          studentId={student.id}
+          onClose={() => setAdding(false)}
+          onSaved={() => fetchTodos(student.id)}
+        />
       )}
     </div>
   );

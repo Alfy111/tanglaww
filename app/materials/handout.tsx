@@ -1,5 +1,6 @@
 import { logAudit } from "@/services/auditService";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import * as LegacyFileSystem from "expo-file-system/legacy";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as Sharing from "expo-sharing";
 import { useCallback, useEffect, useState } from "react";
@@ -7,6 +8,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Platform,
   SafeAreaView,
   StyleSheet,
   Text,
@@ -33,7 +35,45 @@ import {
   getMaterialsByCourse,
   getModulesByCourse,
   LearningMaterial,
+  materialFileName,
+  materialMimeType,
 } from "../../services/materialService";
+
+let androidSaveFolder: string | null = null;
+
+async function saveToAndroidFolder(
+  uri: string,
+  item: LearningMaterial,
+): Promise<"saved" | "cancelled"> {
+  const SAF = LegacyFileSystem.StorageAccessFramework;
+  const base64 = await LegacyFileSystem.readAsStringAsync(uri, {
+    encoding: LegacyFileSystem.EncodingType.Base64,
+  });
+  const name = materialFileName(item).replace(/\.[^.]+$/, "");
+
+  for (let attempt = 0; attempt < 2; attempt++) {
+    if (!androidSaveFolder) {
+      const permission = await SAF.requestDirectoryPermissionsAsync();
+      if (!permission.granted) return "cancelled";
+      androidSaveFolder = permission.directoryUri;
+    }
+    try {
+      const fileUri = await SAF.createFileAsync(
+        androidSaveFolder,
+        name,
+        materialMimeType(item),
+      );
+      await LegacyFileSystem.writeAsStringAsync(fileUri, base64, {
+        encoding: LegacyFileSystem.EncodingType.Base64,
+      });
+      return "saved";
+    } catch (err) {
+      androidSaveFolder = null;
+      if (attempt === 1) throw err;
+    }
+  }
+  return "cancelled";
+}
 
 const formatBytes = (bytes: number | null) => {
   if (!bytes) return "—";
@@ -248,7 +288,7 @@ export default function HandoutScreen() {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState("");
-
+  // Admin tools: "select" = tick cards to delete, "reorder" = drag to sort
   const [mode, setMode] = useState<"normal" | "select" | "reorder">("normal");
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [deleting, setDeleting] = useState(false);
@@ -360,6 +400,7 @@ export default function HandoutScreen() {
     }
   };
 
+  // Pick one or more files and upload them all
   const handleUpload = async () => {
     if (!currentAdminId || !uploadModuleId) return;
     setUploading(true);
@@ -374,7 +415,7 @@ export default function HandoutScreen() {
               : "",
           ),
       );
-      if (!result) return;
+      if (!result) return; // cancelled
       if (result.uploaded > 0) fetchHandouts();
       if (result.failed.length > 0) {
         Alert.alert(
@@ -488,17 +529,24 @@ export default function HandoutScreen() {
     logStudentEvent("student_downloaded_material", item);
 
     try {
-      const isAvailable = await Sharing.isAvailableAsync();
-      if (!isAvailable) {
-        Alert.alert("Saved", `File saved to app storage.`);
-        return;
+      if (Platform.OS === "android") {
+        const outcome = await saveToAndroidFolder(result.uri!, item);
+        if (outcome === "saved") {
+          Alert.alert(
+            "Saved",
+            `${materialFileName(item)} was saved to the folder you picked.`,
+          );
+          return;
+        }
       }
 
+      const isAvailable = await Sharing.isAvailableAsync();
+      if (!isAvailable) {
+        Alert.alert("Saved", "File saved to app storage.");
+        return;
+      }
       await Sharing.shareAsync(result.uri!, {
-        mimeType:
-          item.fileType === "pdf"
-            ? "application/pdf"
-            : "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        mimeType: materialMimeType(item),
         dialogTitle: "Save or open file",
         UTI:
           item.fileType === "pdf"
@@ -656,6 +704,7 @@ export default function HandoutScreen() {
         </TouchableOpacity>
       )}
 
+      {/* Admin tools: Select (bulk delete) and Reorder (drag to sort) */}
       {isAdmin && !loading && handouts.length > 0 && mode === "normal" && (
         <View style={styles.toolsRow}>
           <TouchableOpacity

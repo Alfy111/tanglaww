@@ -1,9 +1,9 @@
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap");
 
 .dashboard-layout {
   display: flex;
   min-height: 100vh;
-  font-family: 'Poppins', sans-serif;
+  font-family: "Poppins", sans-serif;
   background-color: #f4f6fb;
 }
 
@@ -61,13 +61,13 @@
 
 .sidebar-link:hover {
   background-color: #f0f3ff;
-  color: #0D2A94;
+  color: #0d2a94;
 }
 
 .sidebar-link.active {
-  color: #0D2A94;
+  color: #0d2a94;
   font-weight: 700;
-  border-left: 3px solid #FFB800;
+  border-left: 3px solid #ffb800;
   background-color: #f0f3ff;
 }
 
@@ -162,7 +162,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 16px 32px;
-  background-color: #0D2A94;
+  background-color: #0d2a94;
   border-bottom: none;
   position: sticky;
   top: 0;
@@ -184,7 +184,7 @@
   background: transparent;
   outline: none;
   font-size: 14px;
-  font-family: 'Poppins', sans-serif;
+  font-family: "Poppins", sans-serif;
   color: #333;
   width: 100%;
 }
@@ -203,7 +203,7 @@
   font-size: 20px;
   cursor: pointer;
   color: #fff;
-  background-color: #0D2A94;
+  background-color: #0d2a94;
   width: 36px;
   height: 36px;
   border-radius: 50%;
@@ -282,13 +282,13 @@
   background-color: #fff;
   border-radius: 12px;
   padding: 20px 24px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
 .card-title {
   font-size: 15px;
   font-weight: 700;
-  color: #0D2A94;
+  color: #0d2a94;
   margin-bottom: 16px;
 }
 
@@ -303,7 +303,7 @@
 .announcement-title {
   font-size: 13px;
   font-weight: 700;
-  color: #0D2A94;
+  color: #0d2a94;
   margin-bottom: 4px;
 }
 
@@ -347,7 +347,7 @@
 }
 
 .dot.active {
-  background-color: #0D2A94;
+  background-color: #0d2a94;
 }
 
 /* CONTINUE SESSION */
@@ -376,7 +376,7 @@
 .session-title {
   font-size: 14px;
   font-weight: 600;
-  color: #0D2A94;
+  color: #0d2a94;
 }
 
 /* COURSES & ACCORDION */
@@ -396,7 +396,7 @@
 }
 
 .course-card.expanded {
-  border-color: #0D2A94;
+  border-color: #0d2a94;
   box-shadow: 0 4px 12px rgba(13, 42, 148, 0.08);
 }
 
@@ -425,7 +425,7 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
 }
 
 .progress-dot {
@@ -489,7 +489,7 @@
   gap: 6px;
   font-size: 11px;
   font-weight: 700;
-  color: #0D2A94;
+  color: #0d2a94;
   margin-bottom: 8px;
 }
 
@@ -544,7 +544,7 @@
 }
 
 .handout-download-btn:hover {
-  background: #0D2A94;
+  background: #0d2a94;
 }
 
 .handout-download-btn:hover svg {
@@ -554,7 +554,7 @@
 /* PROFILE CARD */
 .profile-banner {
   height: 80px;
-  background: linear-gradient(135deg, #0D2A94, #2842ad);
+  background: linear-gradient(135deg, #0d2a94, #2842ad);
   border-radius: 10px 10px 0 0;
   margin: -20px -24px 0;
 }
@@ -759,7 +759,7 @@
 
 .deadline-link {
   font-size: 11px;
-  color: #0D2A94;
+  color: #0d2a94;
   text-decoration: underline;
   cursor: pointer;
   font-weight: 500;
@@ -1055,37 +1055,65 @@ html[data-user-theme="dark"] .dashboard-layout .deadline-meta {
   color: #aab6c5;
 }
 
-html[data-user-theme="dark"] .dashboard-layout .dashboard-main
+html[data-user-theme="dark"]
+  .dashboard-layout
+  .dashboard-main
   [style*="background-color: rgb(255, 255, 255)"],
-html[data-user-theme="dark"] .dashboard-layout .dashboard-main
+html[data-user-theme="dark"]
+  .dashboard-layout
+  .dashboard-main
   [style*="background: rgb(255, 255, 255)"],
-html[data-user-theme="dark"] .dashboard-layout .dashboard-main
+html[data-user-theme="dark"]
+  .dashboard-layout
+  .dashboard-main
   [style*="background-color: rgb(249, 249, 249)"],
-html[data-user-theme="dark"] .dashboard-layout .dashboard-main
+html[data-user-theme="dark"]
+  .dashboard-layout
+  .dashboard-main
   [style*="background-color: rgb(250, 250, 250)"],
-html[data-user-theme="dark"] .dashboard-layout .dashboard-main
+html[data-user-theme="dark"]
+  .dashboard-layout
+  .dashboard-main
   [style*="background-color: rgb(245, 246, 250)"],
-html[data-user-theme="dark"] .dashboard-layout .dashboard-main
+html[data-user-theme="dark"]
+  .dashboard-layout
+  .dashboard-main
   [style*="background: rgb(250, 250, 250)"] {
   background-color: #1f2937 !important;
   background-image: none;
 }
 
-html[data-user-theme="dark"] .dashboard-layout .dashboard-main
+html[data-user-theme="dark"]
+  .dashboard-layout
+  .dashboard-main
   [style*="color: rgb(26, 26, 46)"],
-html[data-user-theme="dark"] .dashboard-layout .dashboard-main
+html[data-user-theme="dark"]
+  .dashboard-layout
+  .dashboard-main
   [style*="color: rgb(34, 34, 34)"],
-html[data-user-theme="dark"] .dashboard-layout .dashboard-main
+html[data-user-theme="dark"]
+  .dashboard-layout
+  .dashboard-main
   [style*="color: rgb(51, 51, 51)"],
-html[data-user-theme="dark"] .dashboard-layout .dashboard-main
+html[data-user-theme="dark"]
+  .dashboard-layout
+  .dashboard-main
   [style*="color: rgb(85, 85, 85)"],
-html[data-user-theme="dark"] .dashboard-layout .dashboard-main
+html[data-user-theme="dark"]
+  .dashboard-layout
+  .dashboard-main
   [style*="color: rgb(102, 102, 102)"],
-html[data-user-theme="dark"] .dashboard-layout .dashboard-main
+html[data-user-theme="dark"]
+  .dashboard-layout
+  .dashboard-main
   [style*="color: rgb(119, 119, 119)"],
-html[data-user-theme="dark"] .dashboard-layout .dashboard-main
+html[data-user-theme="dark"]
+  .dashboard-layout
+  .dashboard-main
   [style*="color: rgb(136, 136, 136)"],
-html[data-user-theme="dark"] .dashboard-layout .dashboard-main
+html[data-user-theme="dark"]
+  .dashboard-layout
+  .dashboard-main
   [style*="color: rgb(153, 153, 153)"] {
   color: #cbd5e1 !important;
 }
@@ -1099,24 +1127,89 @@ html[data-user-theme="dark"] .dashboard-layout .dashboard-main textarea {
   border-color: #4b5563;
 }
 
-html[data-user-theme="dark"] .dashboard-layout .dashboard-main input::placeholder,
-html[data-user-theme="dark"] .dashboard-layout .dashboard-main textarea::placeholder {
+html[data-user-theme="dark"]
+  .dashboard-layout
+  .dashboard-main
+  input::placeholder,
+html[data-user-theme="dark"]
+  .dashboard-layout
+  .dashboard-main
+  textarea::placeholder {
   color: #9ca3af;
 }
 
-html[data-user-theme="dark"] .dashboard-layout .dashboard-main
+html[data-user-theme="dark"]
+  .dashboard-layout
+  .dashboard-main
   [style*="color: rgb(26, 26, 110)"] {
   color: #8da2ff !important;
 }
 
-html[data-user-theme="dark"] .dashboard-layout .dashboard-main button
+html[data-user-theme="dark"]
+  .dashboard-layout
+  .dashboard-main
+  button
   [style*="background-color: rgb(26, 26, 110)"],
-html[data-user-theme="dark"] .dashboard-layout .dashboard-main button[style*="background-color: rgb(26, 26, 110)"],
-html[data-user-theme="dark"] .dashboard-layout .dashboard-main button[style*="background: rgb(26, 26, 110)"],
-html[data-user-theme="dark"] .dashboard-layout .dashboard-main .settings-toggle {
+html[data-user-theme="dark"]
+  .dashboard-layout
+  .dashboard-main
+  button[style*="background-color: rgb(26, 26, 110)"],
+html[data-user-theme="dark"]
+  .dashboard-layout
+  .dashboard-main
+  button[style*="background: rgb(26, 26, 110)"],
+html[data-user-theme="dark"]
+  .dashboard-layout
+  .dashboard-main
+  .settings-toggle {
   background-color: #718bfa !important;
 }
 
-html[data-user-theme="dark"] .dashboard-layout .dashboard-main button[style*="border: 1px solid rgb(26, 26, 110)"] {
+html[data-user-theme="dark"]
+  .dashboard-layout
+  .dashboard-main
+  button[style*="border: 1px solid rgb(26, 26, 110)"] {
   border-color: #8da2ff !important;
+}
+/* STUDENT DASHBOARD — clickable cards and buttons */
+.analytics-card {
+  cursor: pointer;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.analytics-card:hover,
+.analytics-card:focus-visible {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
+}
+
+.affirmation-card {
+  background: linear-gradient(135deg, #0d2a94 0%, #1a3ab8 100%);
+  color: #ffffff;
+}
+
+.carousel-dots .dot {
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  transition: width 0.2s;
+}
+
+.carousel-dots .dot.active {
+  width: 18px;
+  border-radius: 4px;
+}
+
+button.deadline-link {
+  align-self: flex-start;
+  border: 0;
+  padding: 0;
+  background: none;
+  font-family: inherit;
+}
+
+html[data-user-theme="dark"] .dashboard-layout .affirmation-card {
+  background: linear-gradient(135deg, #1e3a8a 0%, #263449 100%);
 }
