@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -15,9 +15,16 @@ import {
   View,
 } from "react-native";
 import { useAdmin } from "../../context/AdminContext";
+import { getStatus } from "../../services/enrollmentStatusService";
 
 type SortOption = "alpha_asc" | "alpha_desc" | "id_asc" | "id_desc";
-type StatusFilter = "all" | "approved" | "pending" | "rejected";
+type StatusFilter =
+  | "all"
+  | "pending"
+  | "partially_approved"
+  | "approved"
+  | "withdrawn"
+  | "rejected";
 
 const SORT_LABELS: Record<SortOption, string> = {
   alpha_asc: "Name (Ascending)",
@@ -28,25 +35,24 @@ const SORT_LABELS: Record<SortOption, string> = {
 
 const STATUS_LABELS: Record<StatusFilter, string> = {
   all: "All Students",
-  approved: "Approved",
   pending: "Pending",
+  partially_approved: "Partially Approved",
+  approved: "Approved",
+  withdrawn: "Withdrawn",
   rejected: "Rejected",
 };
 
 const STATUS_COLORS: Record<StatusFilter, string> = {
   all: "#2F459B",
-  approved: "#27ae60",
   pending: "#F39C12",
+  partially_approved: "#2F80ED",
+  approved: "#27ae60",
+  withdrawn: "#7F8C8D",
   rejected: "#e74c3c",
 };
 
 function getEnrollmentStatus(item: any): StatusFilter {
-  const v = Array.isArray(item.verification)
-    ? item.verification[0]
-    : item.verification;
-  if (v?.verificationStatus === true) return "approved";
-  if (v?.verificationNotes) return "rejected";
-  return "pending";
+  return getStatus(item);
 }
 
 export default function AdminRegistry() {

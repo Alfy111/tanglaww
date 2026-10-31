@@ -70,18 +70,17 @@ export default function AdminDashboard() {
         `
       enrollment_id,
       student (firstName, lastName),
-      verification!enrollment_verification_id_fkey (verificationStatus)
+      verification!enrollment_verification_id_fkey (status)
       `,
       )
-      .order("enrollment_id", { ascending: false })
-      .limit(10);
+      .order("enrollment_id", { ascending: false });
 
     const pending = (data ?? [])
       .filter((e: any) => {
         const v = Array.isArray(e.verification)
           ? e.verification[0]
           : e.verification;
-        return v?.verificationStatus === false;
+        return v?.status === "pending";
       })
       .slice(0, 3);
 
@@ -93,7 +92,7 @@ export default function AdminDashboard() {
 
     const { data: enrollments } = await supabase.from("enrollment").select(`
     enrollment_id,
-    verification!enrollment_verification_id_fkey (verificationStatus, verificationNotes, created_at)
+    verification!enrollment_verification_id_fkey (status, created_at)
   `);
 
     const pendingCount = (enrollments ?? []).filter((e: any) => {
@@ -103,9 +102,7 @@ export default function AdminDashboard() {
       const isUnseen = lastSeen
         ? new Date(v?.created_at) > new Date(lastSeen)
         : true;
-      return (
-        v?.verificationStatus === false && !v?.verificationNotes && isUnseen
-      );
+      return v?.status === "pending" && isUnseen;
     }).length;
 
     const now = new Date();

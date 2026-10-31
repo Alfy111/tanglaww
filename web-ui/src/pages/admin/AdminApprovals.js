@@ -1,296 +1,354 @@
-import { ChevronDown, ChevronUp, Key, User, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Check, KeyRound, RefreshCw, X } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 import AdminSidebar from "../../components/admin/AdminSidebar";
 import AdminTopbar from "../../components/admin/AdminTopbar";
+import RegistrantModal, {
+  Avatar,
+  CodeModal,
+} from "../../components/admin/RegistrantModal";
+import {
+  ENROLLMENT_SELECT,
+  approveWithCode,
+  first,
+  getActivationCode,
+  getStatus,
+  getVerification,
+  setEnrollmentStatus,
+} from "../../lib/enrollmentStatus";
 import { supabase } from "../../lib/supabase";
 
-// Proof of payment expandable
-function ProofOfPaymentSection({ url }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <div style={{ border: "1px solid #ddd", borderRadius: "10px", marginBottom: "10px", overflow: "hidden" }}>
-      <div
-        onClick={() => setOpen(!open)}
-        style={{ padding: "16px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", fontWeight: "600", fontSize: "14px", color: "#1a1a2e" }}
-      >
-        Proof of Payment
-        {open ? <ChevronUp size={16} color="#aaa" /> : <ChevronDown size={16} color="#aaa" />}
-      </div>
-      {open && (
-        <div style={{ padding: "12px 20px 16px", borderTop: "1px solid #f0f0f0" }}>
-          {url ? (
-            url.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
-              <img src={url} alt="Proof of Payment" style={{ width: "100%", borderRadius: "8px", objectFit: "contain", maxHeight: "300px" }} />
-            ) : (
-              <a href={url} target="_blank" rel="noreferrer" style={{ color: "#1a1a6e", fontWeight: "600", fontSize: "14px" }}>
-                📄 View Document
-              </a>
-            )
-          ) : (
-            <p style={{ fontSize: "13px", color: "#aaa" }}>No proof of payment uploaded.</p>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-// Dropdown section for student detail modal
-function DetailSection({ title, fields }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <div style={{ border: "1px solid #ddd", borderRadius: "10px", marginBottom: "10px", overflow: "hidden" }}>
-      <div
-        onClick={() => setOpen(!open)}
-        style={{ padding: "16px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", fontWeight: "600", fontSize: "14px", color: "#1a1a2e" }}
-      >
-        {title}
-        {open ? <ChevronUp size={16} color="#aaa" /> : <ChevronDown size={16} color="#aaa" />}
-      </div>
-      {open && (
-        <div style={{ padding: "12px 20px 16px", borderTop: "1px solid #f0f0f0", display: "flex", flexDirection: "column", gap: "8px" }}>
-          {fields.map(([label, value]) => (
-            <div key={label} style={{ fontSize: "13px", color: "#555" }}>
-              <strong style={{ color: "#1a1a2e" }}>{label}:</strong> {value || "—"}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
+const NAVY = "#2F459B";
+const FONT = "Poppins, sans-serif";
 
-// Student detail modal
-function StudentDetailModal({ enrollment, onClose }) {
-const [showActivatedPopup, setShowActivatedPopup] = useState(false);
+const SECTIONS = [
+  { status: "pending", title: "Pending", empty: "No pending enrollments" },
+  {
+    status: "partially_approved",
+    title: "Partially Approved",
+    empty: "No partially approved students",
+  },
+  { status: "approved", title: "Approved", empty: "No approved enrollments" },
+  { status: "withdrawn", title: "Withdrawn", empty: "No withdrawn students" },
+  { status: "rejected", title: "Rejected", empty: "No rejected enrollments" },
+];
 
-  const s = enrollment.student;
-  const name = `${s?.firstName ?? ""} ${s?.lastName ?? ""}`.trim().toUpperCase();
-  const curriculum = enrollment.curriculum?.curriculumName ?? "—";
-  const specialization = enrollment.specialization?.specializationName ?? "—";
-  const takerType = enrollment.type_of_taker?.typeOfTaker ?? "—";
-  const promo = enrollment.promo?.promo ?? "None";
- const payment = Array.isArray(enrollment.paymentDetails) 
-    ? enrollment.paymentDetails[0] 
-    : enrollment.paymentDetails;
-  console.log("payment data:", payment);
-  const channel = payment?.payment_channel?.paymentChannelName ?? "—";
+const roundButton = (color) => ({
+  width: "34px",
+  height: "34px",
+  borderRadius: "50%",
+  border: 0,
+  backgroundColor: color,
+  color: "#fff",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  cursor: "pointer",
+});
 
-
-
-  const fetchCode = async () => {
-    setShowActivatedPopup(true);
-  };
-
-  return (
-    <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 999, fontFamily: "Poppins, sans-serif" }}>
-      <div style={{ backgroundColor: "#fff", borderRadius: "16px", width: "100%", maxWidth: "560px", maxHeight: "90vh", overflowY: "auto", padding: "32px" }}>
-
-        {/* Header */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
-          <h2 style={{ fontSize: "18px", fontWeight: "700", color: "#1a1a6e", margin: 0 }}>Approved</h2>
-          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer" }}>
-            <X size={20} color="#aaa" />
-          </button>
-        </div>
-
-        {/* Avatar + Name */}
-        <div style={{ textAlign: "center", marginBottom: "24px" }}>
-          <div style={{ width: "80px", height: "80px", borderRadius: "50%", backgroundColor: "#e8eaf6", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 12px", overflow: "hidden" }}>
-            {s?.profilephotourl
-              ? <img src={s.profilephotourl} alt={name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-              : <User size={36} color="#aaa" />
-            }
-          </div>
-          <div style={{ fontSize: "18px", fontWeight: "700", color: "#1a1a6e" }}>{name || "Unknown"}</div>
-          <div style={{ fontSize: "13px", color: "#888", fontStyle: "italic" }}>{curriculum}</div>
-        </div>
-
-        {/* Registrant Information */}
-        <div style={{ fontSize: "14px", fontWeight: "700", color: "#1a1a6e", marginBottom: "12px" }}>Registrant Information:</div>
-
-        <DetailSection title="Program & Curriculum" fields={[
-          ["Curriculum", curriculum],
-          ["Specialization", specialization],
-          ["Type of Taker", takerType],
-        ]} />
-
-      <DetailSection title="Personal Information" fields={[
-          ["First Name", s?.firstName],
-          ["Middle Name", s?.middleName],
-          ["Last Name", s?.lastName],
-          ["Email", s?.email],
-          ["Bachelor's Degree", s?.bachelorsDegree],
-          ["Majorship Taken", s?.majorshipTaken],
-          ["Last School Attended", s?.lastSchoolAttended],
-          ["Province", s?.province],
-        ]} />
-
-        <DetailSection title="Promotions & Verification" fields={[
-          ["Promo Code", promo],
-          ["Verification Status", enrollment.verification?.verificationStatus ? "Approved" : "Pending"],
-          ["Notes", enrollment.verification?.verificationNotes],
-        ]} />
-
-        <DetailSection title="Payment Information" fields={[
-          ["Reference Number", payment?.referenceNumber],
-          ["Payment Channel", channel],
-        ]} />
-
-      {/* Documents */}
-        <div style={{ fontSize: "14px", fontWeight: "700", color: "#1a1a6e", margin: "20px 0 12px" }}>Documents:</div>
-        <ProofOfPaymentSection url={payment?.proofOfPaymentUrl} />
-
-       {/* View Activation Code */}
-        <button
-          onClick={fetchCode}
-          style={{ width: "100%", padding: "14px", borderRadius: "10px", border: "2px solid #1a1a6e", backgroundColor: "#fff", color: "#1a1a6e", fontSize: "14px", fontWeight: "700", cursor: "pointer", fontFamily: "Poppins, sans-serif", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}
-        >
-          <Key size={16} /> View Activation Code
-        </button>
-
-        {/* Account Activated Popup */}
-        {showActivatedPopup && (
-          <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
-            <div style={{ backgroundColor: "#333", borderRadius: "16px", padding: "32px 24px", width: "300px", textAlign: "center" }}>
-              <div style={{ fontSize: "18px", fontWeight: "700", color: "#fff", marginBottom: "12px" }}>Account Activated</div>
-              <div style={{ fontSize: "14px", color: "#ccc", marginBottom: "24px" }}>This student has already activated their account.</div>
-              <button
-                onClick={() => setShowActivatedPopup(false)}
-                style={{ width: "100%", padding: "12px", borderRadius: "10px", border: "none", backgroundColor: "rgba(255,255,255,0.2)", color: "#fff", fontSize: "15px", fontWeight: "700", cursor: "pointer", fontFamily: "Poppins, sans-serif" }}
-              >
-                OK
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
+const fullName = (enrollment) => {
+  const s = first(enrollment.student);
+  return `${s?.firstName ?? ""} ${s?.lastName ?? ""}`.trim() || "Unknown";
+};
 
 export default function AdminApprovals() {
   const [enrollments, setEnrollments] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedEnrollment, setSelectedEnrollment] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [busyId, setBusyId] = useState(null);
+  const [selectedId, setSelectedId] = useState(null);
+  const [codeInfo, setCodeInfo] = useState(null);
 
-  const fetchEnrollments = async () => {
-    setLoading(true);
-    const { data, error } = await supabase.from("enrollment").select(`
-      enrollment_id,
-      student_id,
-     student (firstName, middleName, lastName, email, profilephotourl, bachelorsDegree, majorshipTaken, lastSchoolAttended, province),
-      curriculum!enrollment_curriculum_id_fkey (curriculumName),
-      specialization!enrollment_specialization_id_fkey (specializationName),
-      type_of_taker!enrollment_typeOfTaker_id_fkey (typeOfTaker),
-      promo!enrollment_promo_id_fkey (promo),
-      paymentDetails (
-        referenceNumber,
-        proofOfPaymentUrl,
-        amountTransferred,
-        dateOfPayment,
-        payment_channel!paymentDetails_paymentChannel_id_fkey (paymentChannelName)
-      ),
-      verification!enrollment_verification_id_fkey (
-        verification_id,
-        verificationStatus,
-        verificationNotes
-      )
-    `);
-    if (error) { console.error(error.message); setLoading(false); return; }
-    setEnrollments(data ?? []);
+  const fetchEnrollments = useCallback(async () => {
+    const { data, error: loadError } = await supabase
+      .from("enrollment")
+      .select(ENROLLMENT_SELECT)
+      .order("enrollment_id", { ascending: false });
+    if (loadError) setError(`Could not load enrollments: ${loadError.message}`);
+    else setEnrollments(data ?? []);
     setLoading(false);
-  };
+  }, []);
 
-  useEffect(() => { fetchEnrollments(); }, []);
-
-  const processAudit = async (verificationId, status) => {
-    const { error } = await supabase
-      .from("verification")
-      .update({
-        verificationStatus: status === "approved",
-        lastVerificationDate: new Date().toISOString(),
-      })
-      .eq("verification_id", verificationId);
-    if (error) { console.error(error.message); return; }
+  useEffect(() => {
     fetchEnrollments();
+  }, [fetchEnrollments]);
+
+  const refresh = async () => {
+    setRefreshing(true);
+    await fetchEnrollments();
+    setRefreshing(false);
   };
 
-  const pending = enrollments.filter((e) => e.verification?.verificationStatus === false || e.verification?.verificationStatus === null);
-  const approved = enrollments.filter((e) => e.verification?.verificationStatus === true);
+  const run = async (enrollment, task) => {
+    setBusyId(enrollment.enrollment_id);
+    setError("");
+    setNotice("");
+    try {
+      await task();
+      await fetchEnrollments();
+    } catch (err) {
+      setError(err.message ?? "Something went wrong.");
+    } finally {
+      setBusyId(null);
+    }
+  };
 
-  const StudentCard = ({ e, showActions, showCode }) => {
-    const name = `${e.student?.firstName ?? ""} ${e.student?.lastName ?? ""}`.trim();
-    const curriculum = e.curriculum?.curriculumName ?? "—";
-    const verificationId = e.verification?.verification_id;
+  const approve = (enrollment) => {
+    const name = fullName(enrollment);
+    if (!window.confirm(`Approve ${name}?`)) return;
+    run(enrollment, async () => {
+      const { code, emailSent } = await approveWithCode(enrollment, "approved");
+      setCodeInfo({ code, name, email: first(enrollment.student)?.email });
+      if (!emailSent)
+        setNotice(
+          `The activation email to ${name} could not be sent. Use Resend Email or share the code manually.`,
+        );
+    });
+  };
+
+  const reject = (enrollment) => {
+    if (!window.confirm(`Reject ${fullName(enrollment)}?`)) return;
+    run(enrollment, () =>
+      setEnrollmentStatus(
+        getVerification(enrollment)?.verification_id,
+        "rejected",
+        "Application rejected by administrator.",
+      ),
+    );
+  };
+
+  const viewCode = async (enrollment) => {
+    const base = {
+      code: "",
+      name: fullName(enrollment),
+      email: first(enrollment.student)?.email,
+    };
+    setCodeInfo(base);
+    const result = await getActivationCode(enrollment.enrollment_id);
+    setCodeInfo({
+      ...base,
+      code: result.code ?? "",
+      message:
+        result.message === "The activation code has expired."
+          ? "The activation code has expired. Open the student and approve again to generate a new one."
+          : result.message,
+    });
+  };
+
+  const ApprovalCard = ({ enrollment }) => {
+    const student = first(enrollment.student);
+    const status = getStatus(enrollment);
+    const name = fullName(enrollment);
+    const busy = busyId === enrollment.enrollment_id;
+    const stop = (handler) => (event) => {
+      event.stopPropagation();
+      handler(enrollment);
+    };
 
     return (
-      <div style={{ backgroundColor: "#fff", borderRadius: "12px", padding: "16px 20px", border: "1px solid #ddd", display: "flex", alignItems: "center", gap: "14px" }}>
-        <div style={{ width: "44px", height: "44px", borderRadius: "50%", backgroundColor: "#e8eaf6", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, overflow: "hidden" }}>
-          {e.student?.profilephotourl
-            ? <img src={e.student.profilephotourl} alt={name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-            : <User size={20} color="#1a1a6e" />
-          }
-        </div>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: "14px", fontWeight: "700", color: "#1a1a6e" }}>{name || "Unknown"}</div>
-          <div style={{ fontSize: "12px", color: "#888" }}>{curriculum}</div>
-          <div style={{ fontSize: "11px", color: "#aaa" }}>{e.student?.email}</div>
-        </div>
-        {showActions && verificationId && (
-          <div style={{ display: "flex", gap: "8px" }}>
-            <button onClick={() => processAudit(verificationId, "rejected")} style={{ padding: "8px 20px", borderRadius: "8px", border: "1px solid #e53935", backgroundColor: "#fff", color: "#e53935", fontWeight: "600", fontSize: "13px", cursor: "pointer", fontFamily: "Poppins, sans-serif" }}>Reject</button>
-            <button onClick={() => processAudit(verificationId, "approved")} style={{ padding: "8px 20px", borderRadius: "8px", border: "none", backgroundColor: "#1a1a6e", color: "#fff", fontWeight: "600", fontSize: "13px", cursor: "pointer", fontFamily: "Poppins, sans-serif" }}>Approve</button>
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => setSelectedId(enrollment.enrollment_id)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") setSelectedId(enrollment.enrollment_id);
+        }}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "15px",
+          padding: "15px",
+          borderRadius: "12px",
+          border: `1px solid ${NAVY}`,
+          backgroundColor: "#fff",
+          cursor: "pointer",
+        }}
+      >
+        <Avatar url={student?.profilephotourl} size={44} name={name} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: "15px", fontWeight: "700", color: NAVY }}>
+            {name}
           </div>
-        )}
-        {showCode && (
-          <button
-            onClick={() => setSelectedEnrollment(e)}
-            style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 16px", borderRadius: "8px", border: "1px solid #1a1a6e", backgroundColor: "#fff", color: "#1a1a6e", fontWeight: "600", fontSize: "13px", cursor: "pointer", fontFamily: "Poppins, sans-serif" }}
+          <div style={{ fontSize: "12px", color: "#777" }}>
+            {first(enrollment.curriculum)?.curriculumName ?? "—"}
+          </div>
+          <div
+            style={{
+              fontSize: "11px",
+              color: "#aaa",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
           >
-            <Key size={14} /> Code
+            {student?.email}
+          </div>
+        </div>
+
+        {busy ? (
+          <span style={{ fontSize: "12px", color: NAVY }}>Working...</span>
+        ) : status === "pending" ? (
+          <div style={{ display: "flex", gap: "8px" }}>
+            <button
+              type="button"
+              title="Approve"
+              aria-label={`Approve ${name}`}
+              onClick={stop(approve)}
+              style={roundButton("#27ae60")}
+            >
+              <Check size={18} />
+            </button>
+            <button
+              type="button"
+              title="Reject"
+              aria-label={`Reject ${name}`}
+              onClick={stop(reject)}
+              style={roundButton("#e74c3c")}
+            >
+              <X size={18} />
+            </button>
+          </div>
+        ) : status === "approved" || status === "partially_approved" ? (
+          <button
+            type="button"
+            onClick={stop(viewCode)}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "5px",
+              padding: "6px 12px",
+              borderRadius: "8px",
+              border: `1px solid ${NAVY}`,
+              backgroundColor: "#fff",
+              color: NAVY,
+              fontSize: "12px",
+              fontWeight: "600",
+              cursor: "pointer",
+              fontFamily: FONT,
+            }}
+          >
+            <KeyRound size={14} /> Code
           </button>
-        )}
+        ) : null}
       </div>
     );
   };
 
-  const Section = ({ title, students, showActions, showCode }) => (
-    <div style={{ marginBottom: "32px" }}>
-      <h2 style={{ fontSize: "18px", fontWeight: "700", color: "#1a1a6e", marginBottom: "12px" }}>
-        {title} ({students.length})
-      </h2>
-      {students.length === 0 ? (
-        <p style={{ fontSize: "13px", color: "#aaa", fontStyle: "italic" }}>No {title.toLowerCase()} enrollments</p>
-      ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-          {students.map((e) => <StudentCard key={e.enrollment_id} e={e} showActions={showActions} showCode={showCode} />)}
-        </div>
-      )}
-    </div>
-  );
-
   return (
-    <div style={{ display: "flex", minHeight: "100vh", fontFamily: "Poppins, sans-serif", backgroundColor: "#f5f6fa" }}>
+    <div
+      style={{
+        display: "flex",
+        minHeight: "100vh",
+        fontFamily: FONT,
+        backgroundColor: "#f5f6fa",
+      }}
+    >
       <AdminSidebar />
-      <div style={{ marginLeft: "240px", flex: 1 }}>
-        <AdminTopbar title="Approvals" />
-        <div style={{ padding: "32px 40px" }}>
+      <div style={{ marginLeft: "240px", flex: 1, minWidth: 0 }}>
+        <AdminTopbar
+          title="Approvals"
+          actions={
+            <button
+              type="button"
+              onClick={refresh}
+              disabled={refreshing}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                padding: "8px 14px",
+                borderRadius: "8px",
+                border: `1px solid ${NAVY}`,
+                backgroundColor: "#fff",
+                color: NAVY,
+                fontSize: "13px",
+                fontWeight: "600",
+                cursor: "pointer",
+                fontFamily: FONT,
+              }}
+            >
+              <RefreshCw size={15} /> {refreshing ? "Refreshing..." : "Refresh"}
+            </button>
+          }
+        />
+        <div style={{ padding: "32px 40px", maxWidth: "900px" }}>
+          {error && (
+            <p
+              role="alert"
+              style={{ color: "#c0392b", fontSize: "13px", marginTop: 0 }}
+            >
+              {error}
+            </p>
+          )}
+          {notice && (
+            <p
+              role="status"
+              style={{ color: "#E67E22", fontSize: "13px", marginTop: 0 }}
+            >
+              {notice}
+            </p>
+          )}
+
           {loading ? (
             <p style={{ color: "#aaa" }}>Loading...</p>
           ) : (
-            <>
-              <Section title="Pending" students={pending} showActions />
-              <Section title="Approved" students={approved} showCode />
-            </>
+            SECTIONS.map((section) => {
+              const items = enrollments.filter(
+                (e) => getStatus(e) === section.status,
+              );
+              return (
+                <section key={section.status} style={{ marginBottom: "28px" }}>
+                  <h2
+                    style={{
+                      fontSize: "18px",
+                      fontWeight: "700",
+                      color: NAVY,
+                      margin: "0 0 12px",
+                    }}
+                  >
+                    {section.title} ({items.length})
+                  </h2>
+                  {items.length === 0 ? (
+                    <p
+                      style={{
+                        fontSize: "13px",
+                        color: "#999",
+                        fontStyle: "italic",
+                        margin: 0,
+                      }}
+                    >
+                      {section.empty}
+                    </p>
+                  ) : (
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "10px",
+                      }}
+                    >
+                      {items.map((e) => (
+                        <ApprovalCard key={e.enrollment_id} enrollment={e} />
+                      ))}
+                    </div>
+                  )}
+                </section>
+              );
+            })
           )}
         </div>
       </div>
 
-      {selectedEnrollment && (
-        <StudentDetailModal
-          enrollment={selectedEnrollment}
-          onClose={() => setSelectedEnrollment(null)}
+      {selectedId && (
+        <RegistrantModal
+          enrollmentId={selectedId}
+          onClose={() => setSelectedId(null)}
+          onChanged={fetchEnrollments}
         />
+      )}
+      {codeInfo && (
+        <CodeModal {...codeInfo} onClose={() => setCodeInfo(null)} />
       )}
     </div>
   );
