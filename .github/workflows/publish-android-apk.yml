@@ -1,0 +1,54 @@
+name: Build and publish Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+    paths:
+      - app.json
+      - eas.json
+      - package.json
+      - package-lock.json
+      - android/**
+
+permissions:
+  contents: write
+
+concurrency:
+  group: production-android-apk
+  cancel-in-progress: false
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Build production APK with EAS
+        run: npx --yes eas-cli build --profile production-apk --platform android --non-interactive --wait --json > eas-build.json
+      - name: Download APK build artifact
+        shell: bash
+        run: |
+          build_url="$(node -e 'const data = JSON.parse(require("fs").readFileSync("eas-build.json", "utf8")); const builds = Array.isArray(data) ? data : (data.builds ?? [data]); const build = builds.find((item) => item.artifacts?.buildUrl) ?? builds.find((item) => item.build?.artifacts?.buildUrl)?.build; if (!build?.artifacts?.buildUrl) process.exit(1); process.stdout.write(build.artifacts.buildUrl)')"
+          mkdir -p apk-artifact
+          curl --fail --location --retry 3 --output apk-artifact/tanglaw-latest.apk "$build_url"
+          test -s apk-artifact/tanglaw-latest.apk
+          unzip -tq apk-artifact/tanglaw-latest.apk >/dev/null
+      - name: Create or replace stable APK release asset
+        shell: bash
+        run: |
+          if gh release view android-apk >/dev/null 2>&1; then
+            gh release upload android-apk apk-artifact/tanglaw-latest.apk --clobber
+          else
+            gh release create android-apk apk-artifact/tanglaw-latest.apk \
+              --title "Tanglaw Android APK" \
+              --notes "Latest production APK for Tanglaw."
+          fi

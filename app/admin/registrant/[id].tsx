@@ -2,7 +2,6 @@ import { useAdmin } from "@/context/AdminContext";
 import { supabase } from "@/lib/supabase";
 import { Ionicons } from "@expo/vector-icons";
 import * as FileSystem from "expo-file-system/legacy";
-import * as MediaLibrary from "expo-media-library";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import { useEffect, useState } from "react";
@@ -14,6 +13,7 @@ import {
   Image,
   Linking,
   Modal,
+  Platform,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -357,22 +357,28 @@ export default function RegistrantDetails() {
       .replace(/[^A-Za-z0-9_-]+/g, "_")
       .toUpperCase();
 
-    const downloadViaBrowser = () => {
+    const downloadViaBrowser = async () => {
       const separator = url.includes("?") ? "&" : "?";
-      Linking.openURL(
+      await Linking.openURL(
         `${url}${separator}download=${encodeURIComponent(`${fileName}.${ext}`)}`,
       );
     };
 
+    if (Platform.OS === "web") {
+      await downloadViaBrowser();
+      return;
+    }
+
     setSavingPhoto(true);
     try {
+      const MediaLibrary = await import("expo-media-library");
       let granted = false;
       try {
         ({ granted } = await MediaLibrary.requestPermissionsAsync(true, [
           "photo",
         ]));
       } catch {
-        downloadViaBrowser();
+        await downloadViaBrowser();
         return;
       }
       if (!granted) {

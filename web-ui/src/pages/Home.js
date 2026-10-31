@@ -1,11 +1,11 @@
 import {
-    BookOpen,
-    Check,
-    Globe,
-    GraduationCap,
-    Play,
-    Smartphone,
-    Star,
+  BookOpen,
+  Check,
+  Globe,
+  GraduationCap,
+  Play,
+  Smartphone,
+  Star,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -14,6 +14,9 @@ import aboutImage from "../assets/enrollBanner.png";
 import logo from "../assets/logo.png";
 import Navbar from "../components/Navbar";
 import "./Home.css";
+
+const androidApkUrl =
+  "https://github.com/newtical/tanglaww/releases/download/android-apk/tanglaw-latest.apk";
 
 const programs = [
   { title: "General Education", icon: Globe },
@@ -739,7 +742,7 @@ function Home() {
                 Watch sessions, read learning modules, answer quizzes and check
                 your progress — anywhere, anytime.
               </p>
-              <a className="landing-button button-navy" href="#download">
+              <a className="landing-button button-navy" href={androidApkUrl}>
                 <Smartphone size={16} /> Download for Android
               </a>
             </div>
