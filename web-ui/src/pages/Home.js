@@ -15,6 +15,9 @@ import logo from "../assets/logo.png";
 import Navbar from "../components/Navbar";
 import "./Home.css";
 
+const androidApkUrl =
+  "https://github.com/newtical/tanglaww/releases/download/android-apk/tanglaw-latest.apk";
+
 const programs = [
   { title: "General Education", icon: Globe },
   { title: "Professional Education", icon: GraduationCap },
@@ -532,7 +535,10 @@ function Home() {
               <p className="section-eyebrow">Download the app</p>
               <h2 className="section-title" id="download-heading">Download Tanglaw Now!</h2>
               <p>Watch sessions, read learning modules, answer quizzes and check your progress — anywhere, anytime.</p>
-              <a className="landing-button button-navy" href="#download">
+              <a
+                className="landing-button button-navy"
+                href={androidApkUrl}
+              >
                 <Smartphone size={16} /> Download for Android
               </a>
             </div>

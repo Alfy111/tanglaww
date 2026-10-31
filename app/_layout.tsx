@@ -6,6 +6,9 @@ import {
   validateSession,
 } from "@/lib/session";
 import { supabase } from "@/lib/supabase";
+import { ThemeProvider } from "@/context/ThemeContext";
+import NetworkStatusBanner from "@/components/NetworkStatusBanner";
+import UpdatePrompt from "@/components/UpdatePrompt";
 import type { Session } from "@supabase/supabase-js";
 import { Stack, usePathname, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
@@ -278,26 +281,33 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 
 export default function RootLayout() {
   return (
-    <AdminProvider>
-      <AuthGate>
-        <Stack screenOptions={{ headerShown: false, animation: "fade" }}>
-          <Stack.Screen name="index" />
-          <Stack.Screen name="welcome" />
-          <Stack.Screen name="login" />
-          <Stack.Screen name="signin" />
-          <Stack.Screen name="enroll" />
-          <Stack.Screen name="code" />
-          <Stack.Screen name="profilesetup" />
-          <Stack.Screen name="succes" />
-          <Stack.Screen name="homepage" />
-          <Stack.Screen name="admin" />
-          <Stack.Screen name="registrant" />
-          <Stack.Screen name="materials" />
-          <Stack.Screen name="resetpass" />
-          <Stack.Screen name="forgotpass" />
-        </Stack>
-      </AuthGate>
-      <Toast config={toastConfig} />
-    </AdminProvider>
+    <ThemeProvider>
+      <AdminProvider>
+        <View style={{ flex: 1 }}>
+          <NetworkStatusBanner />
+          <UpdatePrompt />
+          <View style={{ flex: 1 }}>
+            <AuthGate>
+              <Stack screenOptions={{ headerShown: false, animation: "fade" }}>
+                <Stack.Screen name="index" />
+                <Stack.Screen name="welcome" />
+                <Stack.Screen name="login" />
+                <Stack.Screen name="signin" />
+                <Stack.Screen name="enroll" />
+                <Stack.Screen name="code" />
+                <Stack.Screen name="profilesetup" />
+                <Stack.Screen name="succes" />
+                <Stack.Screen name="homepage" />
+                <Stack.Screen name="admin" />
+                <Stack.Screen name="materials" />
+                <Stack.Screen name="resetpass" />
+                <Stack.Screen name="forgotpass" />
+              </Stack>
+            </AuthGate>
+          </View>
+        </View>
+        <Toast config={toastConfig} />
+      </AdminProvider>
+    </ThemeProvider>
   );
 }

@@ -1,0 +1,39 @@
+name: Publish production OTA update
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+    paths:
+      - app/**/*.ts
+      - app/**/*.tsx
+      - components/**/*.ts
+      - components/**/*.tsx
+      - context/**/*.ts
+      - context/**/*.tsx
+      - lib/**/*.ts
+      - lib/**/*.tsx
+      - assets/**
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-ota
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Publish compatible Android and iOS updates
+        run: npx --yes eas-cli update --channel production --message "Production OTA update ${GITHUB_SHA}" --non-interactive
