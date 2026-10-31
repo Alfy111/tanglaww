@@ -4,9 +4,9 @@ import FormField from "../../components/FormField";
 import StepBanner from "../../components/StepBanner";
 import {
   PAYMENT_TYPES,
-  PROMOS,
   channelDetails,
   getPaymentChannels,
+  getPromos,
 } from "../../lib/enrollment";
 
 const UPPERCASE_FIELDS = [
@@ -42,6 +42,11 @@ export default function Step3Personal({
 }) {
   const [errors, setErrors] = useState({});
   const [channels, setChannels] = useState([]);
+  const [promos, setPromos] = useState([]);
+
+  useEffect(() => {
+    getPromos().then(setPromos);
+  }, []);
 
   useEffect(() => {
     getPaymentChannels().then(setChannels);
@@ -266,7 +271,7 @@ export default function Step3Personal({
                 className="field-input"
                 value={data.promoId ?? ""}
                 onChange={(e) => {
-                  const promo = PROMOS.find(
+                  const promo = promos.find(
                     (p) => p.id === Number(e.target.value),
                   );
                   setData({
@@ -277,7 +282,7 @@ export default function Step3Personal({
                 }}
               >
                 <option value="">Select promo (optional)</option>
-                {PROMOS.map((p) => (
+                {promos.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name}
                   </option>
@@ -380,7 +385,7 @@ export default function Step3Personal({
               {error("paymentType")}
               {data.paymentType === "downpayment" && (
                 <p style={noteStyle}>
-                  With a downpayment, you can access the courses up to LEPT
+                  With a downpayment, you can access the courses up to LET
                   Express. Upload your remaining balance receipt later in your
                   Profile to unlock the rest.
                 </p>

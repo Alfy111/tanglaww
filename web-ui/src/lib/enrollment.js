@@ -71,6 +71,22 @@ export const CURRICULUM_NAMES = {
   BSEd: "Bachelor of Secondary Education (BSEd)",
 };
 
+// Promos come from the "promo" table. PROMOS above is only a fallback
+// if the table can't be read.
+export async function getPromos() {
+  const { data, error } = await supabase
+    .from("promo")
+    .select("promo_id, promo, is_active")
+    .order("promo_id");
+  if (error) {
+    console.error("promo:", error.message);
+    return PROMOS;
+  }
+  return (data ?? [])
+    .filter((r) => r.is_active !== false)
+    .map((r) => ({ id: Number(r.promo_id), name: String(r.promo ?? "") }));
+}
+
 export async function getSpecializations() {
   const { data, error } = await supabase
     .from("specialization")

@@ -307,16 +307,31 @@ export default function EnrollmentScreen() {
     (o) => o.curriculumId === dataTypes.curriculumId,
   );
 
-  const promoOptions = [
-    {
-      id: 1,
-      name: "Advocacy Promo (BSEd and BEEd with specialization - 3500)",
-    },
-    { id: 2, name: "Advocacy Promo (BEEd - 2500)" },
-    { id: 3, name: "Regular Rates (BSEd and BEEd with specialization - 5000)" },
-    { id: 4, name: "Regular Rates (BEEd - 4000)" },
-    { id: 5, name: "Summa Cum Laude" },
-  ];
+  // Promos come from the "promo" table, so new ones only need a DB change.
+  const [promoOptions, setPromoOptions] = useState<
+    { id: number; name: string }[]
+  >([]);
+
+  useEffect(() => {
+    supabase
+      .from("promo")
+      .select("promo_id, promo, is_active")
+      .order("promo_id")
+      .then(({ data, error }) => {
+        if (error) {
+          console.error("promo:", error.message);
+          return;
+        }
+        setPromoOptions(
+          (data ?? [])
+            .filter((r: any) => r.is_active !== false)
+            .map((r: any) => ({
+              id: Number(r.promo_id),
+              name: String(r.promo ?? ""),
+            })),
+        );
+      });
+  }, []);
 
   const [paymentChannels, setPaymentChannels] = useState<
     { id: number; name: string }[]
