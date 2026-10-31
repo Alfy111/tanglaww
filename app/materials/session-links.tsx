@@ -349,7 +349,7 @@ export default function SessionLinkScreen() {
               <Text style={styles.inputLabel}>Session Title *</Text>
               <TextInput
                 style={styles.input}
-                placeholder="e.g. LET Express - Module 3"
+                placeholder="e.g. LEPT Express - Module 3"
                 placeholderTextColor="#9AA0A6"
                 value={newTitle}
                 onChangeText={setNewTitle}

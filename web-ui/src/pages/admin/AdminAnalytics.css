@@ -512,6 +512,9 @@
 }
 
 @media (max-width: 900px) {
+  .admin-analytics-main {
+    margin-left: 0;
+  }
   .admin-analytics-content {
     padding: 20px;
   }
@@ -524,12 +527,6 @@
 }
 
 @media (max-width: 600px) {
-  .admin-analytics-layout > aside {
-    display: none;
-  }
-  .admin-analytics-main {
-    margin-left: 0;
-  }
   .admin-analytics-content {
     gap: 14px;
     padding: 14px 12px 28px;

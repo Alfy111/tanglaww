@@ -140,7 +140,7 @@ function AddSessionModal({ courseId, onClose, onSaved }) {
         <label style={labelStyle}>Session Title *</label>
         <input
           style={inputStyle}
-          placeholder="e.g. LET Express - Module 3"
+          placeholder="e.g. LEPT Express - Module 3"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
         />
