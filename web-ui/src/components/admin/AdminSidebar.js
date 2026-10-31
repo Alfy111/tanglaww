@@ -1,4 +1,5 @@
 import {
+  BarChart3,
   BookOpen,
   Calendar as CalendarIcon,
   CheckSquare,
@@ -31,6 +32,11 @@ const OVERVIEW = [
     icon: <CalendarIcon size={18} />,
   },
   { label: "Courses", path: "/admin/courses", icon: <BookOpen size={18} /> },
+  {
+    label: "Analytics",
+    path: "/admin/analytics",
+    icon: <BarChart3 size={18} />,
+  },
 ];
 
 const MANAGEMENT = [
