@@ -193,6 +193,7 @@ export async function submitEnrollment(data) {
     curriculum_id: CURRICULUM_IDS[data.curriculum],
     specialization_id:
       data.specializationId ?? SPECIALIZATIONS.indexOf(data.specialization) + 1,
+    comments: upper(data.comments) || null,
     typeOfTaker_id: TAKER_TYPE_IDS[data.takerType],
     promo_id: data.promoId ?? null,
     enrollmentDate: now,

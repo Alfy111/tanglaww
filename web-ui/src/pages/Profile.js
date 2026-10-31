@@ -2,6 +2,7 @@ import { Camera, Clock, Pencil, UploadCloud, User, Wallet } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import profileBanner from "../assets/profileBanner.png";
 import Sidebar from "../components/Sidebar";
+import { getSignedInUser } from "../components/StudentSidePanel";
 import UserTopbar from "../components/UserTopbar";
 import { supabase } from "../lib/supabase";
 import "./Dashboard.css";
@@ -60,9 +61,7 @@ export default function Profile() {
   const receiptRef = useRef(null);
 
   const fetchProfile = useCallback(async () => {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await getSignedInUser();
     if (!user) {
       setLoading(false);
       return;

@@ -129,6 +129,29 @@ export default function Step2Curriculum({ data, setData, onNext, onBack }) {
             <p className="field-error">{errors.specialization}</p>
           )}
         </div>
+        <div className="field-group">
+          <label htmlFor="enroll-comments" className="field-label">
+            Others:{" "}
+            <span style={{ fontWeight: 400, color: "#95A5A6" }}>
+              (optional)
+            </span>
+          </label>
+          <textarea
+            id="enroll-comments"
+            className="field-input"
+            rows={3}
+            maxLength={500}
+            placeholder="Other specialization"
+            value={data.comments ?? ""}
+            onChange={(e) =>
+              setData({
+                ...data,
+                comments: e.target.value.replace(/\d/g, "").toUpperCase(),
+              })
+            }
+            style={{ resize: "vertical", fontFamily: "inherit" }}
+          />
+        </div>
         <ContinueButton onClick={validate} onBack={onBack} />
       </div>
     </>

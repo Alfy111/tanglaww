@@ -38,6 +38,7 @@ interface dataTypes {
   curriculumId: number | null;
   specialization: string;
   specializationId: number | null;
+  comments: string;
   takerType: string | null;
   takerTypeId: number | null;
   firstName: string;
@@ -68,6 +69,7 @@ const defaultValues: dataTypes = {
   curriculumId: null,
   specialization: "",
   specializationId: null,
+  comments: "",
   takerType: null,
   takerTypeId: null,
   firstName: "",
@@ -183,6 +185,7 @@ const formatDate = (d: Date | null) =>
     : "";
 
 const toUpper = (v: string) => v.toUpperCase();
+const lettersUpper = (v: string) => v.replace(/\d/g, "").toUpperCase();
 
 const PAYMENT_TYPES = [
   { value: "downpayment" as const, name: "Downpayment" },
@@ -515,6 +518,7 @@ export default function EnrollmentScreen() {
             .update({
               curriculum_id: dataTypes.curriculumId,
               specialization_id: dataTypes.specializationId,
+              comments: dataTypes.comments.trim() || null,
               typeOfTaker_id: dataTypes.takerTypeId,
               promo_id: dataTypes.promoId,
               enrollmentDate: new Date().toISOString(),
@@ -554,6 +558,7 @@ export default function EnrollmentScreen() {
             student_id: studentData.id,
             curriculum_id: dataTypes.curriculumId,
             specialization_id: dataTypes.specializationId,
+            comments: dataTypes.comments.trim() || null,
             typeOfTaker_id: dataTypes.takerTypeId,
             promo_id: dataTypes.promoId,
             verification_id: verificationData.verification_id,
@@ -694,7 +699,8 @@ export default function EnrollmentScreen() {
       | "lastSchool"
       | "province"
       | "amountTransferred"
-      | "referenceNumber";
+      | "referenceNumber"
+      | "comments";
     label: string;
     placeholder: string;
     required?: boolean;
@@ -1097,6 +1103,15 @@ export default function EnrollmentScreen() {
                 </View>
               )}
               {fieldError("specialization")}
+
+              {textField({
+                key: "comments",
+                label: "Comments:",
+                placeholder: "Optional",
+                hint: "Anything the admin should know about your program or majorship (optional).",
+                autoCapitalize: "characters",
+                clean: lettersUpper,
+              })}
             </View>
           </View>
         )}
@@ -1359,7 +1374,7 @@ export default function EnrollmentScreen() {
               {fieldError("paymentType")}
               {dataTypes.paymentType === "downpayment" && (
                 <Text style={styles.payTypeNote}>
-                  With a downpayment, you can access the courses up to LEPT
+                  With a downpayment, you can access the courses up to LET
                   Express. Upload your remaining balance receipt later in your
                   Profile to unlock the rest.
                 </Text>
@@ -1422,6 +1437,10 @@ export default function EnrollmentScreen() {
                     {summaryRow({
                       label: "Specialization",
                       value: dataTypes.specialization,
+                    })}
+                    {summaryRow({
+                      label: "Comments",
+                      value: dataTypes.comments.trim() || "—",
                     })}
                   </>
                 ),

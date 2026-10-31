@@ -3,14 +3,15 @@ import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Image,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 type QuestionType = "mcq" | "identification" | "matching";
@@ -19,11 +20,17 @@ interface ReviewQuestion {
   question_id: number;
   questionType: QuestionType;
   questionText: string;
+  imageUrl?: string | null;
   points: number;
   majorTag: string | null;
   minorTag: string | null;
   choices:
-    | { choice_id: number; choiceText: string; isCorrect: boolean | null }[]
+    | {
+        choice_id: number;
+        choiceText: string;
+        imageUrl?: string | null;
+        isCorrect: boolean | null;
+      }[]
     | null;
   matchItems:
     | { pair_id: number; leftText: string; correctMatch: string | null }[]
@@ -184,7 +191,16 @@ export default function QuizReviewScreen() {
                 )}
               </View>
 
-              <Text style={styles.questionText}>{q.questionText}</Text>
+              {!!q.questionText && (
+                <Text style={styles.questionText}>{q.questionText}</Text>
+              )}
+              {!!q.imageUrl && (
+                <Image
+                  source={{ uri: q.imageUrl }}
+                  style={styles.questionImage}
+                  resizeMode="contain"
+                />
+              )}
 
               {q.questionType === "mcq" &&
                 (q.choices ?? []).map((c, ci) => {
@@ -213,7 +229,21 @@ export default function QuizReviewScreen() {
                       <Text style={styles.choiceLetter}>
                         {String.fromCharCode(65 + ci)}
                       </Text>
-                      <Text style={styles.choiceText}>{c.choiceText}</Text>
+                      <View style={{ flex: 1 }}>
+                        {!!c.choiceText && (
+                          <Text style={styles.choiceText}>{c.choiceText}</Text>
+                        )}
+                        {!!c.imageUrl && (
+                          <Image
+                            source={{ uri: c.imageUrl }}
+                            style={[
+                              styles.choiceImage,
+                              !!c.choiceText && { marginTop: 6 },
+                            ]}
+                            resizeMode="contain"
+                          />
+                        )}
+                      </View>
                       {picked && (
                         <Text style={styles.yourPick}>Your answer</Text>
                       )}
@@ -374,6 +404,16 @@ const styles = StyleSheet.create({
   },
   choiceLetter: { fontWeight: "700", color: COLORS.text, width: 18 },
   choiceText: { flex: 1, fontSize: 13, color: COLORS.text },
+  choiceImage: { width: "100%", height: 120 },
+  questionImage: {
+    width: "100%",
+    height: 200,
+    marginVertical: 10,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: "#E5E8EE",
+    backgroundColor: "#FAFAFA",
+  },
   yourPick: { fontSize: 10, color: COLORS.primary, fontWeight: "600" },
 
   answerLabel: { fontSize: 12, color: COLORS.muted, marginTop: 4 },

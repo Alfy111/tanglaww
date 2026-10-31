@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
   Alert,
   BackHandler,
+  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -32,10 +33,13 @@ interface Question {
   question_id: number;
   questionType: QuestionType;
   questionText: string;
+  imageUrl?: string | null;
   points: number;
   majorTag: string | null;
   minorTag: string | null;
-  choices: { choice_id: number; choiceText: string }[] | null;
+  choices:
+    | { choice_id: number; choiceText: string; imageUrl?: string | null }[]
+    | null;
   matchItems: { pair_id: number; leftText: string }[] | null;
   matchOptions: string[] | null;
   answer: SavedAnswer | null;
@@ -403,7 +407,19 @@ export default function QuizTakeScreen() {
             </TouchableOpacity>
           </View>
 
-          <Text style={styles.questionText}>{q.questionText}</Text>
+          {!!q.questionText && (
+            <Text style={styles.questionText}>{q.questionText}</Text>
+          )}
+          {!!q.imageUrl && (
+            <Image
+              source={{ uri: q.imageUrl }}
+              style={[
+                styles.questionImage,
+                !q.questionText && { marginTop: 18 },
+              ]}
+              resizeMode="contain"
+            />
+          )}
 
           {q.questionType === "mcq" &&
             (q.choices ?? []).map((c, i) => {
@@ -434,7 +450,21 @@ export default function QuizTakeScreen() {
                       {String.fromCharCode(65 + i)}
                     </Text>
                   </View>
-                  <Text style={styles.choiceText}>{c.choiceText}</Text>
+                  <View style={styles.choiceBody}>
+                    {!!c.choiceText && (
+                      <Text style={styles.choiceTextInner}>{c.choiceText}</Text>
+                    )}
+                    {!!c.imageUrl && (
+                      <Image
+                        source={{ uri: c.imageUrl }}
+                        style={[
+                          styles.choiceImage,
+                          !!c.choiceText && { marginTop: 8 },
+                        ]}
+                        resizeMode="contain"
+                      />
+                    )}
+                  </View>
                 </TouchableOpacity>
               );
             })}
@@ -764,6 +794,18 @@ const styles = StyleSheet.create({
   },
   letterText: { fontWeight: "700", color: COLORS.text },
   choiceText: { flex: 1, fontSize: 13, color: COLORS.text, padding: 12 },
+  choiceBody: { flex: 1, padding: 12 },
+  choiceTextInner: { fontSize: 13, color: COLORS.text },
+  choiceImage: { width: "100%", height: 140 },
+  questionImage: {
+    width: "100%",
+    height: 220,
+    marginBottom: 14,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: "#FAFAFA",
+  },
 
   textAnswer: {
     borderWidth: 1,

@@ -11,10 +11,19 @@ import { supabase } from "../lib/supabase";
 
 const pct = (done, total) => (total ? Math.round((done / total) * 100) : 0);
 
-export async function getMyStudent() {
+export async function getSignedInUser() {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (session?.user) return session.user;
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  return user ?? null;
+}
+
+export async function getMyStudent() {
+  const user = await getSignedInUser();
   if (!user) return null;
   const { data } = await supabase
     .from("student")

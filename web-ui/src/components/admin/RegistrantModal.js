@@ -888,6 +888,7 @@ export default function RegistrantModal({ enrollmentId, onClose, onChanged }) {
                   first(enrollment.specialization)?.specializationName,
                 ],
                 ["Type of Taker", first(enrollment.type_of_taker)?.typeOfTaker],
+                ["Comments", enrollment.comments || "None"],
               ]}
             />
             <InfoSection

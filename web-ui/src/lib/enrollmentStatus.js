@@ -25,6 +25,7 @@ export const ENROLLMENT_SELECT = `
   enrollment_id,
   student_id,
   enrollmentDate,
+  comments,
   student (
     id, firstName, middleName, lastName, email, bachelorsDegree, majorshipTaken,
     lastSchoolAttended, province, profilephotourl, phoneNumber, validIdUrl, formalPhotoUrl

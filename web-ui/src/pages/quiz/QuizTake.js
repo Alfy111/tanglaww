@@ -1,10 +1,10 @@
 import {
-    ChevronLeft,
-    ChevronRight,
-    Clock,
-    Flag,
-    Hourglass,
-    Send,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  Flag,
+  Hourglass,
+  Send,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
@@ -461,17 +461,43 @@ export default function QuizTake() {
               </button>
             </div>
 
-            <p
-              style={{
-                fontSize: "15px",
-                color: C.text,
-                margin: "18px 0 16px",
-                whiteSpace: "pre-wrap",
-                lineHeight: 1.5,
-              }}
-            >
-              {q.questionText}
-            </p>
+            {q.questionText && (
+              <p
+                style={{
+                  fontSize: "15px",
+                  color: C.text,
+                  margin: "18px 0 16px",
+                  whiteSpace: "pre-wrap",
+                  lineHeight: 1.5,
+                }}
+              >
+                {q.questionText}
+              </p>
+            )}
+            {q.imageUrl && (
+              <a
+                href={q.imageUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Open full size"
+                style={{
+                  display: "block",
+                  margin: q.questionText ? "0 0 16px" : "18px 0 16px",
+                }}
+              >
+                <img
+                  src={q.imageUrl}
+                  alt={`Question ${index + 1}`}
+                  style={{
+                    display: "block",
+                    maxWidth: "100%",
+                    maxHeight: "420px",
+                    borderRadius: "8px",
+                    border: `1px solid ${C.border}`,
+                  }}
+                />
+              </a>
+            )}
 
             {q.questionType === "mcq" &&
               (q.choices ?? []).map((c, i) => {
@@ -520,9 +546,23 @@ export default function QuizTake() {
                         padding: "12px",
                         fontSize: "14px",
                         color: C.text,
+                        minWidth: 0,
                       }}
                     >
                       {c.choiceText}
+                      {c.imageUrl && (
+                        <img
+                          src={c.imageUrl}
+                          alt={`Choice ${String.fromCharCode(65 + i)}`}
+                          style={{
+                            display: "block",
+                            maxWidth: "100%",
+                            maxHeight: "200px",
+                            marginTop: c.choiceText ? "8px" : 0,
+                            borderRadius: "6px",
+                          }}
+                        />
+                      )}
                     </span>
                   </button>
                 );
