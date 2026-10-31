@@ -29,6 +29,7 @@ export async function getMaterialsByModule(
     .select("*")
     .eq("module_id", moduleId)
     .eq("materialType", type)
+    .order("position", { ascending: true, nullsFirst: false })
     .order("uploadedAt", { ascending: false });
 
   if (error) {
@@ -46,6 +47,7 @@ export async function getMaterialsByCourse(
     .select("*, module!inner(course_id)")
     .eq("module.course_id", courseId)
     .eq("materialType", type)
+    .order("position", { ascending: true, nullsFirst: false })
     .order("uploadedAt", { ascending: false });
 
   if (error) {
@@ -216,6 +218,7 @@ export async function getModulesByCourse(courseId: number) {
     .from("module")
     .select("module_id, moduleName, description")
     .eq("course_id", courseId)
+    .eq("is_diagnostic", false)
     .order("module_id");
 
   if (error) {
@@ -274,7 +277,7 @@ export interface SectionProgress {
 
 export interface CourseProgress {
   percent: number;
-  lockReason: "access" | "previous" | null;
+  lockReason: "access" | "previous" | "payment" | "not_applicable" | null;
   previousCourseName: string | null;
   handouts: SectionProgress;
   sessions: SectionProgress;

@@ -84,8 +84,41 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const kickWithdrawn = async () => {
+    if (kickingRef.current) return;
+    kickingRef.current = true;
+    try {
+      await clearLocalSession();
+      await supabase.auth.signOut({ scope: "local" });
+    } finally {
+      setSession(null);
+      applyRole(null);
+      kickingRef.current = false;
+      Toast.show({
+        type: "warning",
+        text1: "You've been signed out",
+        text2: "Your enrollment has been withdrawn. Please contact the admin.",
+        position: "bottom",
+        visibilityTime: 6000,
+      });
+    }
+  };
+
+  const isWithdrawn = async () => {
+    try {
+      const { data } = await supabase.rpc("my_enrollment_status");
+      return data === "withdrawn";
+    } catch {
+      return false;
+    }
+  };
+
   const checkStudentSession = async () => {
     if (roleRef.current !== "student") return;
+    if (await isWithdrawn()) {
+      await kickWithdrawn();
+      return;
+    }
     try {
       const { valid, studentId } = await validateSession();
       if (studentId !== null && !valid) await kickStudent();
@@ -117,6 +150,11 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 
       if (!student) {
         applyRole(null);
+        return;
+      }
+
+      if (await isWithdrawn()) {
+        await kickWithdrawn();
         return;
       }
 

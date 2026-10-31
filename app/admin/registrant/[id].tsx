@@ -1,6 +1,8 @@
 import { useAdmin } from "@/context/AdminContext";
 import { supabase } from "@/lib/supabase";
 import { Ionicons } from "@expo/vector-icons";
+import * as FileSystem from "expo-file-system/legacy";
+import * as MediaLibrary from "expo-media-library";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import { useEffect, useState } from "react";
@@ -20,37 +22,19 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import {
+  approveWithCode,
+  EnrollmentStatus,
+  getStatus,
+  getVerification,
+  PAYMENT_TYPE_LABELS,
+  sendActivationEmail,
+  setEnrollmentStatus,
+  STATUS_COLORS,
+  STATUS_LABELS,
+} from "../../../services/enrollmentStatusService";
 
 const { height } = Dimensions.get("window");
-
-const generateCode = (): string =>
-  Math.floor(100000 + Math.random() * 900000).toString();
-
-const sendActivationEmail = async (
-  to: string,
-  studentName: string,
-  code: string,
-): Promise<boolean> => {
-  try {
-    const response = await fetch(
-      "https://ohqzmjlerxudlhggxqnn.supabase.co/functions/v1/send-activation-email",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!}`,
-        },
-        body: JSON.stringify({ to, studentName, code }),
-      },
-    );
-    const text = await response.text();
-    const data = JSON.parse(text);
-    return data?.success === true;
-  } catch (err) {
-    console.error("Email send error:", err);
-    return false;
-  }
-};
 
 export default function RegistrantDetails() {
   const { id, name } = useLocalSearchParams();
@@ -73,9 +57,12 @@ export default function RegistrantDetails() {
     email: string;
   } | null>(null);
   const [approveLoading, setApproveLoading] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewTitle, setPreviewTitle] = useState("Proof of Payment");
 
   const [allowReenrollment, setAllowReenrollment] = useState(false);
   const [toggleLoading, setToggleLoading] = useState(false);
+  const [savingPhoto, setSavingPhoto] = useState(false);
 
   const displayName =
     typeof name === "string" ? name.toUpperCase() : "REGISTRANT";
@@ -95,18 +82,19 @@ export default function RegistrantDetails() {
         student (
           firstName, lastName, middleName,
           email, bachelorsDegree, lastSchoolAttended,
-          province, profilephotourl, phoneNumber
+          province, profilephotourl, phoneNumber,
+          validIdUrl, formalPhotoUrl
         ),
         curriculum!enrollment_curriculum_id_fkey (curriculumName),
         specialization!enrollment_specialization_id_fkey (specializationName),
         type_of_taker!enrollment_typeOfTaker_id_fkey (typeOfTaker),
         promo!enrollment_promo_id_fkey (promo),
         verification!enrollment_verification_id_fkey (
-          verification_id, verificationStatus, verificationNotes, allow_reenrollment
+          verification_id, verificationStatus, verificationNotes, allow_reenrollment, status
         ),
         paymentDetails (
-          amountTransferred, referenceNumber,
-          proofOfPaymentUrl,
+          amountTransferred, referenceNumber, dateOfPayment,
+          proofOfPaymentUrl, paymentType, balanceProofUrl, balanceSubmittedAt,
           payment_channel!paymentDetails_paymentChannel_id_fkey (paymentChannelName)
         )
       `,
@@ -212,6 +200,20 @@ export default function RegistrantDetails() {
     </View>
   );
 
+  const openDocument = (url: string | null | undefined, title: string) => {
+    if (!url) {
+      Alert.alert(`No ${title.toLowerCase()} uploaded.`);
+      return;
+    }
+    if (url.toLowerCase().endsWith(".pdf")) {
+      WebBrowser.openBrowserAsync(url);
+      return;
+    }
+    setPreviewUrl(url);
+    setPreviewTitle(title);
+    openSheet();
+  };
+
   const openSheet = () => {
     setPaymentPreview(true);
     Animated.spring(slideAnimation, {
@@ -229,76 +231,75 @@ export default function RegistrantDetails() {
     }).start(() => setPaymentPreview(false));
   };
 
-  const handleApprove = () => {
-    Alert.alert(
-      "Approve Enrollment",
-      `Approve ${enrollment.student.firstName} ${enrollment.student.lastName}? An activation code will be sent to their email.`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Approve",
-          onPress: async () => {
-            setApproveLoading(true);
-            try {
-              const v = Array.isArray(enrollment.verification)
-                ? enrollment.verification[0]
-                : enrollment.verification;
+  const handleApprove = (target: "approved" | "partially_approved") => {
+    const full = target === "approved";
+    const current = getStatus(enrollment);
+    const fromPending = current === "pending";
+    const studentName = `${enrollment.student.firstName} ${enrollment.student.lastName}`;
+    const message = fromPending
+      ? `${full ? "Fully approve" : "Partially approve"} ${studentName}? An activation code will be sent to their email.`
+      : full
+        ? `Fully approve ${studentName}? They get access to all courses.`
+        : `Set ${studentName} as partially approved? They get access up to LEPT Express until the balance is settled.`;
 
-              const { error: verifyError } = await supabase
-                .from("verification")
-                .update({
-                  verificationStatus: true,
-                  lastVerificationDate: new Date().toISOString(),
-                })
-                .eq("verification_id", v?.verification_id);
-
-              if (verifyError) throw new Error(verifyError.message);
-
-              const { data: existingCode } = await supabase
-                .from("activation_codes")
-                .select("code")
-                .eq("enrollment_id", enrollment.enrollment_id)
-                .eq("is_used", false)
-                .gt("expires_at", new Date().toISOString())
-                .maybeSingle();
-
-              let code: string;
-
-              if (existingCode) {
-                code = existingCode.code;
-              } else {
-                code = generateCode();
-                const expiresAt = new Date();
-                expiresAt.setDate(expiresAt.getDate() + 7);
-
-                const { error: codeError } = await supabase
-                  .from("activation_codes")
-                  .insert({
-                    code,
-                    student_id: enrollment.student_id,
-                    enrollment_id: enrollment.enrollment_id,
-                    is_used: false,
-                    expires_at: expiresAt.toISOString(),
-                  });
-
-                if (codeError) throw new Error(codeError.message);
-              }
-
-              const studentName = `${enrollment.student.firstName} ${enrollment.student.lastName}`;
-              const sent = await sendActivationEmail(
-                enrollment.student.email,
-                enrollment.student.firstName,
-                code,
+    Alert.alert(full ? "Fully Approve" : "Partially Approve", message, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Confirm",
+        onPress: async () => {
+          setApproveLoading(true);
+          try {
+            if (fromPending) {
+              const { code, emailSent } = await approveWithCode(
+                enrollment,
+                target,
               );
-
               setGeneratedCode(code);
-              setEmailSent(sent);
+              setEmailSent(emailSent);
               setCodeStudent({
                 name: studentName,
                 email: enrollment.student.email,
               });
               setCodeModal(true);
+            } else {
+              await setEnrollmentStatus(
+                getVerification(enrollment)?.verification_id,
+                target,
+              );
+              Alert.alert(
+                "Updated",
+                `${studentName} is now ${STATUS_LABELS[target].toLowerCase()}.`,
+              );
+            }
+            await refreshData();
+            await fetchEnrollmentDetails();
+          } catch (err: any) {
+            Alert.alert("Error", err.message ?? "Something went wrong.");
+          } finally {
+            setApproveLoading(false);
+          }
+        },
+      },
+    ]);
+  };
 
+  const handleWithdraw = () => {
+    const studentName = `${enrollment.student.firstName} ${enrollment.student.lastName}`;
+    Alert.alert(
+      "Mark as Withdrawn",
+      `${studentName} will no longer be able to log in. You can restore them later.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Withdraw",
+          style: "destructive",
+          onPress: async () => {
+            setApproveLoading(true);
+            try {
+              await setEnrollmentStatus(
+                getVerification(enrollment)?.verification_id,
+                "withdrawn",
+              );
               await refreshData();
               await fetchEnrollmentDetails();
             } catch (err: any) {
@@ -324,21 +325,14 @@ export default function RegistrantDetails() {
         text: "Reject",
         style: "destructive",
         onPress: async () => {
-          const v = Array.isArray(enrollment.verification)
-            ? enrollment.verification[0]
-            : enrollment.verification;
-
-          const { error } = await supabase
-            .from("verification")
-            .update({
-              verificationStatus: false,
-              verificationNotes: remarks,
-              lastVerificationDate: new Date().toISOString(),
-            })
-            .eq("verification_id", v?.verification_id);
-
-          if (error) {
-            Alert.alert("Error", error.message);
+          try {
+            await setEnrollmentStatus(
+              getVerification(enrollment)?.verification_id,
+              "rejected",
+              remarks,
+            );
+          } catch (err: any) {
+            Alert.alert("Error", err.message);
             return;
           }
           await refreshData();
@@ -347,6 +341,44 @@ export default function RegistrantDetails() {
         },
       },
     ]);
+  };
+
+  const handleSavePhoto = async () => {
+    const student = enrollment?.student;
+    const url: string | undefined = student?.formalPhotoUrl;
+    if (!url) return;
+    setSavingPhoto(true);
+    try {
+      const { granted } = await MediaLibrary.requestPermissionsAsync(true, [
+        "photo",
+      ]);
+      if (!granted) {
+        Alert.alert(
+          "Permission needed",
+          "Allow photo access so the photo can be saved to your gallery.",
+        );
+        return;
+      }
+      const ext =
+        url
+          .split("?")[0]
+          .match(/\.(jpe?g|png|webp|heic)$/i)?.[1]
+          ?.toLowerCase() ?? "jpg";
+      const fileName = `${student.lastName}_${student.firstName}_formal_photo`
+        .replace(/[^A-Za-z0-9_-]+/g, "_")
+        .toUpperCase();
+      const { uri, status } = await FileSystem.downloadAsync(
+        url,
+        `${FileSystem.cacheDirectory}${fileName}.${ext}`,
+      );
+      if (status !== 200) throw new Error("Could not download the photo.");
+      await MediaLibrary.saveToLibraryAsync(uri);
+      Alert.alert("Saved", "The photo was saved to your gallery.");
+    } catch (err: any) {
+      Alert.alert("Error", err.message ?? "Could not save the photo.");
+    } finally {
+      setSavingPhoto(false);
+    }
   };
 
   const handleResendEmail = async () => {
@@ -382,12 +414,14 @@ export default function RegistrantDetails() {
   const verification = Array.isArray(enrollment?.verification)
     ? enrollment.verification[0]
     : enrollment?.verification;
-  const isAlreadyApproved = verification?.verificationStatus === true;
-  const statusColor = isAlreadyApproved
-    ? "#27ae60"
-    : verification?.verificationNotes
-      ? "#e74c3c"
-      : "#F39C12";
+  const status: EnrollmentStatus = getStatus(enrollment);
+  const statusColor = STATUS_COLORS[status];
+  const hasAccess = status === "approved" || status === "partially_approved";
+  const balanceUrl = payment?.balanceProofUrl;
+  const showBalanceRow =
+    payment?.paymentType === "downpayment" ||
+    status === "partially_approved" ||
+    !!balanceUrl;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -424,11 +458,7 @@ export default function RegistrantDetails() {
               style={[styles.statusDot, { backgroundColor: statusColor }]}
             />
             <Text style={[styles.statusText, { color: statusColor }]}>
-              {isAlreadyApproved
-                ? "Approved"
-                : verification?.verificationNotes
-                  ? "Rejected"
-                  : "Pending"}
+              {STATUS_LABELS[status]}
             </Text>
           </View>
         </View>
@@ -478,49 +508,104 @@ export default function RegistrantDetails() {
             value={payment?.amountTransferred?.toString()}
           />
           <DetailRow label="Reference #" value={payment?.referenceNumber} />
+          <DetailRow
+            label="Date of Transaction"
+            value={
+              payment?.dateOfPayment
+                ? new Date(payment.dateOfPayment).toLocaleDateString("en-PH", {
+                    month: "long",
+                    day: "numeric",
+                    year: "numeric",
+                  })
+                : "Not set"
+            }
+          />
+          <DetailRow
+            label="Payment Type"
+            value={PAYMENT_TYPE_LABELS[payment?.paymentType] ?? "Not specified"}
+          />
         </InfoRow>
 
         <Text style={[styles.sectionLabel, { marginTop: 20 }]}>Documents:</Text>
 
         <TouchableOpacity
           style={styles.infoRow}
-          onPress={() => {
-            if (!proofUrl) {
-              Alert.alert("No proof of payment uploaded.");
-              return;
-            }
-            if (proofUrl.endsWith(".pdf")) {
-              WebBrowser.openBrowserAsync(proofUrl);
-            } else {
-              openSheet();
-            }
-          }}
+          onPress={() => openDocument(proofUrl, "Proof of Payment")}
         >
           <Text style={styles.infoRowText}>Proof of Payment</Text>
           <Ionicons name="chevron-forward" size={20} color="#555" />
         </TouchableOpacity>
 
-        {!isAlreadyApproved && !verification?.verificationNotes && (
+        <TouchableOpacity
+          style={styles.infoRow}
+          onPress={() =>
+            openDocument(student?.formalPhotoUrl, "Graduation or Formal Photo")
+          }
+        >
+          <Text style={styles.infoRowText}>Graduation or Formal Photo</Text>
+          <Ionicons name="chevron-forward" size={20} color="#555" />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.infoRow}
+          onPress={() => openDocument(student?.validIdUrl, "Valid ID")}
+        >
+          <View style={{ flex: 1 }}>
+            <Text style={styles.infoRowText}>Valid ID</Text>
+            {!student?.validIdUrl && (
+              <Text style={styles.balanceSub}>Not provided</Text>
+            )}
+          </View>
+          <Ionicons name="chevron-forward" size={20} color="#555" />
+        </TouchableOpacity>
+
+        {showBalanceRow && (
+          <TouchableOpacity
+            style={styles.infoRow}
+            onPress={() =>
+              openDocument(balanceUrl, "Remaining Balance Receipt")
+            }
+          >
+            <View style={{ flex: 1 }}>
+              <Text style={styles.infoRowText}>Remaining Balance Receipt</Text>
+              <Text style={styles.balanceSub}>
+                {balanceUrl
+                  ? `Submitted ${new Date(payment.balanceSubmittedAt).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" })}`
+                  : "Not submitted yet"}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#555" />
+          </TouchableOpacity>
+        )}
+
+        {status === "pending" && (
           <>
             <View style={styles.buttonRow}>
               <TouchableOpacity
                 style={[styles.approveBtn, approveLoading && { opacity: 0.7 }]}
-                onPress={handleApprove}
+                onPress={() => handleApprove("approved")}
                 disabled={approveLoading}
               >
                 {approveLoading ? (
                   <ActivityIndicator color="white" size="small" />
                 ) : (
-                  <Text style={styles.buttonText}>Approve</Text>
+                  <Text style={styles.buttonText}>Fully Approve</Text>
                 )}
               </TouchableOpacity>
               <TouchableOpacity
-                style={styles.rejectBtn}
-                onPress={() => setShowRemarks(!showRemarks)}
+                style={[styles.partialBtn, approveLoading && { opacity: 0.7 }]}
+                onPress={() => handleApprove("partially_approved")}
+                disabled={approveLoading}
               >
-                <Text style={styles.buttonText}>Reject</Text>
+                <Text style={styles.buttonText}>Partially Approve</Text>
               </TouchableOpacity>
             </View>
+            <TouchableOpacity
+              style={styles.rejectWideBtn}
+              onPress={() => setShowRemarks(!showRemarks)}
+            >
+              <Text style={styles.buttonText}>Reject</Text>
+            </TouchableOpacity>
 
             {showRemarks && (
               <>
@@ -542,7 +627,48 @@ export default function RegistrantDetails() {
           </>
         )}
 
-        {isAlreadyApproved && (
+        {status === "partially_approved" && (
+          <TouchableOpacity
+            style={[styles.approveWideBtn, approveLoading && { opacity: 0.7 }]}
+            onPress={() => handleApprove("approved")}
+            disabled={approveLoading}
+          >
+            <Text style={styles.buttonText}>
+              Fully Approve (balance settled)
+            </Text>
+          </TouchableOpacity>
+        )}
+
+        {status === "withdrawn" && (
+          <View style={styles.buttonRow}>
+            <TouchableOpacity
+              style={[styles.approveBtn, approveLoading && { opacity: 0.7 }]}
+              onPress={() => handleApprove("approved")}
+              disabled={approveLoading}
+            >
+              <Text style={styles.buttonText}>Restore as Approved</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.partialBtn, approveLoading && { opacity: 0.7 }]}
+              onPress={() => handleApprove("partially_approved")}
+              disabled={approveLoading}
+            >
+              <Text style={styles.buttonText}>Restore as Partial</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {hasAccess && (
+          <TouchableOpacity
+            style={styles.withdrawBtn}
+            onPress={handleWithdraw}
+            disabled={approveLoading}
+          >
+            <Text style={styles.withdrawBtnText}>Mark as Withdrawn</Text>
+          </TouchableOpacity>
+        )}
+
+        {hasAccess && (
           <TouchableOpacity
             style={styles.viewCodeBtn}
             onPress={async () => {
@@ -582,7 +708,7 @@ export default function RegistrantDetails() {
           </TouchableOpacity>
         )}
 
-        {!isAlreadyApproved && verification?.verificationNotes && (
+        {status === "rejected" && (
           <View style={styles.rejectedSection}>
             <View style={styles.rejectionNotesBox}>
               <View style={styles.rejectionNotesHeader}>
@@ -668,14 +794,14 @@ export default function RegistrantDetails() {
         >
           <View style={styles.sheetHandle} />
           <View style={styles.sheetHeader}>
-            <Text style={styles.sheetTitle}>Proof of Payment</Text>
+            <Text style={styles.sheetTitle}>{previewTitle}</Text>
             <TouchableOpacity onPress={closeSheet}>
               <Ionicons name="close" size={24} color="#333" />
             </TouchableOpacity>
           </View>
-          {proofUrl ? (
+          {previewUrl ? (
             <Image
-              source={{ uri: proofUrl }}
+              source={{ uri: previewUrl }}
               style={styles.proofImage}
               resizeMode="contain"
             />
@@ -687,9 +813,27 @@ export default function RegistrantDetails() {
               </Text>
             </View>
           )}
+          {previewTitle === "Graduation or Formal Photo" && previewUrl && (
+            <TouchableOpacity
+              style={[styles.savePhotoBtn, savingPhoto && { opacity: 0.6 }]}
+              onPress={handleSavePhoto}
+              disabled={savingPhoto}
+            >
+              {savingPhoto ? (
+                <ActivityIndicator size="small" color="#2F459B" />
+              ) : (
+                <Ionicons name="download-outline" size={18} color="#2F459B" />
+              )}
+              <Text style={styles.savePhotoText}>
+                {savingPhoto ? "Saving..." : "Save Photo to Gallery"}
+              </Text>
+            </TouchableOpacity>
+          )}
           <TouchableOpacity
             style={styles.openBrowserBtn}
-            onPress={() => proofUrl && WebBrowser.openBrowserAsync(proofUrl)}
+            onPress={() =>
+              previewUrl && WebBrowser.openBrowserAsync(previewUrl)
+            }
           >
             <Ionicons name="open-outline" size={18} color="white" />
             <Text style={styles.openBrowserText}>Open Full Size</Text>
@@ -826,7 +970,38 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: "center",
   },
-  buttonText: { fontWeight: "bold", color: "white" },
+  buttonText: { fontWeight: "bold", color: "white", textAlign: "center" },
+  partialBtn: {
+    backgroundColor: "#2F80ED",
+    width: "48%",
+    padding: 12,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  rejectWideBtn: {
+    backgroundColor: "#e74c3c",
+    padding: 12,
+    borderRadius: 8,
+    alignItems: "center",
+    marginTop: 10,
+  },
+  approveWideBtn: {
+    backgroundColor: "#27ae60",
+    padding: 12,
+    borderRadius: 8,
+    alignItems: "center",
+    marginTop: 24,
+  },
+  withdrawBtn: {
+    borderWidth: 1,
+    borderColor: "#7F8C8D",
+    padding: 12,
+    borderRadius: 8,
+    alignItems: "center",
+    marginTop: 12,
+  },
+  withdrawBtnText: { color: "#7F8C8D", fontWeight: "bold" },
+  balanceSub: { fontSize: 11, color: "#888", marginTop: 2 },
   remarksInput: {
     borderWidth: 1,
     borderColor: "#CCC",
@@ -907,6 +1082,18 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   openBrowserText: { color: "white", fontWeight: "600", fontSize: 14 },
+  savePhotoBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1.5,
+    borderColor: "#2F459B",
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 15,
+    gap: 8,
+  },
+  savePhotoText: { color: "#2F459B", fontWeight: "600", fontSize: 14 },
 
   modalOverlay: {
     flex: 1,

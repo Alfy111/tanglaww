@@ -1,48 +1,50 @@
-const MAX_FAILED_ATTEMPTS = 5;
-const LOCKOUT_DURATION_MS = 3 * 60 * 1000;
-const STORAGE_PREFIX = "tanglaw-login-lockout";
+import { supabase } from "./supabase";
 
-function getStorageKey(role, email) {
-  return `${STORAGE_PREFIX}:${role}:${email.trim().toLowerCase()}`;
+const EMPTY = { failures: 0, lockCount: 0, remainingSeconds: 0 };
+
+export const normalizeEmail = (email) => (email || "").trim().toLowerCase();
+
+export const isWrongPasswordError = (error) =>
+  error?.code === "invalid_credentials" ||
+  /invalid login credentials/i.test(error?.message ?? "");
+
+export const formatRemaining = (seconds) =>
+  `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+
+export async function getLockStatus(email) {
+  if (!normalizeEmail(email)) return EMPTY;
+  const { data, error } = await supabase.rpc("login_lock_status", {
+    p_email: normalizeEmail(email),
+  });
+  return error || !data ? EMPTY : data;
 }
 
-export function getLockoutMessage(remainingMs) {
-  const totalSeconds = Math.ceil(remainingMs / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  const duration = minutes > 0
-    ? `${minutes} minute${minutes === 1 ? "" : "s"}${seconds > 0 ? ` and ${seconds} second${seconds === 1 ? "" : "s"}` : ""}`
-    : `${seconds} second${seconds === 1 ? "" : "s"}`;
-
-  return `You've been temporarily locked out after five unsuccessful sign-in attempts. Please try again in ${duration}. If you need to reset your password, use the “Forgot Password?” link.`;
+export async function recordLoginFailure(email) {
+  const { data, error } = await supabase.rpc("record_login_failure", {
+    p_email: normalizeEmail(email),
+  });
+  return error || !data ? EMPTY : data;
 }
 
-export function getLoginLockout(role, email) {
-  if (!email.trim()) return { attempts: 0, remainingMs: 0 };
-  const storage = window.localStorage;
-  const key = getStorageKey(role, email);
-  const saved = storage.getItem(key);
-  if (!saved) return { attempts: 0, remainingMs: 0 };
+export async function clearLoginFailures() {
+  await supabase.rpc("clear_login_failures");
+}
 
-  const state = JSON.parse(saved);
-  const remainingMs = Math.max(0, (state.lockedUntil ?? 0) - Date.now());
-  if (remainingMs === 0 && state.lockedUntil) {
-    storage.removeItem(key);
-    return { attempts: 0, remainingMs: 0 };
+export function warningFor(status) {
+  if (status.lockMinutes) {
+    return {
+      title: "Sign-in disabled",
+      message: `Too many wrong attempts. Password entry is disabled for ${status.lockMinutes} minutes.`,
+      locked: true,
+    };
   }
-  return { attempts: state.attempts ?? 0, remainingMs };
-}
-
-export function recordFailedLogin(role, email) {
-  const storage = window.localStorage;
-  const current = getLoginLockout(role, email);
-  const attempts = current.attempts + 1;
-  const lockedUntil = attempts >= MAX_FAILED_ATTEMPTS ? Date.now() + LOCKOUT_DURATION_MS : null;
-  storage.setItem(getStorageKey(role, email), JSON.stringify({ attempts, lockedUntil }));
-  return { attempts, remainingMs: lockedUntil ? LOCKOUT_DURATION_MS : 0 };
-}
-
-export function clearFailedLogins(role, email) {
-  if (!email.trim()) return;
-  window.localStorage.removeItem(getStorageKey(role, email));
+  if (status.failures === 4 && status.lockCount === 0) {
+    return {
+      title: "Incorrect password",
+      message:
+        "You have one last attempt. One more wrong password will disable sign-in for 3 minutes.",
+      locked: false,
+    };
+  }
+  return null;
 }

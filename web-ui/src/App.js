@@ -2,8 +2,8 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { applyUserTheme, getUserThemePreference } from "./lib/userTheme";
 import About from "./pages/About";
 import AdminAbout from "./pages/admin/AdminAbout";
-import AdminAnalytics from "./pages/admin/AdminAnalytics";
 import AdminActivate from "./pages/admin/AdminActivate";
+import AdminAnalytics from "./pages/admin/AdminAnalytics";
 import AdminApprovals from "./pages/admin/AdminApprovals";
 import AdminAuditLog from "./pages/admin/AdminAuditLog";
 import AdminAuditQueue from "./pages/admin/AdminAuditQueue";
@@ -13,7 +13,10 @@ import AdminCourses from "./pages/admin/AdminCourses";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminHandouts from "./pages/admin/AdminHandouts";
 import AdminHelp from "./pages/admin/AdminHelp";
+import AdminOnlineSession from "./pages/admin/AdminOnlineSession";
 import AdminPolicies from "./pages/admin/AdminPolicies";
+import AdminQuiz from "./pages/admin/AdminQuiz";
+import AdminQuizEditor from "./pages/admin/AdminQuizEditor";
 import AdminRecordedSessions from "./pages/admin/AdminRecordedSessions";
 import AdminSignIn from "./pages/admin/AdminSignIn";
 import AdminStudentRegistry from "./pages/admin/AdminStudentRegistry";
@@ -43,25 +46,40 @@ export default function App() {
       <Route path="/enroll" element={<Enroll />} />
       <Route path="/signin" element={<SignIn />} />
       <Route path="/forgot-password" element={<PasswordRecovery />} />
-      <Route path="/reset-password" element={<PasswordRecovery isResetPage />} />
+      <Route
+        path="/reset-password"
+        element={<PasswordRecovery isResetPage />}
+      />
       <Route path="/signin/code" element={<SignInWithCode />} />
       <Route path="/dashboard" element={<Dashboard />} />
-      <Route path="/dashboard/Analytics" element={<Analytics />} /> {/* <-- 2. ADD THIS ROUTE */}
+      <Route path="/dashboard/Analytics" element={<Analytics />} />{" "}
+      {/* <-- 2. ADD THIS ROUTE */}
       <Route path="/dashboard/courses" element={<Courses />} />
-      <Route path="/dashboard/courses/:courseId" element={<CourseDetail isAdmin={false} />} />
+      <Route
+        path="/dashboard/courses/:courseId"
+        element={<CourseDetail isAdmin={false} />}
+      />
       <Route path="/dashboard/calendar" element={<Calendar />} />
       <Route path="/dashboard/profile" element={<Profile />} />
       <Route path="/dashboard/about" element={<About />} />
       <Route path="/dashboard/help" element={<Help />} />
       <Route path="/dashboard/terms" element={<Terms />} />
       <Route path="/dashboard/settings" element={<Settings />} />
-      <Route path="/dashboard/settings/change-password" element={<ChangePassword />} />
-   
+      <Route
+        path="/dashboard/settings/change-password"
+        element={<ChangePassword />}
+      />
       <Route path="/dashboard/notifications" element={<Notifications />} />
       <Route path="/admin/signin" element={<AdminSignIn />} />
       <Route path="/admin/activate" element={<AdminActivate />} />
-      <Route path="/admin/forgot-password" element={<PasswordRecovery isAdmin />} />
-      <Route path="/admin/reset-password" element={<PasswordRecovery isAdmin isResetPage />} />
+      <Route
+        path="/admin/forgot-password"
+        element={<PasswordRecovery isAdmin />}
+      />
+      <Route
+        path="/admin/reset-password"
+        element={<PasswordRecovery isAdmin isResetPage />}
+      />
       <Route path="/admin/dashboard" element={<AdminDashboard />} />
       <Route path="/admin/approvals" element={<AdminApprovals />} />
       <Route path="/admin/audit-queue" element={<AdminAuditQueue />} />
@@ -74,11 +92,26 @@ export default function App() {
       <Route path="/admin/help" element={<AdminHelp />} />
       <Route path="/admin/policies" element={<AdminPolicies />} />
       <Route path="/admin/audit-log" element={<AdminAuditLog />} />
-      <Route path="/admin/courses/:courseId/handouts" element={<AdminHandouts />} />
+      <Route
+        path="/admin/courses/:courseId/handouts"
+        element={<AdminHandouts />}
+      />
       <Route path="/our-courses" element={<Navigate to="/#courses" replace />} />
       <Route path="/about-us" element={<Navigate to="/#about" replace />} />
       <Route path="/helpdesk" element={<Navigate to="/#helpdesk" replace />} />
-      <Route path="/admin/courses/:courseId/recorded-sessions" element={<AdminRecordedSessions />} />
+      <Route
+        path="/admin/courses/:courseId/recorded-sessions"
+        element={<AdminRecordedSessions />}
+      />
+      <Route path="/admin/courses/:courseId/quiz" element={<AdminQuiz />} />
+      <Route
+        path="/admin/courses/:courseId/quiz/:assessmentId"
+        element={<AdminQuizEditor />}
+      />
+      <Route
+        path="/admin/courses/:courseId/online-session"
+        element={<AdminOnlineSession />}
+      />
     </Routes>
   );
 }

@@ -43,6 +43,14 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow Tanglaw to save student photos.",
+          "savePhotosPermission": "Allow Tanglaw to save student photos to your gallery.",
+          "isAccessMediaLocationEnabled": false
+        }
+      ],
       "expo-router",
       [
         "expo-splash-screen",

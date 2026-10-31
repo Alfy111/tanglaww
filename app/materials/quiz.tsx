@@ -53,13 +53,32 @@ const formatScore = (n: number) => String(Number(n.toFixed(2)));
 
 export default function QuizScreen() {
   const router = useRouter();
-  const { courseId: courseIdParam, courseTitle = "Course" } =
-    useLocalSearchParams<{ courseId: string; courseTitle: string }>();
+  const {
+    courseId: courseIdParam,
+    courseTitle = "Course",
+    diagnostic,
+  } = useLocalSearchParams<{
+    courseId: string;
+    courseTitle: string;
+    diagnostic?: string;
+  }>();
   const courseId = Number(courseIdParam);
+  const isDiagnostic = diagnostic === "1";
   const { isAdmin, isStudent, authLoading } = useAdmin();
 
   const [quizzes, setQuizzes] = useState<QuizRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [diagnosticModuleId, setDiagnosticModuleId] = useState<number | null>(
+    null,
+  );
+
+  const getDiagnosticModuleId = async (): Promise<number | null> => {
+    const { data } = await supabase.rpc("get_diagnostic_quiz");
+    return (data as any)?.module_id ?? null;
+  };
+
+  const keepRow = (moduleId: number, diagModuleId: number | null) =>
+    isDiagnostic ? moduleId === diagModuleId : moduleId !== diagModuleId;
 
   const fetchAdminQuizzes = async (): Promise<QuizRow[]> => {
     const { data, error } = await supabase
@@ -112,14 +131,18 @@ export default function QuizScreen() {
   const fetchQuizzes = useCallback(async () => {
     setLoading(true);
     if (authLoading) return;
-    const rows = isAdmin
-      ? await fetchAdminQuizzes()
-      : isStudent
-        ? await fetchStudentQuizzes()
-        : [];
-    setQuizzes(rows);
+    const [rows, diagModuleId] = await Promise.all([
+      isAdmin
+        ? fetchAdminQuizzes()
+        : isStudent
+          ? fetchStudentQuizzes()
+          : Promise.resolve([] as QuizRow[]),
+      getDiagnosticModuleId(),
+    ]);
+    setQuizzes(rows.filter((r) => keepRow(r.module_id, diagModuleId)));
+    setDiagnosticModuleId(diagModuleId);
     setLoading(false);
-  }, [courseId, isAdmin, isStudent, authLoading]);
+  }, [courseId, isAdmin, isStudent, authLoading, isDiagnostic]);
 
   useFocusEffect(
     useCallback(() => {
@@ -134,6 +157,9 @@ export default function QuizScreen() {
         courseId: String(courseId),
         courseTitle,
         ...(assessmentId ? { assessmentId: String(assessmentId) } : {}),
+        ...(isDiagnostic && diagnosticModuleId
+          ? { diagnostic: "1", moduleId: String(diagnosticModuleId) }
+          : {}),
       },
     });
   };
@@ -230,7 +256,7 @@ export default function QuizScreen() {
 
       <View style={styles.courseLabelWrap}>
         <Text style={styles.courseLabel}>{courseTitle}</Text>
-        <Text style={styles.courseSub}>Quizzes</Text>
+        {!isDiagnostic && <Text style={styles.courseSub}>Quizzes</Text>}
       </View>
 
       {loading ? (

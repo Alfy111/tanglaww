@@ -2,6 +2,7 @@ import { supabase } from "../lib/supabase";
 
 export type AuditAction =
   | "admin_approved_enrollment"
+  | "admin_partially_approved_enrollment"
   | "admin_rejected_enrollment"
   | "admin_generated_code"
   | "admin_unlocked_course_single"

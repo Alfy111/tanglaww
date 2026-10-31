@@ -1,234 +1,392 @@
+import { Eye, EyeOff } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import Navbar from "../components/Navbar";
-import { supabase } from "../lib/supabase";
+import { normalizeEmail } from "../lib/loginLockout";
+import {
+  passwordProblems,
+  resetPasswordWithCode,
+  sendResetCode,
+} from "../lib/passwordReset";
 import "./SignIn.css";
 
-const PASSWORD_RULES = [
-  { test: (password) => password.length >= 8, message: "Password must be at least 8 characters." },
-  { test: (password) => /[0-9]/.test(password), message: "Password must contain at least one number." },
-  { test: (password) => /[a-z]/.test(password), message: "Password must contain at least one lowercase letter." },
-  { test: (password) => /[A-Z]/.test(password), message: "Password must contain at least one uppercase letter." },
-  { test: (password) => [...password].some((character) => "!@#$%^&*()_+-=[]{};':\"\\|,.<>/?".includes(character)), message: "Password must contain at least one special character." },
-];
+const RESEND_SECONDS = 60;
 
-export default function PasswordRecovery({ isAdmin = false, isResetPage = false }) {
+export default function PasswordRecovery({
+  isAdmin = false,
+  isResetPage = false,
+}) {
   const navigate = useNavigate();
-  const [email, setEmail] = useState("");
+  const [searchParams] = useSearchParams();
+  const [email, setEmail] = useState(searchParams.get("email") ?? "");
+  const [code, setCode] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [step, setStep] = useState(isResetPage ? "checking" : "email");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [step, setStep] = useState("email");
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState("");
   const [errors, setErrors] = useState([]);
+  const [resendIn, setResendIn] = useState(0);
   const signInPath = isAdmin ? "/admin/signin" : "/signin";
   const forgotPath = isAdmin ? "/admin/forgot-password" : "/forgot-password";
   const title = isAdmin ? "Admin Password" : "Password";
 
   useEffect(() => {
-    if (!isResetPage) return undefined;
+    if (isResetPage) navigate(forgotPath, { replace: true });
+  }, [isResetPage, forgotPath, navigate]);
 
-    let active = true;
-    const search = new URLSearchParams(window.location.search);
-    const hash = new URLSearchParams(window.location.hash.slice(1));
-    const hasRecoveryLink = search.get("flow") === "password-reset"
-      || search.has("code")
-      || hash.get("type") === "recovery"
-      || (hash.has("access_token") && hash.has("refresh_token"));
+  const counting = resendIn > 0;
+  useEffect(() => {
+    if (!counting) return undefined;
+    const timer = window.setInterval(
+      () => setResendIn((s) => Math.max(0, s - 1)),
+      1000,
+    );
+    return () => window.clearInterval(timer);
+  }, [counting]);
 
-    const verifyAccount = async (session) => {
-      if (!session?.user || !hasRecoveryLink) return;
-
-      const { data, error } = isAdmin
-        ? await supabase.from("admin").select("admin_id").eq("admin_id", session.user.id).maybeSingle()
-        : await supabase.from("student").select("id, isAccountSetup").eq("email", session.user.email?.toLowerCase()).maybeSingle();
-
-      if (!active) return;
-      if (error) {
-        setStep("error");
-        setMessage(`Unable to verify your account: ${error.message}`);
-      } else if (!data || (!isAdmin && !data.isAccountSetup)) {
-        setStep("error");
-        setMessage("This reset link is not valid for this account. Request a new link from the correct sign-in page.");
-      } else {
-        setStep("ready");
-      }
-    };
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "PASSWORD_RECOVERY") void verifyAccount(session);
-    });
-
-    supabase.auth.getSession().then(({ data: { session }, error }) => {
-      if (!active) return;
-      if (error) {
-        setStep("error");
-        setMessage(`Unable to verify the reset link: ${error.message}`);
-      } else if (session && hasRecoveryLink) {
-        void verifyAccount(session);
-      } else if (!hasRecoveryLink) {
-        setStep("error");
-        setMessage("This reset link is missing or invalid. Please request a new password reset link.");
-      } else {
-        setStep("error");
-        setMessage("This reset link has expired or could not be verified. Please request a new one.");
-      }
-    });
-
-    return () => {
-      active = false;
-      subscription.unsubscribe();
-    };
-  }, [isAdmin, isResetPage]);
-
-  const handleSendReset = async (event) => {
-    event.preventDefault();
-    const normalizedEmail = email.trim().toLowerCase();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
-      setErrors(["Please enter a valid email address."]);
-      return;
-    }
-
+  const sendCode = async () => {
     setErrors([]);
-    setMessage("");
     setLoading(true);
     try {
-      if (isAdmin) {
-        const { data: admin, error: adminError } = await supabase
-          .from("admin").select("admin_id").eq("email", normalizedEmail).maybeSingle();
-        if (adminError) throw new Error(adminError.message);
-        if (!admin) throw new Error("No administrator account was found with that email address.");
-      } else {
-        const { data: student, error: studentError } = await supabase
-          .from("student").select("id, isAccountSetup").eq("email", normalizedEmail).maybeSingle();
-        if (studentError) throw new Error(studentError.message);
-        if (!student) throw new Error("No student account was found with that email address.");
-        if (!student.isAccountSetup) {
-          throw new Error("This account has not been activated yet. Please use your activation code first.");
-        }
-      }
-
-      const redirectPath = isAdmin ? "/admin/reset-password" : "/reset-password";
-      const redirectTo = new URL(redirectPath, window.location.origin);
-      redirectTo.searchParams.set("flow", "password-reset");
-      const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
-        redirectTo: redirectTo.toString(),
-      });
-      if (error) throw new Error(error.message);
-      setStep("sent");
+      await sendResetCode(email);
+      setStep("code");
+      setResendIn(RESEND_SECONDS);
     } catch (error) {
-      setErrors([error.message || "Unable to send the reset email. Please try again."]);
+      setErrors([
+        error.message || "Unable to send the reset code. Please try again.",
+      ]);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleUpdatePassword = async (event) => {
+  const handleSendCode = (event) => {
     event.preventDefault();
-    const newErrors = PASSWORD_RULES.filter((rule) => !rule.test(password)).map((rule) => rule.message);
-    if (password !== confirmPassword) newErrors.push("Passwords do not match.");
-    if (newErrors.length > 0) {
-      setErrors(newErrors);
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizeEmail(email))) {
+      setErrors(["Please enter a valid email address."]);
       return;
     }
+    sendCode();
+  };
 
+  const handleReset = async (event) => {
+    event.preventDefault();
+    const problems = [];
+    if (!/^\d{6}$/.test(code))
+      problems.push("Enter the 6-digit code from your email.");
+    problems.push(...passwordProblems(password, confirmPassword));
+    if (problems.length > 0) {
+      setErrors(problems);
+      return;
+    }
     setErrors([]);
     setLoading(true);
     try {
-      const { error } = await supabase.auth.updateUser({ password });
-      if (error) throw new Error(error.message);
+      await resetPasswordWithCode(email, code, password);
       setStep("success");
     } catch (error) {
-      setErrors([error.message || "Unable to update your password. Please try again."]);
+      setErrors(
+        (
+          error.message || "Unable to update your password. Please try again."
+        ).split("\n"),
+      );
     } finally {
       setLoading(false);
     }
   };
 
   const inputStyle = {
-    width: "100%", padding: "12px 14px", borderRadius: "8px",
-    border: "1px solid #ccc", fontSize: "14px",
-    fontFamily: "Poppins, sans-serif", boxSizing: "border-box",
-    marginTop: "6px", outline: "none",
+    width: "100%",
+    padding: "12px 14px",
+    borderRadius: "8px",
+    border: "1px solid #ccc",
+    fontSize: "14px",
+    fontFamily: "Poppins, sans-serif",
+    boxSizing: "border-box",
+    marginTop: "6px",
+    outline: "none",
+  };
+  const labelStyle = {
+    display: "block",
+    marginTop: "16px",
+    fontSize: "13px",
+    fontWeight: "600",
+    color: "#222",
+  };
+  const linkButton = {
+    border: 0,
+    padding: 0,
+    background: "none",
+    color: "#1a1a6e",
+    fontWeight: "700",
+    cursor: "pointer",
+    font: "inherit",
+  };
+
+  const buttonStyle = {
+    width: "100%",
+    padding: "14px",
+    backgroundColor: isAdmin ? "#f5a623" : "#1a1a6e",
+    color: isAdmin ? "#1a1a2e" : "#fff",
+    border: "none",
+    borderRadius: "8px",
+    fontSize: "15px",
+    fontWeight: "700",
+    cursor: loading ? "not-allowed" : "pointer",
+    fontFamily: "Poppins, sans-serif",
+    marginTop: "20px",
+    opacity: loading ? 0.7 : 1,
   };
 
   const renderErrors = errors.length > 0 && (
-    <div role="alert" style={{ backgroundColor: "#fff5f5", border: "1px solid #e53935", borderRadius: "8px", padding: "12px 16px", marginBottom: "16px" }}>
-      {errors.map((error) => <p key={error} style={{ color: "#c0392b", fontSize: "13px", margin: "2px 0" }}>{error}</p>)}
+    <div
+      role="alert"
+      style={{
+        backgroundColor: "#fff5f5",
+        border: "1px solid #e53935",
+        borderRadius: "8px",
+        padding: "12px 16px",
+        marginBottom: "16px",
+      }}
+    >
+      {errors.map((error) => (
+        <p
+          key={error}
+          style={{ color: "#c0392b", fontSize: "13px", margin: "2px 0" }}
+        >
+          {errors.length > 1 ? `• ${error}` : error}
+        </p>
+      ))}
     </div>
   );
 
-  const buttonStyle = {
-    width: "100%", padding: "14px", backgroundColor: isAdmin ? "#f5a623" : "#1a1a6e",
-    color: isAdmin ? "#1a1a2e" : "#fff", border: "none", borderRadius: "8px",
-    fontSize: "15px", fontWeight: "700", cursor: loading ? "not-allowed" : "pointer",
-    fontFamily: "Poppins, sans-serif", marginTop: "20px", opacity: loading ? 0.7 : 1,
-  };
+  const passwordInput = (id, label, value, setValue, visible, setVisible) => (
+    <>
+      <label htmlFor={id} style={labelStyle}>
+        {label}
+      </label>
+      <div style={{ position: "relative" }}>
+        <input
+          id={id}
+          type={visible ? "text" : "password"}
+          autoComplete="new-password"
+          value={value}
+          onChange={(event) => setValue(event.target.value)}
+          style={{ ...inputStyle, paddingRight: "44px" }}
+        />
+        <button
+          type="button"
+          aria-label={visible ? "Hide password" : "Show password"}
+          onClick={() => setVisible(!visible)}
+          style={{
+            position: "absolute",
+            right: "10px",
+            top: "50%",
+            transform: "translateY(-50%)",
+            display: "flex",
+            alignItems: "center",
+            padding: "4px",
+            color: "#707782",
+            border: 0,
+            background: "transparent",
+            cursor: "pointer",
+          }}
+        >
+          {visible ? <EyeOff size={18} /> : <Eye size={18} />}
+        </button>
+      </div>
+    </>
+  );
+
+  const subtitle = {
+    email:
+      "Enter the email address linked to your account and we'll send you a 6-digit reset code.",
+    code: "Enter the code we emailed you, then choose a new password.",
+    success:
+      "Your password has been updated. You can now sign in with your new password.",
+  }[step];
 
   return (
     <div className="auth-page">
       <Navbar brandOnly />
-      <main style={{ width: "100%", maxWidth: "480px", margin: "0 auto", backgroundColor: "#fff", borderRadius: "12px", boxShadow: "0 4px 20px rgba(0,0,0,0.1)", padding: "40px", boxSizing: "border-box" }}>
+      <main
+        style={{
+          width: "100%",
+          maxWidth: "480px",
+          margin: "0 auto",
+          backgroundColor: "#fff",
+          borderRadius: "12px",
+          boxShadow: "0 4px 20px rgba(0,0,0,0.1)",
+          padding: "40px",
+          boxSizing: "border-box",
+        }}
+      >
         <div style={{ textAlign: "center", marginBottom: "28px" }}>
-          {isAdmin && <div style={{ display: "inline-block", backgroundColor: "#fff8e1", color: "#f5a623", fontWeight: "700", fontSize: "12px", padding: "4px 14px", borderRadius: "20px", border: "1px solid #f5a623", marginBottom: "12px" }}>ADMIN PORTAL</div>}
-          <h1 style={{ fontSize: "25px", fontWeight: "700", color: "#1a1a6e", margin: "0 0 8px" }}>
-            {isResetPage ? `Reset ${title.toLowerCase()}` : `Forgot ${title.toLowerCase()}?`}
+          {isAdmin && (
+            <div
+              style={{
+                display: "inline-block",
+                backgroundColor: "#fff8e1",
+                color: "#f5a623",
+                fontWeight: "700",
+                fontSize: "12px",
+                padding: "4px 14px",
+                borderRadius: "20px",
+                border: "1px solid #f5a623",
+                marginBottom: "12px",
+              }}
+            >
+              ADMIN PORTAL
+            </div>
+          )}
+          <h1
+            style={{
+              fontSize: "25px",
+              fontWeight: "700",
+              color: "#1a1a6e",
+              margin: "0 0 8px",
+            }}
+          >
+            {step === "success"
+              ? "Password updated"
+              : step === "code"
+                ? `Reset ${title.toLowerCase()}`
+                : `Forgot ${title.toLowerCase()}?`}
           </h1>
           <p style={{ fontSize: "13px", color: "#777", lineHeight: 1.6 }}>
-            {isResetPage
-              ? step === "checking" ? "Verifying your password reset link..." : "Choose a new password for your account."
-              : "Enter the email address linked to your account and we'll send you a password reset link."}
+            {subtitle}
           </p>
         </div>
 
         {renderErrors}
 
-        {!isResetPage && step === "email" && (
-          <form onSubmit={handleSendReset}>
-            <label htmlFor="recovery-email" style={{ fontSize: "13px", fontWeight: "600", color: "#222" }}>Email address</label>
-            <input id="recovery-email" type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" style={inputStyle} />
-            <button type="submit" disabled={loading} style={buttonStyle}>{loading ? "Sending..." : "Send reset link"}</button>
+        {step === "email" && (
+          <form onSubmit={handleSendCode}>
+            <label
+              htmlFor="recovery-email"
+              style={{ fontSize: "13px", fontWeight: "600", color: "#222" }}
+            >
+              Email address
+            </label>
+            <input
+              id="recovery-email"
+              type="email"
+              autoComplete="email"
+              value={email}
+              onChange={(event) => {
+                setEmail(event.target.value);
+                setErrors([]);
+              }}
+              placeholder="you@example.com"
+              style={inputStyle}
+            />
+            <button type="submit" disabled={loading} style={buttonStyle}>
+              {loading ? "Sending..." : "Send reset code"}
+            </button>
           </form>
         )}
 
-        {!isResetPage && step === "sent" && (
-          <div role="status" style={{ textAlign: "center", color: "#555" }}>
-            <p>If the address is associated with an account, a password reset email has been sent.</p>
-            <p>Please check your inbox and follow the link to choose a new password.</p>
-          </div>
-        )}
-
-        {isResetPage && step === "checking" && (
-          <p role="status" style={{ textAlign: "center", color: "#777" }}>Please wait while we verify your reset link.</p>
-        )}
-
-        {isResetPage && step === "ready" && (
-          <form onSubmit={handleUpdatePassword}>
-            <label htmlFor="new-password" style={{ fontSize: "13px", fontWeight: "600", color: "#222" }}>New password</label>
-            <input id="new-password" type="password" autoComplete="new-password" required value={password} onChange={(event) => setPassword(event.target.value)} style={inputStyle} />
-            <label htmlFor="confirm-password" style={{ display: "block", marginTop: "16px", fontSize: "13px", fontWeight: "600", color: "#222" }}>Confirm new password</label>
-            <input id="confirm-password" type="password" autoComplete="new-password" required value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} style={inputStyle} />
-            <button type="submit" disabled={loading} style={buttonStyle}>{loading ? "Updating..." : "Update password"}</button>
+        {step === "code" && (
+          <form onSubmit={handleReset}>
+            <p
+              style={{
+                fontSize: "13px",
+                color: "#555",
+                textAlign: "center",
+                margin: "0 0 4px",
+              }}
+            >
+              If an account exists, we sent a code to{" "}
+              <strong>{normalizeEmail(email)}</strong>. It expires in 15
+              minutes.
+            </p>
+            <label htmlFor="reset-code" style={labelStyle}>
+              6-digit reset code
+            </label>
+            <input
+              id="reset-code"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              maxLength={6}
+              value={code}
+              onChange={(event) => {
+                setCode(event.target.value.replace(/\D/g, "").slice(0, 6));
+                setErrors([]);
+              }}
+              placeholder="Enter code"
+              style={{ ...inputStyle, letterSpacing: "0.3em" }}
+            />
+            {passwordInput(
+              "new-password",
+              "New password",
+              password,
+              setPassword,
+              showPassword,
+              setShowPassword,
+            )}
+            {passwordInput(
+              "confirm-password",
+              "Confirm new password",
+              confirmPassword,
+              setConfirmPassword,
+              showConfirm,
+              setShowConfirm,
+            )}
+            <p style={{ color: "#777", fontSize: "12px", lineHeight: 1.5 }}>
+              At least 8 characters with an uppercase letter, a lowercase
+              letter, a number, and a special character.
+            </p>
+            <button type="submit" disabled={loading} style={buttonStyle}>
+              {loading ? "Updating..." : "Reset password"}
+            </button>
+            <p
+              style={{
+                textAlign: "center",
+                fontSize: "13px",
+                marginTop: "16px",
+              }}
+            >
+              {resendIn > 0 ? (
+                <span style={{ color: "#999" }}>
+                  Resend code in {resendIn}s
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={sendCode}
+                  disabled={loading}
+                  style={linkButton}
+                >
+                  Resend code
+                </button>
+              )}
+              {" · "}
+              <button
+                type="button"
+                onClick={() => {
+                  setStep("email");
+                  setErrors([]);
+                }}
+                style={linkButton}
+              >
+                Change email
+              </button>
+            </p>
           </form>
         )}
 
-        {isResetPage && step === "error" && (
-          <div role="alert" style={{ textAlign: "center", color: "#b42318", fontSize: "14px" }}>{message}</div>
-        )}
-
-        {isResetPage && step === "success" && (
-          <div role="status" style={{ textAlign: "center", color: "#286b3a", fontSize: "14px" }}>
-            Your password has been updated successfully.
-          </div>
-        )}
-
-        <div style={{ textAlign: "center", marginTop: "24px", fontSize: "13px" }}>
-          <button type="button" onClick={() => navigate(signInPath)} style={{ border: 0, padding: 0, background: "none", color: "#1a1a6e", fontWeight: "700", cursor: "pointer", font: "inherit" }}>
-            {isResetPage && step !== "success" ? `Back to ${isAdmin ? "admin " : ""}sign in` : "Back to sign in"}
+        <div
+          style={{ textAlign: "center", marginTop: "24px", fontSize: "13px" }}
+        >
+          <button
+            type="button"
+            onClick={() => navigate(signInPath)}
+            style={linkButton}
+          >
+            Back to {isAdmin ? "admin " : ""}sign in
           </button>
-          {isResetPage && step === "error" && (
-            <span> · <button type="button" onClick={() => navigate(forgotPath)} style={{ border: 0, padding: 0, background: "none", color: "#1a1a6e", fontWeight: "700", cursor: "pointer", font: "inherit" }}>Request a new link</button></span>
-          )}
         </div>
       </main>
     </div>

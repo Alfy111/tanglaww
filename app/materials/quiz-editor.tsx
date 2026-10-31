@@ -170,7 +170,9 @@ export default function QuizEditorScreen() {
     courseTitle: string;
     assessmentId?: string;
     moduleId?: string;
+    diagnostic?: string;
   }>();
+  const isDiagnostic = params.diagnostic === "1";
   const courseId = Number(params.courseId);
   const assessmentId = params.assessmentId ? Number(params.assessmentId) : null;
 
@@ -216,6 +218,7 @@ export default function QuizEditorScreen() {
           .from("module")
           .select("module_id, moduleName")
           .eq("course_id", courseId)
+          .eq("is_diagnostic", isDiagnostic)
           .order("module_id"),
         supabase
           .from("topic")
@@ -506,7 +509,6 @@ export default function QuizEditorScreen() {
           <TextInput
             style={styles.input}
             placeholder="Title of quiz"
-            placeholderTextColor="#9AA0A6"
             value={title}
             onChangeText={setTitle}
           />
@@ -515,7 +517,6 @@ export default function QuizEditorScreen() {
           <TextInput
             style={[styles.input, styles.multiline]}
             placeholder="Instructions for students"
-            placeholderTextColor="#9AA0A6"
             value={instructions}
             onChangeText={setInstructions}
             multiline
@@ -605,7 +606,6 @@ export default function QuizEditorScreen() {
               <TextInput
                 style={styles.input}
                 placeholder={`0 - ${totalPoints}`}
-                placeholderTextColor="#9AA0A6"
                 value={passingScore}
                 onChangeText={setPassingScore}
                 keyboardType="number-pad"
@@ -618,7 +618,6 @@ export default function QuizEditorScreen() {
           <TextInput
             style={styles.input}
             placeholder="Leave empty for no time limit"
-            placeholderTextColor="#9AA0A6"
             value={timeLimit}
             onChangeText={setTimeLimit}
             keyboardType="number-pad"

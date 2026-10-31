@@ -12,6 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import DiagnosticCard from "../../components/DiagnosticCard";
 import { supabase } from "../../lib/supabase";
 import { getModulesByCourse } from "../../services/materialService";
 import AdminHamburger from "./hamburger";
@@ -139,19 +140,11 @@ const CourseCard = React.memo(
               <Text style={styles.dropText}>Quiz</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={styles.dropItem}
+              style={[styles.dropItem, { borderBottomWidth: 0 }]}
               onPress={() => navigateTo("session-links")}
             >
               <Ionicons name="share-outline" size={20} color="#2F459B" />
               <Text style={styles.dropText}>Online Session Link</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.dropItem, { borderBottomWidth: 0 }]}
-            >
-              <Ionicons name="add-circle-outline" size={20} color="#BDC3C7" />
-              <Text style={[styles.dropText, { color: "#BDC3C7" }]}>
-                Add new section
-              </Text>
             </TouchableOpacity>
           </View>
         )}
@@ -244,6 +237,7 @@ export default function AdminCourses() {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
+          <DiagnosticCard isAdmin />
           {courses.map((course) => (
             <CourseCard
               key={course.course_id}
