@@ -7,6 +7,9 @@
     "icon": "./assets/icons/ios-dark.png",
     "scheme": "tanglaw",
     "userInterfaceStyle": "light",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "ios": {
       "bundleIdentifier": "com.tanglaw.tarc",
       "supportsTablet": true,
@@ -34,7 +37,10 @@
               "scheme": "tanglaw"
             }
           ],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ]
     },
@@ -52,6 +58,7 @@
         }
       ],
       "expo-router",
+      "expo-updates",
       [
         "expo-splash-screen",
         {
@@ -85,8 +92,12 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "fceed51d-e69c-4535-87d0-3d3f4ca511e5"
+        "projectId": "ae6c9ab0-c2e0-404d-a32c-af6761d04427"
       }
+    },
+    "owner": "alffeee",
+    "updates": {
+      "url": "https://u.expo.dev/ae6c9ab0-c2e0-404d-a32c-af6761d04427"
     }
   }
 }
