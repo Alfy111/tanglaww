@@ -1680,20 +1680,55 @@ html {
   }
 
   .landing-hero {
-    min-height: 560px;
-    background-position: 58% center;
+    min-height: max(600px, calc(100vh - 120px));
+    min-height: max(600px, calc(100svh - 120px));
+    align-items: flex-start;
+    padding: 180px 0 30px;
+    background-color: var(--navy-dark);
+    background-position: center top;
+    background-repeat: no-repeat;
+    background-size: 100% 220px;
   }
 
   .landing-hero::before {
-    background: linear-gradient(90deg, rgba(16, 35, 111, .98) 0%, rgba(16, 35, 111, .9) 54%, rgba(16, 35, 111, .45) 100%);
+    inset: 0 0 auto;
+    height: 220px;
+    background: linear-gradient(to top, #0e2069 0%, rgba(14, 32, 105, .94) 27%, rgba(14, 32, 105, .4) 65%, rgba(14, 32, 105, .08) 100%);
   }
 
   .hero-inner h1 {
-    font-size: clamp(40px, 10vw, 54px);
+    font-size: clamp(32px, 9.2vw, 36px);
   }
 
   .hero-description {
     max-width: 400px;
+  }
+
+  .hero-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .hero-actions .landing-button {
+    width: 100%;
+  }
+
+  .hero-stats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .hero-stats div {
+    min-width: 0;
+  }
+
+  .hero-stats span {
+    width: auto;
+    height: 42px;
+    display: block;
+    line-height: 1.15;
+    font-size: 9px;
   }
 
   .journey-section,
@@ -1711,23 +1746,20 @@ html {
   }
 
   .journey-step:not(:last-child)::after {
-    top: 42px;
-    bottom: -22px;
-    left: 20px;
-    width: 0;
-    height: calc(100% + 22px);
-    border-top: 0;
-    border-left: 1px dashed #d1d8ed;
-    transform: scaleY(0);
-    transform-origin: top center;
+    top: 19px;
+    left: 54px;
+    width: calc(100% - 54px);
+    height: 0;
+    transform: scaleX(0);
+    transform-origin: left center;
   }
 
   .journey-steps-visible .journey-step:first-child::after {
-    animation-name: journey-path-draw-vertical;
+    animation-name: journey-path-draw;
   }
 
   .journey-steps-visible .journey-step:nth-child(2)::after {
-    animation-name: journey-path-draw-vertical;
+    animation-name: journey-path-draw;
   }
 
   .journey-step h3 {
@@ -1809,24 +1841,15 @@ html {
   }
 
   .landing-hero {
-    min-height: 540px;
-    padding: 46px 0;
+    padding: 180px 0 30px;
   }
 
   .hero-inner h1 {
-    font-size: 42px;
-  }
-
-  .hero-stats {
-    gap: 18px;
-  }
-
-  .hero-stats div {
-    min-width: 78px;
+    font-size: clamp(24px, 9.2vw, 36px);
   }
 
   .hero-stats strong {
-    font-size: 18px;
+    font-size: 16px;
   }
 
   .section-title {
@@ -1863,11 +1886,6 @@ html {
   .journey-step h3,
   .journey-step p {
     opacity: 1;
-    transform: none;
-    animation: none;
-  }
-
-  .journey-step:not(:last-child)::after {
     transform: none;
     animation: none;
   }

@@ -177,6 +177,20 @@
     height: 42px;
   }
 
+  .landing-navbar .landing-brand {
+    order: 0;
+  }
+
+  .landing-navbar .btn-signin {
+    order: 1;
+    margin-left: auto;
+  }
+
+  .landing-navbar .nav-menu-toggle {
+    order: 2;
+    margin-left: 8px;
+  }
+
   .landing-navbar .nav-links {
     margin: 8px -16px 0;
     padding: 8px 20px 10px;
