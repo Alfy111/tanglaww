@@ -3,13 +3,13 @@ import { useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
 import QuizLayout, {
-    QUIZ_COLORS as C,
-    TYPE_LABELS,
-    cardText,
-    cardTitle,
-    formatDuration,
-    formatScore,
-    quizCard,
+  QUIZ_COLORS as C,
+  TYPE_LABELS,
+  cardText,
+  cardTitle,
+  formatDuration,
+  formatScore,
+  quizCard,
 } from "./QuizLayout";
 
 const answerValue = { fontSize: "14px", color: C.text, margin: "2px 0 4px" };
@@ -135,17 +135,40 @@ export default function QuizReview() {
               )}
             </div>
 
-            <p
-              style={{
-                fontSize: "15px",
-                color: C.text,
-                margin: "12px 0",
-                whiteSpace: "pre-wrap",
-                lineHeight: 1.5,
-              }}
-            >
-              {q.questionText}
-            </p>
+            {q.questionText && (
+              <p
+                style={{
+                  fontSize: "15px",
+                  color: C.text,
+                  margin: "12px 0",
+                  whiteSpace: "pre-wrap",
+                  lineHeight: 1.5,
+                }}
+              >
+                {q.questionText}
+              </p>
+            )}
+            {q.imageUrl && (
+              <a
+                href={q.imageUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Open full size"
+                style={{ display: "block", margin: "12px 0" }}
+              >
+                <img
+                  src={q.imageUrl}
+                  alt={`Question ${i + 1}`}
+                  style={{
+                    display: "block",
+                    maxWidth: "100%",
+                    maxHeight: "360px",
+                    borderRadius: "8px",
+                    border: "1px solid #E5E8EE",
+                  }}
+                />
+              </a>
+            )}
 
             {q.questionType === "mcq" &&
               (q.choices ?? []).map((c, ci) => {
@@ -189,8 +212,28 @@ export default function QuizReview() {
                     >
                       {String.fromCharCode(65 + ci)}
                     </span>
-                    <span style={{ flex: 1, fontSize: "14px", color: C.text }}>
+                    <span
+                      style={{
+                        flex: 1,
+                        fontSize: "14px",
+                        color: C.text,
+                        minWidth: 0,
+                      }}
+                    >
                       {c.choiceText}
+                      {c.imageUrl && (
+                        <img
+                          src={c.imageUrl}
+                          alt={`Choice ${String.fromCharCode(65 + ci)}`}
+                          style={{
+                            display: "block",
+                            maxWidth: "100%",
+                            maxHeight: "180px",
+                            marginTop: c.choiceText ? "6px" : 0,
+                            borderRadius: "6px",
+                          }}
+                        />
+                      )}
                     </span>
                     {picked && (
                       <span

@@ -3,13 +3,14 @@ import {
     Check,
     ChevronDown,
     ChevronUp,
+    ImagePlus,
     Lock,
     Plus,
     Trash2,
     X,
     XCircle,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import AdminSidebar from "../../components/admin/AdminSidebar";
 import AdminTopbar from "../../components/admin/AdminTopbar";
@@ -42,9 +43,11 @@ const emptyQuestion = () => ({
   questionText: "",
   points: "1",
   topicId: null,
+  imageUrl: null,
   choices: [0, 1, 2, 3].map(() => ({
     key: newKey(),
     choiceText: "",
+    imageUrl: null,
     isCorrect: false,
   })),
   answers: [{ key: newKey(), answerText: "" }],
@@ -68,7 +71,7 @@ const cleanQuestion = (q) => ({
   points: String(q.points).trim(),
   choices: q.choices
     .map((c) => ({ ...c, choiceText: c.choiceText.trim() }))
-    .filter((c) => c.choiceText !== ""),
+    .filter((c) => c.choiceText !== "" || c.imageUrl),
   answers: q.answers
     .map((a) => ({ ...a, answerText: a.answerText.trim() }))
     .filter((a) => a.answerText !== ""),
@@ -84,15 +87,146 @@ const cleanQuestion = (q) => ({
 const hasDuplicates = (values) =>
   new Set(values.map((v) => v.toLowerCase())).size !== values.length;
 
+const MAX_IMAGE_MB = 5;
+
+async function uploadQuizImage(file) {
+  if (!file.type.startsWith("image/"))
+    throw new Error("Please choose an image file (PNG or JPG).");
+  if (file.size > MAX_IMAGE_MB * 1024 * 1024)
+    throw new Error(
+      `The picture is too big. Please use one under ${MAX_IMAGE_MB} MB.`,
+    );
+  const ext = (file.name.split(".").pop() || "png")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+  const path = `questions/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  const { error } = await supabase.storage
+    .from("quiz-images")
+    .upload(path, file, { contentType: file.type, upsert: false });
+  if (error) throw new Error(error.message);
+  return supabase.storage.from("quiz-images").getPublicUrl(path).data.publicUrl;
+}
+
+function ImageField({ url, onChange, label, compact }) {
+  const input = useRef(null);
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState("");
+
+  const pick = async (file) => {
+    if (!file) return;
+    setBusy(true);
+    setProblem("");
+    try {
+      onChange(await uploadQuizImage(file));
+    } catch (err) {
+      setProblem(err.message ?? "Upload failed.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div style={{ marginTop: compact ? "6px" : "10px" }}>
+      <input
+        ref={input}
+        type="file"
+        accept="image/*"
+        hidden
+        onChange={(e) => {
+          pick(e.target.files[0]);
+          e.target.value = "";
+        }}
+      />
+      {url ? (
+        <div
+          style={{
+            position: "relative",
+            display: "inline-block",
+            maxWidth: "100%",
+          }}
+        >
+          <img
+            src={url}
+            alt={label}
+            style={{
+              display: "block",
+              maxWidth: "100%",
+              maxHeight: compact ? "120px" : "220px",
+              borderRadius: "8px",
+              border: `1px solid ${COLORS.border}`,
+            }}
+          />
+          <button
+            type="button"
+            aria-label={`Remove ${label}`}
+            onClick={() => onChange(null)}
+            style={{
+              position: "absolute",
+              top: "6px",
+              right: "6px",
+              width: "28px",
+              height: "28px",
+              borderRadius: "50%",
+              border: 0,
+              backgroundColor: "rgba(0,0,0,0.6)",
+              color: "#fff",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <X size={16} />
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => input.current?.click()}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "6px",
+            border: `1px dashed ${COLORS.border}`,
+            backgroundColor: "#F8F9FC",
+            color: COLORS.accent,
+            borderRadius: "8px",
+            padding: compact ? "6px 10px" : "9px 14px",
+            fontSize: "12px",
+            fontWeight: "600",
+            cursor: busy ? "wait" : "pointer",
+            fontFamily: "inherit",
+          }}
+        >
+          <ImagePlus size={15} />{" "}
+          {busy ? "Uploading..." : `Add picture${compact ? "" : " (optional)"}`}
+        </button>
+      )}
+      {problem && (
+        <p
+          role="alert"
+          style={{ color: COLORS.danger, fontSize: "12px", margin: "6px 0 0" }}
+        >
+          {problem}
+        </p>
+      )}
+    </div>
+  );
+}
+
 const validateQuestion = (q) => {
-  if (!q.questionText) return "Enter the question.";
+  if (!q.questionText && !q.imageUrl)
+    return "Enter the question or add a picture of it.";
   if (!isWholeNumber(q.points, 1))
     return "Points must be a whole number of at least 1.";
   if (!q.topicId)
     return "Select a minor tag. The analytics uses it to find weak areas.";
   if (q.questionType === "mcq") {
     if (q.choices.length < 2) return "Add at least two choices.";
-    if (hasDuplicates(q.choices.map((c) => c.choiceText)))
+    if (
+      hasDuplicates(q.choices.map((c) => `${c.choiceText}|${c.imageUrl ?? ""}`))
+    )
       return "Choices must be different.";
     if (q.choices.filter((c) => c.isCorrect).length !== 1)
       return "Mark exactly one correct answer.";
@@ -413,6 +547,11 @@ function QuestionEditorModal({ initial, isNew, topics, onCancel, onSave }) {
             value={draft.questionText}
             onChange={(e) => update({ questionText: e.target.value })}
           />
+          <ImageField
+            label="question picture"
+            url={draft.imageUrl}
+            onChange={(imageUrl) => update({ imageUrl })}
+          />
 
           <label style={s.label}>Points:</label>
           <input
@@ -427,15 +566,18 @@ function QuestionEditorModal({ initial, isNew, topics, onCancel, onSave }) {
           {draft.questionType === "mcq" && (
             <>
               <label style={s.label}>Choices:</label>
-              <p style={s.hint}>Click a letter to mark the correct answer.</p>
+              <p style={s.hint}>
+                Click a letter to mark the correct answer. A choice can be text,
+                a picture, or both.
+              </p>
               {draft.choices.map((c, i) => (
                 <div
                   key={c.key}
                   style={{
                     display: "flex",
-                    alignItems: "center",
+                    alignItems: "flex-start",
                     gap: "8px",
-                    marginBottom: "10px",
+                    marginBottom: "12px",
                   }}
                 >
                   <button
@@ -470,20 +612,34 @@ function QuestionEditorModal({ initial, isNew, topics, onCancel, onSave }) {
                       String.fromCharCode(65 + i)
                     )}
                   </button>
-                  <input
-                    style={s.input}
-                    placeholder={`Choice ${String.fromCharCode(65 + i)}`}
-                    value={c.choiceText}
-                    onChange={(e) =>
-                      update({
-                        choices: draft.choices.map((x) =>
-                          x.key === c.key
-                            ? { ...x, choiceText: e.target.value }
-                            : x,
-                        ),
-                      })
-                    }
-                  />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <input
+                      style={s.input}
+                      placeholder={`Choice ${String.fromCharCode(65 + i)}`}
+                      value={c.choiceText}
+                      onChange={(e) =>
+                        update({
+                          choices: draft.choices.map((x) =>
+                            x.key === c.key
+                              ? { ...x, choiceText: e.target.value }
+                              : x,
+                          ),
+                        })
+                      }
+                    />
+                    <ImageField
+                      compact
+                      label={`choice ${String.fromCharCode(65 + i)} picture`}
+                      url={c.imageUrl}
+                      onChange={(imageUrl) =>
+                        update({
+                          choices: draft.choices.map((x) =>
+                            x.key === c.key ? { ...x, imageUrl } : x,
+                          ),
+                        })
+                      }
+                    />
+                  </div>
                   {draft.choices.length > 2 && (
                     <button
                       type="button"
@@ -508,7 +664,12 @@ function QuestionEditorModal({ initial, isNew, topics, onCancel, onSave }) {
                     update({
                       choices: [
                         ...draft.choices,
-                        { key: newKey(), choiceText: "", isCorrect: false },
+                        {
+                          key: newKey(),
+                          choiceText: "",
+                          imageUrl: null,
+                          isCorrect: false,
+                        },
                       ],
                     })
                   }
@@ -766,8 +927,8 @@ export default function AdminQuizEditor() {
             `assessment_id, title, instructions, deadline, maxAttempts, passingScore,
              showCorrectAnswers, closeAfterDeadline, isClosed, isPublished, module_id, timeLimitMinutes,
              assessment_question (
-               question_id, questionText, questionType, points, topic_id, position,
-               assessment_choice ( choice_id, choiceText, isCorrect ),
+               question_id, questionText, questionType, points, topic_id, position, image_url,
+               assessment_choice ( choice_id, choiceText, isCorrect, image_url ),
                assessment_identification_answer ( answer_id, answerText ),
                assessment_matching_pair ( pair_id, leftText, rightText )
              )`,
@@ -801,11 +962,13 @@ export default function AdminQuizEditor() {
               questionText: q.questionText,
               points: String(q.points),
               topicId: q.topic_id,
+              imageUrl: q.image_url ?? null,
               choices: [...(q.assessment_choice ?? [])]
                 .sort((x, y) => x.choice_id - y.choice_id)
                 .map((c) => ({
                   key: newKey(),
-                  choiceText: c.choiceText,
+                  choiceText: c.choiceText ?? "",
+                  imageUrl: c.image_url ?? null,
                   isCorrect: c.isCorrect,
                 })),
               answers: (q.assessment_identification_answer ?? []).map(
@@ -928,10 +1091,12 @@ export default function AdminQuizEditor() {
         questionText: q.questionText,
         points: Number(q.points),
         topic_id: q.topicId,
+        image_url: q.imageUrl ?? null,
         choices:
           q.questionType === "mcq"
             ? q.choices.map((c) => ({
                 choiceText: c.choiceText,
+                image_url: c.imageUrl ?? null,
                 isCorrect: c.isCorrect,
               }))
             : [],
@@ -1306,8 +1471,23 @@ export default function AdminQuizEditor() {
                           WebkitBoxOrient: "vertical",
                         }}
                       >
-                        {q.questionText}
+                        {q.questionText ||
+                          (q.imageUrl ? "(Picture question)" : "")}
                       </div>
+                      {(q.imageUrl || q.choices.some((c) => c.imageUrl)) && (
+                        <div
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "4px",
+                            fontSize: "11px",
+                            color: COLORS.accent,
+                            marginTop: "4px",
+                          }}
+                        >
+                          <ImagePlus size={12} /> Has pictures
+                        </div>
+                      )}
                       <div
                         style={{
                           fontSize: "11px",

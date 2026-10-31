@@ -3,11 +3,13 @@ import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker, {
   DateTimePickerEvent,
 } from "@react-native-community/datetimepicker";
+import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -20,12 +22,18 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { readFileBytes } from "../../lib/readFileBytes";
+
+// ------------------------------------------------------------------
+// Types
+// ------------------------------------------------------------------
 
 type QuestionType = "mcq" | "identification" | "matching";
 
 interface ChoiceDraft {
   key: string;
   choiceText: string;
+  imageUrl: string | null;
   isCorrect: boolean;
 }
 interface AnswerDraft {
@@ -43,6 +51,7 @@ interface QuestionDraft {
   questionText: string;
   points: string;
   topicId: number | null;
+  imageUrl: string | null;
   choices: ChoiceDraft[];
   answers: AnswerDraft[];
   pairs: PairDraft[];
@@ -56,6 +65,10 @@ interface ModuleOption {
   module_id: number;
   moduleName: string;
 }
+
+// ------------------------------------------------------------------
+// Helpers
+// ------------------------------------------------------------------
 
 const COLORS = {
   primary: "#0D2A94",
@@ -84,9 +97,11 @@ const emptyQuestion = (): QuestionDraft => ({
   questionText: "",
   points: "1",
   topicId: null,
+  imageUrl: null,
   choices: [0, 1, 2, 3].map(() => ({
     key: newKey(),
     choiceText: "",
+    imageUrl: null,
     isCorrect: false,
   })),
   answers: [{ key: newKey(), answerText: "" }],
@@ -114,13 +129,14 @@ const isWholeNumber = (value: string, min: number) => {
   return value.trim() !== "" && Number.isInteger(n) && n >= min;
 };
 
+// Removes blank rows and trims text before validating or saving
 const cleanQuestion = (q: QuestionDraft): QuestionDraft => ({
   ...q,
   questionText: q.questionText.trim(),
   points: q.points.trim(),
   choices: q.choices
     .map((c) => ({ ...c, choiceText: c.choiceText.trim() }))
-    .filter((c) => c.choiceText !== ""),
+    .filter((c) => c.choiceText !== "" || !!c.imageUrl),
   answers: q.answers
     .map((a) => ({ ...a, answerText: a.answerText.trim() }))
     .filter((a) => a.answerText !== ""),
@@ -137,7 +153,8 @@ const hasDuplicates = (values: string[]) =>
   new Set(values.map((v) => v.toLowerCase())).size !== values.length;
 
 const validateQuestion = (q: QuestionDraft): string | null => {
-  if (!q.questionText) return "Enter the question.";
+  if (!q.questionText && !q.imageUrl)
+    return "Enter the question or add a picture of it.";
   if (!isWholeNumber(q.points, 1))
     return "Points must be a whole number of at least 1.";
   if (!q.topicId)
@@ -145,7 +162,9 @@ const validateQuestion = (q: QuestionDraft): string | null => {
 
   if (q.questionType === "mcq") {
     if (q.choices.length < 2) return "Add at least two choices.";
-    if (hasDuplicates(q.choices.map((c) => c.choiceText)))
+    if (
+      hasDuplicates(q.choices.map((c) => `${c.choiceText}|${c.imageUrl ?? ""}`))
+    )
       return "Choices must be different.";
     if (q.choices.filter((c) => c.isCorrect).length !== 1)
       return "Mark exactly one correct answer.";
@@ -163,6 +182,100 @@ const validateQuestion = (q: QuestionDraft): string | null => {
   return null;
 };
 
+// ------------------------------------------------------------------
+// Quiz editor screen
+// ------------------------------------------------------------------
+
+async function pickAndUploadQuizImage(): Promise<string | null> {
+  const result = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ["images"],
+    quality: 0.85,
+  });
+  if (result.canceled) return null;
+  const asset = result.assets[0];
+  const ext = (asset.fileName?.split(".").pop() || "jpg")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+  const path = `questions/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  const bytes = await readFileBytes(asset.uri);
+  const { error } = await supabase.storage
+    .from("quiz-images")
+    .upload(path, bytes, {
+      contentType: asset.mimeType ?? "image/jpeg",
+      upsert: false,
+    });
+  if (error) throw new Error(error.message);
+  return supabase.storage.from("quiz-images").getPublicUrl(path).data.publicUrl;
+}
+
+function ImageField({
+  url,
+  onChange,
+  compact,
+}: {
+  url: string | null;
+  onChange: (url: string | null) => void;
+  compact?: boolean;
+}) {
+  const [busy, setBusy] = useState(false);
+  const pick = async () => {
+    setBusy(true);
+    try {
+      const uploaded = await pickAndUploadQuizImage();
+      if (uploaded) onChange(uploaded);
+    } catch (err: any) {
+      Alert.alert("Upload failed", err.message ?? "Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (url) {
+    return (
+      <View style={{ marginTop: compact ? 6 : 10, alignSelf: "flex-start" }}>
+        <Image
+          source={{ uri: url }}
+          style={{
+            width: compact ? 160 : 240,
+            height: compact ? 100 : 160,
+            borderRadius: 8,
+            borderWidth: 1,
+            borderColor: COLORS.border,
+          }}
+          resizeMode="contain"
+        />
+        <TouchableOpacity
+          onPress={() => onChange(null)}
+          style={styles.imageRemove}
+          accessibilityLabel="Remove picture"
+        >
+          <Ionicons name="close" size={16} color="white" />
+        </TouchableOpacity>
+      </View>
+    );
+  }
+  return (
+    <TouchableOpacity
+      style={[styles.imageAdd, compact && { paddingVertical: 6 }]}
+      onPress={pick}
+      disabled={busy}
+    >
+      {busy ? (
+        <ActivityIndicator size="small" color={COLORS.primary} />
+      ) : (
+        <Ionicons name="image-outline" size={16} color={COLORS.primary} />
+      )}
+      <Text style={styles.imageAddText}>
+        {busy
+          ? "Uploading..."
+          : compact
+            ? "Add picture"
+            : "Add picture (optional)"}
+      </Text>
+    </TouchableOpacity>
+  );
+}
+
 export default function QuizEditorScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{
@@ -170,7 +283,7 @@ export default function QuizEditorScreen() {
     courseTitle: string;
     assessmentId?: string;
     moduleId?: string;
-    diagnostic?: string;
+    diagnostic?: string; // "1" = creating/editing the diagnostic exam
   }>();
   const isDiagnostic = params.diagnostic === "1";
   const courseId = Number(params.courseId);
@@ -179,6 +292,7 @@ export default function QuizEditorScreen() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
+  // Settings
   const [title, setTitle] = useState("");
   const [instructions, setInstructions] = useState("");
   const [moduleId, setModuleId] = useState<number | null>(null);
@@ -186,12 +300,13 @@ export default function QuizEditorScreen() {
   const [picker, setPicker] = useState<"date" | "time" | null>(null);
   const [maxAttempts, setMaxAttempts] = useState("1");
   const [passingScore, setPassingScore] = useState("");
-  const [timeLimit, setTimeLimit] = useState("");
+  const [timeLimit, setTimeLimit] = useState(""); // minutes; empty = no limit
   const [showCorrectAnswers, setShowCorrectAnswers] = useState(false);
   const [closeAfterDeadline, setCloseAfterDeadline] = useState(true);
   const [isClosed, setIsClosed] = useState(false);
   const [isPublished, setIsPublished] = useState(false);
 
+  // Questions and lookups
   const [questions, setQuestions] = useState<QuestionDraft[]>([]);
   const [modules, setModules] = useState<ModuleOption[]>([]);
   const [topics, setTopics] = useState<Topic[]>([]);
@@ -209,6 +324,7 @@ export default function QuizEditorScreen() {
   const topicName = (id: number | null) =>
     topics.find((t) => t.topic_id === id)?.topicName ?? "No tag";
 
+  // ---------------- Load ----------------
   useEffect(() => {
     const load = async () => {
       setLoading(true);
@@ -218,6 +334,7 @@ export default function QuizEditorScreen() {
           .from("module")
           .select("module_id, moduleName")
           .eq("course_id", courseId)
+          // Diagnostic exam: only the diagnostic module. Normal quizzes: hide it.
           .eq("is_diagnostic", isDiagnostic)
           .order("module_id"),
         supabase
@@ -239,8 +356,8 @@ export default function QuizEditorScreen() {
              showCorrectAnswers, closeAfterDeadline, isClosed, isPublished, module_id,
              timeLimitMinutes,
              assessment_question (
-               question_id, questionText, questionType, points, topic_id, position,
-               assessment_choice ( choice_id, choiceText, isCorrect ),
+               question_id, questionText, questionType, points, topic_id, position, image_url,
+               assessment_choice ( choice_id, choiceText, isCorrect, image_url ),
                assessment_identification_answer ( answer_id, answerText ),
                assessment_matching_pair ( pair_id, leftText, rightText )
              )`,
@@ -273,13 +390,15 @@ export default function QuizEditorScreen() {
             key: newKey(),
             questionType: q.questionType as QuestionType,
             questionText: q.questionText,
+            imageUrl: q.image_url ?? null,
             points: String(q.points),
             topicId: q.topic_id,
             choices: [...(q.assessment_choice ?? [])]
               .sort((x: any, y: any) => x.choice_id - y.choice_id)
               .map((c: any) => ({
                 key: newKey(),
-                choiceText: c.choiceText,
+                choiceText: c.choiceText ?? "",
+                imageUrl: c.image_url ?? null,
                 isCorrect: c.isCorrect,
               })),
             answers: (q.assessment_identification_answer ?? []).map(
@@ -302,7 +421,7 @@ export default function QuizEditorScreen() {
           .eq("assessment_id", assessmentId);
         setHasAttempts((count ?? 0) > 0);
       } else if (params.moduleId) {
-        setModuleId(Number(params.moduleId));
+        setModuleId(Number(params.moduleId)); // module selected on the quiz list
       } else if (moduleList.length === 1) {
         setModuleId(moduleList[0].module_id);
       }
@@ -312,6 +431,7 @@ export default function QuizEditorScreen() {
     load();
   }, [assessmentId, courseId]);
 
+  // ---------------- Deadline picker ----------------
   const onPickerChange = (event: DateTimePickerEvent, selected?: Date) => {
     const mode = picker;
     setPicker(null);
@@ -329,6 +449,7 @@ export default function QuizEditorScreen() {
     setDeadline(next);
   };
 
+  // ---------------- Question list actions ----------------
   const saveQuestion = (q: QuestionDraft) => {
     if (!editing) return;
     setQuestions((prev) => {
@@ -362,6 +483,7 @@ export default function QuizEditorScreen() {
     });
   };
 
+  // ---------------- Save / delete quiz ----------------
   const validateQuiz = (publish: boolean): string | null => {
     if (!title.trim()) return "Enter a quiz title.";
     if (!moduleId) return "Select a module.";
@@ -415,12 +537,14 @@ export default function QuizEditorScreen() {
       questions: questions.map((q) => ({
         questionType: q.questionType,
         questionText: q.questionText,
+        image_url: q.imageUrl ?? null,
         points: Number(q.points),
         topic_id: q.topicId,
         choices:
           q.questionType === "mcq"
             ? q.choices.map((c) => ({
                 choiceText: c.choiceText,
+                image_url: c.imageUrl ?? null,
                 isCorrect: c.isCorrect,
               }))
             : [],
@@ -476,6 +600,7 @@ export default function QuizEditorScreen() {
     ]);
   };
 
+  // ---------------- Render ----------------
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -505,6 +630,7 @@ export default function QuizEditorScreen() {
           contentContainerStyle={styles.scroll}
           keyboardShouldPersistTaps="handled"
         >
+          {/* ---------- Details ---------- */}
           <Text style={styles.label}>Title:</Text>
           <TextInput
             style={styles.input}
@@ -627,6 +753,7 @@ export default function QuizEditorScreen() {
             running if they leave.
           </Text>
 
+          {/* ---------- Settings ---------- */}
           <View style={styles.settingsCard}>
             <SettingRow
               title="Show correct answers"
@@ -649,6 +776,7 @@ export default function QuizEditorScreen() {
             />
           </View>
 
+          {/* ---------- Questions ---------- */}
           <View style={styles.divider} />
 
           {hasAttempts && (
@@ -702,8 +830,15 @@ export default function QuizEditorScreen() {
                   {q.points === "1" ? "pt" : "pts"}
                 </Text>
                 <Text style={styles.questionCardText} numberOfLines={2}>
-                  {q.questionText}
+                  {q.questionText || (q.imageUrl ? "(Picture question)" : "")}
                 </Text>
+                {(q.imageUrl || q.choices.some((c) => c.imageUrl)) && (
+                  <Text
+                    style={[styles.questionCardTag, { color: COLORS.primary }]}
+                  >
+                    Has pictures
+                  </Text>
+                )}
                 <Text style={styles.questionCardTag}>
                   {topicName(q.topicId)}
                 </Text>
@@ -740,6 +875,7 @@ export default function QuizEditorScreen() {
             </TouchableOpacity>
           ))}
 
+          {/* ---------- Buttons ---------- */}
           <TouchableOpacity
             style={[styles.primaryBtn, saving && { opacity: 0.7 }]}
             disabled={saving}
@@ -789,6 +925,10 @@ export default function QuizEditorScreen() {
   );
 }
 
+// ------------------------------------------------------------------
+// Setting row with a switch
+// ------------------------------------------------------------------
+
 function SettingRow(props: {
   title: string;
   description: string;
@@ -812,6 +952,10 @@ function SettingRow(props: {
   );
 }
 
+// ------------------------------------------------------------------
+// Question editor modal
+// ------------------------------------------------------------------
+
 function QuestionEditorModal(props: {
   initial: QuestionDraft;
   isNew: boolean;
@@ -833,6 +977,7 @@ function QuestionEditorModal(props: {
   const update = (changes: Partial<QuestionDraft>) =>
     setDraft((d) => ({ ...d, ...changes }));
 
+  // MCQ
   const setChoiceText = (key: string, text: string) =>
     update({
       choices: draft.choices.map((c) =>
@@ -847,12 +992,13 @@ function QuestionEditorModal(props: {
     update({
       choices: [
         ...draft.choices,
-        { key: newKey(), choiceText: "", isCorrect: false },
+        { key: newKey(), choiceText: "", imageUrl: null, isCorrect: false },
       ],
     });
   const removeChoice = (key: string) =>
     update({ choices: draft.choices.filter((c) => c.key !== key) });
 
+  // Identification
   const setAnswerText = (key: string, text: string) =>
     update({
       answers: draft.answers.map((a) =>
@@ -864,6 +1010,7 @@ function QuestionEditorModal(props: {
   const removeAnswer = (key: string) =>
     update({ answers: draft.answers.filter((a) => a.key !== key) });
 
+  // Matching
   const setPairText = (
     key: string,
     side: "leftText" | "rightText",
@@ -911,6 +1058,7 @@ function QuestionEditorModal(props: {
             contentContainerStyle={styles.scroll}
             keyboardShouldPersistTaps="handled"
           >
+            {/* Type */}
             <Text style={styles.label}>Question type:</Text>
             <View style={styles.segment}>
               {(Object.keys(TYPE_LABELS) as QuestionType[]).map((t) => (
@@ -934,6 +1082,7 @@ function QuestionEditorModal(props: {
               ))}
             </View>
 
+            {/* Tags */}
             <Text style={styles.label}>Major tag:</Text>
             {majors.length === 0 ? (
               <Text style={styles.hint}>
@@ -1002,6 +1151,7 @@ function QuestionEditorModal(props: {
               </>
             )}
 
+            {/* Question text and points */}
             <Text style={styles.label}>Question:</Text>
             <TextInput
               style={[styles.input, styles.multiline]}
@@ -1009,6 +1159,10 @@ function QuestionEditorModal(props: {
               value={draft.questionText}
               onChangeText={(text) => update({ questionText: text })}
               multiline
+            />
+            <ImageField
+              url={draft.imageUrl}
+              onChange={(imageUrl) => update({ imageUrl })}
             />
 
             <Text style={styles.label}>Points:</Text>
@@ -1019,14 +1173,19 @@ function QuestionEditorModal(props: {
               keyboardType="number-pad"
             />
 
+            {/* MCQ */}
             {draft.questionType === "mcq" && (
               <>
                 <Text style={styles.label}>Choices:</Text>
                 <Text style={styles.hint}>
-                  Tap a letter to mark the correct answer.
+                  Tap a letter to mark the correct answer. A choice can be text,
+                  a picture, or both.
                 </Text>
                 {draft.choices.map((c, i) => (
-                  <View key={c.key} style={styles.choiceRow}>
+                  <View
+                    key={c.key}
+                    style={[styles.choiceRow, { alignItems: "flex-start" }]}
+                  >
                     <TouchableOpacity
                       style={[
                         styles.letterBox,
@@ -1042,12 +1201,25 @@ function QuestionEditorModal(props: {
                         </Text>
                       )}
                     </TouchableOpacity>
-                    <TextInput
-                      style={styles.choiceInput}
-                      placeholder={`Choice ${String.fromCharCode(65 + i)}`}
-                      value={c.choiceText}
-                      onChangeText={(text) => setChoiceText(c.key, text)}
-                    />
+                    <View style={{ flex: 1 }}>
+                      <TextInput
+                        style={styles.choiceInput}
+                        placeholder={`Choice ${String.fromCharCode(65 + i)}`}
+                        value={c.choiceText}
+                        onChangeText={(text) => setChoiceText(c.key, text)}
+                      />
+                      <ImageField
+                        compact
+                        url={c.imageUrl}
+                        onChange={(imageUrl) =>
+                          update({
+                            choices: draft.choices.map((x) =>
+                              x.key === c.key ? { ...x, imageUrl } : x,
+                            ),
+                          })
+                        }
+                      />
+                    </View>
                     {draft.choices.length > 2 && (
                       <TouchableOpacity
                         onPress={() => removeChoice(c.key)}
@@ -1070,6 +1242,7 @@ function QuestionEditorModal(props: {
               </>
             )}
 
+            {/* Identification */}
             {draft.questionType === "identification" && (
               <>
                 <Text style={styles.label}>Accepted answers:</Text>
@@ -1105,6 +1278,7 @@ function QuestionEditorModal(props: {
               </>
             )}
 
+            {/* Matching */}
             {draft.questionType === "matching" && (
               <>
                 <Text style={styles.label}>Pairs:</Text>
@@ -1166,6 +1340,10 @@ function QuestionEditorModal(props: {
     </Modal>
   );
 }
+
+// ------------------------------------------------------------------
+// Styles
+// ------------------------------------------------------------------
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "white" },
@@ -1330,6 +1508,32 @@ const styles = StyleSheet.create({
     color: COLORS.text,
   },
   rowIcon: { marginLeft: 8 },
+  imageAdd: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    gap: 6,
+    marginTop: 8,
+    borderWidth: 1,
+    borderStyle: "dashed",
+    borderColor: COLORS.border,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: "#F8F9FC",
+  },
+  imageAddText: { fontSize: 12, fontWeight: "600", color: COLORS.primary },
+  imageRemove: {
+    position: "absolute",
+    top: 6,
+    right: 6,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
   pairRow: { flexDirection: "row", alignItems: "center", marginBottom: 10 },
   pairNumber: { width: 20, fontWeight: "700", color: COLORS.muted },
 

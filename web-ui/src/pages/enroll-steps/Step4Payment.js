@@ -39,6 +39,7 @@ export default function Step4Payment({ data, onNext, onBack }) {
             ["Type of Taker", data.takerType],
             ["Curriculum", data.curriculum],
             ["Specialization", data.specialization],
+            ["Comments", data.comments?.trim() || "—"],
           ]}
         />
         <SummarySection

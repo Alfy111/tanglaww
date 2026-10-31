@@ -126,8 +126,16 @@ export default function AdminSidebar() {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      loadAdmin(session?.user?.id);
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_OUT") {
+        if (active)
+          setAdmin({ firstName: "", lastName: "", email: "", role: "admin" });
+        return;
+      }
+      if (!session?.user?.id) return;
+      // Run the query after the auth callback finishes. Awaiting Supabase calls
+      // inside this callback can lock up the client until the page is reloaded.
+      setTimeout(() => loadAdmin(session.user.id), 0);
     });
 
     return () => {
