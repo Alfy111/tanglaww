@@ -1,11 +1,13 @@
 import { Eye, EyeOff, KeyRound } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import { clearFailedLogins, getLockoutMessage, getLoginLockout, recordFailedLogin } from "../lib/loginLockout";
 import { supabase } from "../lib/supabase";
+import "./SignIn.css";
 
 export default function SignIn() {
+  const location = useLocation();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -129,9 +131,13 @@ export default function SignIn() {
   };
 
   return (
-    <div style={{ fontFamily: "Poppins, sans-serif", minHeight: "100vh", backgroundColor: "#f5f5f5" }}>
-      <Navbar />
-      <div style={{ maxWidth: "480px", margin: "60px auto", backgroundColor: "#fff", borderRadius: "12px", boxShadow: "0 4px 20px rgba(0,0,0,0.1)", padding: "48px 40px" }}>
+    <div className="auth-page">
+      <Navbar brandOnly />
+      <div className={`auth-card${location.state?.authTransition === "admin-to-student"
+        ? " auth-card--enter-from-left"
+        : location.state?.authTransition === "home-to-student"
+          ? " auth-card--enter-from-right"
+          : ""}`}>
 
         <div style={{ textAlign: "center", marginBottom: "32px" }}>
           <h1 style={{ fontSize: "28px", fontWeight: "700", color: "#1a1a6e", marginBottom: "6px" }}>Sign in</h1>
@@ -221,7 +227,7 @@ export default function SignIn() {
           </span>
           <span style={{ color: "#888" }}>
             For Instructors:{" "}
-            <span onClick={() => navigate("/admin/signin")} style={{ color: "#f5b700", fontWeight: "700", cursor: "pointer" }}>Admin Sign-in</span>
+            <button type="button" onClick={() => navigate("/admin/signin", { state: { authTransition: "student-to-admin" } })} style={{ border: 0, padding: 0, background: "none", color: "#f5b700", fontWeight: "700", cursor: "pointer", font: "inherit" }}>Admin Sign-in</button>
           </span>
         </div>
       </div>

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import { supabase } from "../lib/supabase";
+import "./SignIn.css";
 
 const PASSWORD_RULES = [
   { test: (password) => password.length >= 8, message: "Password must be at least 8 characters." },
@@ -165,9 +166,9 @@ export default function PasswordRecovery({ isAdmin = false, isResetPage = false 
   };
 
   return (
-    <div style={{ fontFamily: "Poppins, sans-serif", minHeight: "100vh", backgroundColor: "#f5f5f5" }}>
-      <Navbar />
-      <main style={{ width: "calc(100% - 32px)", maxWidth: "480px", margin: "60px auto", backgroundColor: "#fff", borderRadius: "12px", boxShadow: "0 4px 20px rgba(0,0,0,0.1)", padding: "40px", boxSizing: "border-box" }}>
+    <div className="auth-page">
+      <Navbar brandOnly />
+      <main style={{ width: "100%", maxWidth: "480px", margin: "0 auto", backgroundColor: "#fff", borderRadius: "12px", boxShadow: "0 4px 20px rgba(0,0,0,0.1)", padding: "40px", boxSizing: "border-box" }}>
         <div style={{ textAlign: "center", marginBottom: "28px" }}>
           {isAdmin && <div style={{ display: "inline-block", backgroundColor: "#fff8e1", color: "#f5a623", fontWeight: "700", fontSize: "12px", padding: "4px 14px", borderRadius: "20px", border: "1px solid #f5a623", marginBottom: "12px" }}>ADMIN PORTAL</div>}
           <h1 style={{ fontSize: "25px", fontWeight: "700", color: "#1a1a6e", margin: "0 0 8px" }}>

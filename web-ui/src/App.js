@@ -1,7 +1,6 @@
-import { Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
 import { applyUserTheme, getUserThemePreference } from "./lib/userTheme";
 import About from "./pages/About";
-import AboutUs from "./pages/AboutUs";
 import AdminAbout from "./pages/admin/AdminAbout";
 import AdminAnalytics from "./pages/admin/AdminAnalytics";
 import AdminActivate from "./pages/admin/AdminActivate";
@@ -24,13 +23,10 @@ import ChangePassword from "./pages/ChangePassword";
 import CourseDetail from "./pages/CourseDetails";
 import Courses from "./pages/Courses";
 import Dashboard from "./pages/Dashboard";
-import DownloadApp from "./pages/DownloadApp";
 import Enroll from "./pages/Enroll";
 import Help from "./pages/Help";
-import HelpdeskPage from "./pages/HelpdeskPage";
 import Home from "./pages/Home";
 import Notifications from "./pages/Notifications";
-import OurCourses from "./pages/OurCourses";
 import PasswordRecovery from "./pages/PasswordRecovery";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
@@ -79,10 +75,9 @@ export default function App() {
       <Route path="/admin/policies" element={<AdminPolicies />} />
       <Route path="/admin/audit-log" element={<AdminAuditLog />} />
       <Route path="/admin/courses/:courseId/handouts" element={<AdminHandouts />} />
-      <Route path="/our-courses" element={<OurCourses />} />
-      <Route path="/about-us" element={<AboutUs />} />
-      <Route path="/helpdesk" element={<HelpdeskPage />} />
-      <Route path="/download" element={<DownloadApp />} />
+      <Route path="/our-courses" element={<Navigate to="/#courses" replace />} />
+      <Route path="/about-us" element={<Navigate to="/#about" replace />} />
+      <Route path="/helpdesk" element={<Navigate to="/#helpdesk" replace />} />
       <Route path="/admin/courses/:courseId/recorded-sessions" element={<AdminRecordedSessions />} />
     </Routes>
   );

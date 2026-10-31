@@ -3,6 +3,7 @@ import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import { supabase } from "../lib/supabase";
+import "./SignIn.css";
 
 const CODE_LENGTH = 6;
 
@@ -260,9 +261,9 @@ export default function SignInWithCode() {
   };
 
   return (
-    <div style={{ minHeight: "100vh", backgroundColor: "#f5f5f5", fontFamily: "Poppins, sans-serif" }}>
-      <Navbar />
-      <main style={{ minHeight: "calc(100vh - 70px)", display: "flex", justifyContent: "center", alignItems: "flex-start", padding: "48px 16px", boxSizing: "border-box" }}>
+    <div className="auth-page">
+      <Navbar brandOnly />
+      <main style={{ display: "flex", justifyContent: "center", alignItems: "flex-start", padding: "24px 0 0", boxSizing: "border-box" }}>
         <section style={{ width: "100%", maxWidth: "480px", backgroundColor: "#fff", borderRadius: "12px", boxShadow: "0 4px 20px rgba(0,0,0,0.1)", padding: "32px 40px 40px", boxSizing: "border-box" }}>
           <button
             type="button"
@@ -353,7 +354,7 @@ export default function SignInWithCode() {
                       onChange={(event) => handleCodeChange(event.target.value, index)}
                       onKeyDown={(event) => handleCodeKeyDown(event, index)}
                       placeholder="•"
-                      style={{ width: "min(55px, 14vw)", height: "55px", padding: 0, border: `2px solid ${codeError ? "#E74C3C" : digit ? "#0D2A94" : "#BDC3C7"}`, borderRadius: "10px", backgroundColor: "#F9FAFB", color: "#0D2A94", fontSize: "22px", fontWeight: "700", textAlign: "center", boxSizing: "border-box" }}
+                      style={{ width: "min(55px, calc((100% - 40px) / 6))", height: "55px", padding: 0, border: `2px solid ${codeError ? "#E74C3C" : digit ? "#0D2A94" : "#BDC3C7"}`, borderRadius: "10px", backgroundColor: "#F9FAFB", color: "#0D2A94", fontSize: "22px", fontWeight: "700", textAlign: "center", boxSizing: "border-box" }}
                     />
                   ))}
                 </div>

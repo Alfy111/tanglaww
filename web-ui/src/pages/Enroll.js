@@ -37,7 +37,7 @@ export default function Enroll() {
 
   return (
     <div className="enroll-page">
-      <Navbar />
+      <Navbar brandOnly />
       <div className="enroll-card">
         {steps[step]}
       </div>

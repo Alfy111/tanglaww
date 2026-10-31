@@ -2,18 +2,24 @@
 .enroll-page {
   font-family: "Poppins", sans-serif;
   min-height: 100vh;
-  background-color: #f0f2f5;
-  padding-bottom: 60px;
+  background-color: #f5f5f5;
+  padding: 100px 16px 60px;
 }
 
 .enroll-card {
   max-width: 660px;
-  margin: 40px auto;
+  margin: 0 auto;
   background-color: #fff;
   border-radius: 16px;
   overflow: hidden;
   box-shadow: 0 6px 32px rgba(0, 0, 0, 0.12);
   border: 1.5px solid #e0e4ef;
+}
+
+@media (max-width: 760px) {
+  .enroll-page {
+    padding-top: 84px;
+  }
 }
 
 /* ── Form Body ───────────────────────────────────────────── */

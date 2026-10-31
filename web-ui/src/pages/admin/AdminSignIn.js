@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import Navbar from "../../components/Navbar";
 import { clearFailedLogins, getLoginLockout, getLockoutMessage, recordFailedLogin } from "../../lib/loginLockout";
 import { supabase } from "../../lib/supabase";
+import "../SignIn.css";
 
 export default function AdminSignIn() {
+  const location = useLocation();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -117,9 +119,9 @@ export default function AdminSignIn() {
   };
 
   return (
-    <div style={{ fontFamily: "Poppins, sans-serif", minHeight: "100vh", backgroundColor: "#f5f5f5" }}>
-      <Navbar />
-      <div style={{ maxWidth: "480px", margin: "60px auto", backgroundColor: "#fff", borderRadius: "12px", boxShadow: "0 4px 20px rgba(0,0,0,0.1)", padding: "48px 40px" }}>
+    <div className="auth-page">
+      <Navbar brandOnly />
+      <div className={`auth-card${location.state?.authTransition === "student-to-admin" ? " auth-card--enter-from-right" : ""}`}>
 
         <div style={{ textAlign: "center", marginBottom: "32px" }}>
           <div style={{ display: "inline-block", backgroundColor: "#fff8e1", color: "#f5a623", fontWeight: "700", fontSize: "12px", padding: "4px 14px", borderRadius: "20px", border: "1px solid #f5a623", marginBottom: "12px" }}>
@@ -177,7 +179,7 @@ export default function AdminSignIn() {
 
         <div style={{ textAlign: "center", marginTop: "28px", fontSize: "12px", color: "#888" }}>
           Not an admin?{" "}
-          <span onClick={() => navigate("/signin")} style={{ color: "#1a1a6e", fontWeight: "700", cursor: "pointer" }}>Student Sign-in</span>
+          <button type="button" onClick={() => navigate("/signin", { state: { authTransition: "admin-to-student" } })} style={{ border: 0, padding: 0, background: "none", color: "#1a1a6e", fontWeight: "700", cursor: "pointer", font: "inherit" }}>Student Sign-in</button>
         </div>
         <div style={{ textAlign: "center", marginTop: "12px", fontSize: "12px", color: "#888" }}>
           Got an admin invite?{" "}

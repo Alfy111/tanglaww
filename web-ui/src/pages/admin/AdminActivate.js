@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../../components/Navbar";
 import { activateAdmin, verifyAdminInvite } from "../../lib/adminInvites";
+import "../SignIn.css";
 
 const PASSWORD_RULES = [
   { test: (password) => password.length >= 8, message: "Password must be at least 8 characters." },
@@ -97,9 +98,9 @@ export default function AdminActivate() {
   );
 
   return (
-    <div style={{ fontFamily: "Poppins, sans-serif", minHeight: "100vh", backgroundColor: "#f5f5f5" }}>
-      <Navbar />
-      <main style={{ width: "calc(100% - 32px)", maxWidth: "520px", margin: "48px auto", backgroundColor: "#fff", borderRadius: "12px", boxShadow: "0 4px 20px rgba(0,0,0,0.1)", padding: "40px", boxSizing: "border-box" }}>
+    <div className="auth-page">
+      <Navbar brandOnly />
+      <main style={{ width: "100%", maxWidth: "520px", margin: "0 auto", backgroundColor: "#fff", borderRadius: "12px", boxShadow: "0 4px 20px rgba(0,0,0,0.1)", padding: "40px", boxSizing: "border-box" }}>
         <button type="button" onClick={() => step === "password" ? setStep("code") : navigate("/admin/signin")} style={{
           display: "inline-flex", alignItems: "center", gap: "6px", padding: 0,
           color: "#1a1a6e", border: 0, background: "transparent", cursor: "pointer", font: "inherit", fontSize: "13px",
