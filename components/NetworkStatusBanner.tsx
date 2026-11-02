@@ -1,45 +1,78 @@
-import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { useNetInfo } from "@react-native-community/netinfo";
+// Red bar at the top when the phone has no internet. Shows a short green
+// "Back online" message when the connection returns.
+import { Ionicons } from "@expo/vector-icons";
+import NetInfo, { NetInfoState } from "@react-native-community/netinfo";
+import { useEffect, useRef, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+// null = still checking; only treat a definite "no" as offline
+const isOffline = (s: NetInfoState) =>
+  s.isConnected === false || s.isInternetReachable === false;
 
 export default function NetworkStatusBanner() {
-  const { isConnected, isInternetReachable } = useNetInfo();
-  const isOffline = isConnected === false || isInternetReachable === false;
+  const insets = useSafeAreaInsets();
+  const [offline, setOffline] = useState(false);
+  const [backOnline, setBackOnline] = useState(false);
+  const wasOffline = useRef(false);
+  const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  if (!isOffline) return null;
+  useEffect(() => {
+    const unsubscribe = NetInfo.addEventListener((state) => {
+      const nowOffline = isOffline(state);
+      setOffline(nowOffline);
+      if (nowOffline) {
+        wasOffline.current = true;
+        setBackOnline(false);
+      } else if (wasOffline.current && state.isInternetReachable !== null) {
+        wasOffline.current = false;
+        setBackOnline(true);
+        if (hideTimer.current) clearTimeout(hideTimer.current);
+        hideTimer.current = setTimeout(() => setBackOnline(false), 2500);
+      }
+    });
+    return () => {
+      unsubscribe();
+      if (hideTimer.current) clearTimeout(hideTimer.current);
+    };
+  }, []);
+
+  if (!offline && !backOnline) return null;
 
   return (
     <View
-      accessibilityLiveRegion="assertive"
       accessibilityRole="alert"
-      style={styles.banner}
+      accessibilityLiveRegion="polite"
+      style={[
+        styles.bar,
+        {
+          paddingTop: insets.top + 6,
+          backgroundColor: offline ? "#D93025" : "#1E8E3E",
+        },
+      ]}
     >
-      <MaterialCommunityIcons name="wifi-off" size={20} color="#5C3B00" />
-      <Text style={styles.message}>
-        No internet connection. Some app features may be unavailable.
+      <Ionicons
+        name={offline ? "cloud-offline-outline" : "cloud-done-outline"}
+        size={16}
+        color="white"
+      />
+      <Text style={styles.text}>
+        {offline
+          ? "No internet connection. Some features won't work until you're back online."
+          : "Back online"}
       </Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  banner: {
-    minHeight: 44,
+  bar: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 9,
+    gap: 8,
     paddingHorizontal: 16,
-    paddingVertical: 9,
-    backgroundColor: "#FFF0C2",
-    borderBottomWidth: 1,
-    borderBottomColor: "#E8C66A",
+    paddingBottom: 8,
   },
-  message: {
-    flexShrink: 1,
-    color: "#5C3B00",
-    fontSize: 13,
-    fontWeight: "600",
-    textAlign: "center",
-  },
+  text: { color: "white", fontSize: 12, fontWeight: "600", flexShrink: 1 },
 });

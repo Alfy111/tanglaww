@@ -1,7 +1,11 @@
-import { supabase } from "@/lib/supabase";
+import {
+  FeedItem,
+  KIND_LABELS,
+  useNotificationFeed,
+} from "@/lib/notifications";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   RefreshControl,
@@ -12,18 +16,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-
-interface Notification {
-  id: string;
-  type: "enrollment" | "event";
-  label: string;
-  title: string;
-  description: string;
-  date: string;
-  time: string;
-  route?: string;
-  createdAt: string;
-}
 
 const formatDate = (iso: string): string =>
   new Date(iso).toLocaleDateString("en-PH", {
@@ -59,92 +51,60 @@ const isYesterday = (iso: string) => {
   );
 };
 
+// Where tapping an item goes
+const ROUTES: Partial<Record<FeedItem["kind"], string>> = {
+  enrollment: "/admin/approval",
+  balance_receipt: "/admin/registry",
+};
+
 export default function AdminNotification() {
   const router = useRouter();
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { items, loading, isUnread, markAllRead, refresh } =
+    useNotificationFeed("admin");
   const [refreshing, setRefreshing] = useState(false);
 
-  const fetchNotifications = useCallback(async () => {
-    const results: Notification[] = [];
-
-    const { data: enrollments } = await supabase
-      .from("enrollment")
-      .select(
-        `
-        enrollment_id,
-        enrollmentDate,
-        student (firstName, lastName),
-        verification!enrollment_verification_id_fkey (verificationStatus, verificationNotes)
-      `,
-      )
-      .order("enrollmentDate", { ascending: false });
-
-    (enrollments ?? []).forEach((e: any) => {
-      const v = Array.isArray(e.verification)
-        ? e.verification[0]
-        : e.verification;
-      const isPending =
-        v?.verificationStatus === false && !v?.verificationNotes;
-      if (isPending) {
-        results.push({
-          id: `enrollment-${e.enrollment_id}`,
-          type: "enrollment",
-          label: "New Enrollment Arrived!",
-          title: `${e.student?.firstName} ${e.student?.lastName}`,
-          description: "Awaiting your review and approval",
-          date: formatDate(e.enrollmentDate),
-          time: formatTime(e.enrollmentDate),
-          route: "/admin/approval",
-          createdAt: e.enrollmentDate,
-        });
-      }
-    });
-
-    const { data: events } = await supabase
-      .from("calendar_events")
-      .select("*")
-      .order("event_date", { ascending: false });
-
-    (events ?? []).forEach((event: any) => {
-      results.push({
-        id: `event-${event.event_id}`,
-        type: "event",
-        label: "Calendar Event Posted!",
-        title: event.title,
-        description: event.description ?? "",
-        date: formatDate(event.event_date),
-        time: formatTime(event.event_date),
-        route: "/admin/calendar",
-        createdAt: event.created_at,
-      });
-    });
-
-    results.sort((a, b) => {
-      if (a.type === "enrollment" && b.type !== "enrollment") return -1;
-      if (b.type === "enrollment" && a.type !== "enrollment") return 1;
-      return 0;
-    });
-
-    setNotifications(results);
-    setLoading(false);
-  }, []);
-
+  // Keep the dots for what was new when the screen opened, then mark as read.
+  const newIds = useRef<Set<number> | null>(null);
   useEffect(() => {
-    fetchNotifications();
-  }, [fetchNotifications]);
+    if (loading) return;
+    if (!newIds.current) newIds.current = new Set();
+    const fresh = items.filter(isUnread);
+    if (fresh.length === 0) return;
+    fresh.forEach((n) => newIds.current!.add(n.id));
+    markAllRead();
+  }, [loading, items]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await fetchNotifications();
+    await refresh();
     setRefreshing(false);
-  }, [fetchNotifications]);
+  }, [refresh]);
 
-  const todayItems = notifications.filter((n) => isToday(n.createdAt));
-  const yesterdayItems = notifications.filter((n) => isYesterday(n.createdAt));
-  const olderItems = notifications.filter(
-    (n) => !isToday(n.createdAt) && !isYesterday(n.createdAt),
+  const todayItems = items.filter((n) => isToday(n.created_at));
+  const yesterdayItems = items.filter((n) => isYesterday(n.created_at));
+  const olderItems = items.filter(
+    (n) => !isToday(n.created_at) && !isYesterday(n.created_at),
   );
+
+  const section = (title: string, list: FeedItem[], first = false) =>
+    list.length === 0 ? null : (
+      <>
+        <Text style={[styles.sectionHeader, !first && { marginTop: 10 }]}>
+          {title}
+        </Text>
+        {list.map((n) => (
+          <NotificationCard
+            key={n.id}
+            notif={n}
+            unread={!!newIds.current?.has(n.id) || isUnread(n)}
+            onPress={() => {
+              const route = ROUTES[n.kind];
+              if (route) router.push(route as any);
+            }}
+          />
+        ))}
+      </>
+    );
 
   return (
     <SafeAreaView style={styles.container}>
@@ -160,12 +120,12 @@ export default function AdminNotification() {
         <View style={styles.centered}>
           <ActivityIndicator size="large" color="#2F459B" />
         </View>
-      ) : notifications.length === 0 ? (
+      ) : items.length === 0 ? (
         <View style={styles.centered}>
           <Ionicons name="notifications-off-outline" size={64} color="#DDD" />
           <Text style={styles.emptyTitle}>All caught up!</Text>
           <Text style={styles.emptySubtitle}>
-            No pending enrollments or upcoming events.
+            New enrollments and balance receipts will show up here.
           </Text>
         </View>
       ) : (
@@ -180,47 +140,12 @@ export default function AdminNotification() {
             />
           }
         >
-          {todayItems.length > 0 && (
-            <>
-              <Text style={styles.sectionHeader}>Today</Text>
-              {todayItems.map((n) => (
-                <NotificationCard
-                  key={n.id}
-                  notif={n}
-                  onPress={() => n.route && router.push(n.route as any)}
-                />
-              ))}
-            </>
-          )}
-
-          {yesterdayItems.length > 0 && (
-            <>
-              <Text style={[styles.sectionHeader, { marginTop: 10 }]}>
-                Yesterday
-              </Text>
-              {yesterdayItems.map((n) => (
-                <NotificationCard
-                  key={n.id}
-                  notif={n}
-                  onPress={() => n.route && router.push(n.route as any)}
-                />
-              ))}
-            </>
-          )}
-
-          {olderItems.length > 0 && (
-            <>
-              <Text style={[styles.sectionHeader, { marginTop: 10 }]}>
-                Earlier
-              </Text>
-              {olderItems.map((n) => (
-                <NotificationCard
-                  key={n.id}
-                  notif={n}
-                  onPress={() => n.route && router.push(n.route as any)}
-                />
-              ))}
-            </>
+          {section("Today", todayItems, true)}
+          {section("Yesterday", yesterdayItems, todayItems.length === 0)}
+          {section(
+            "Earlier",
+            olderItems,
+            todayItems.length === 0 && yesterdayItems.length === 0,
           )}
         </ScrollView>
       )}
@@ -230,9 +155,11 @@ export default function AdminNotification() {
 
 function NotificationCard({
   notif,
+  unread,
   onPress,
 }: {
-  notif: Notification;
+  notif: FeedItem;
+  unread: boolean;
   onPress: () => void;
 }) {
   return (
@@ -242,17 +169,22 @@ function NotificationCard({
       activeOpacity={0.7}
     >
       <View style={styles.textContainer}>
-        <Text style={styles.label}>{notif.label}</Text>
-        <Text style={styles.notiTitle}>{notif.title}</Text>
-        {notif.description ? (
-          <Text style={styles.notiDescription} numberOfLines={1}>
-            {notif.description}
-          </Text>
-        ) : null}
+        <Text style={styles.label}>
+          {notif.kind === "enrollment"
+            ? "New Enrollment Arrived!"
+            : `${KIND_LABELS[notif.kind]}!`}
+        </Text>
+        <Text style={styles.notiTitle}>{notif.body || notif.title}</Text>
+        <Text style={styles.notiDescription} numberOfLines={1}>
+          {notif.kind === "enrollment"
+            ? "Awaiting your review and approval"
+            : "Check the student's remaining balance receipt"}
+        </Text>
       </View>
       <View style={styles.dateTimeContainer}>
-        <Text style={styles.notiDate}>{notif.date}</Text>
-        <Text style={styles.notiTime}>{notif.time}</Text>
+        <Text style={styles.notiDate}>{formatDate(notif.created_at)}</Text>
+        <Text style={styles.notiTime}>{formatTime(notif.created_at)}</Text>
+        {unread && <View style={styles.unreadDot} />}
       </View>
     </TouchableOpacity>
   );
@@ -308,4 +240,11 @@ const styles = StyleSheet.create({
   dateTimeContainer: { alignItems: "flex-end" },
   notiDate: { fontSize: 10, color: "#777" },
   notiTime: { fontSize: 10, color: "#777", fontWeight: "bold" },
+  unreadDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#2F459B",
+    marginTop: 6,
+  },
 });
