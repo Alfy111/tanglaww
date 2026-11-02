@@ -1,8 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
+  Animated,
+  Easing,
   Image,
+  ImageSourcePropType,
+  LayoutChangeEvent,
   Linking,
   Modal,
   SafeAreaView,
@@ -94,6 +98,120 @@ function ContactModal({
   );
 }
 
+const SLIDES: { source: ImageSourcePropType; direction: "ltr" | "rtl" }[] = [
+  { source: require("../assets/images/landing-1.png"), direction: "ltr" },
+  { source: require("../assets/images/landing-2.png"), direction: "rtl" },
+];
+const PAN_MS = 9000;
+const FADE_MS = 1000;
+const BLUE_LAYER = "rgba(0, 22, 122, 0.62)";
+
+function slideSize(source: ImageSourcePropType, boxW: number, boxH: number) {
+  const { width: iw, height: ih } = Image.resolveAssetSource(source);
+  const scale = Math.max(boxW / iw, boxH / ih);
+  const width = iw * scale;
+  const height = ih * scale;
+  return {
+    width,
+    height,
+    extra: Math.max(0, width - boxW),
+    top: (boxH - height) / 2,
+  };
+}
+
+function MovingBackground() {
+  const [box, setBox] = useState({ w: 0, h: 0 });
+  const opacity = useRef(
+    SLIDES.map((_, i) => new Animated.Value(i === 0 ? 1 : 0)),
+  ).current;
+  const shift = useRef(SLIDES.map(() => new Animated.Value(0))).current;
+
+  const onLayout = (e: LayoutChangeEvent) => {
+    const { width, height } = e.nativeEvent.layout;
+    if (width !== box.w || height !== box.h) setBox({ w: width, h: height });
+  };
+
+  useEffect(() => {
+    if (!box.w || !box.h) return;
+    let stopped = false;
+    let running: Animated.CompositeAnimation | null = null;
+
+    const play = (i: number, prev: number | null) => {
+      if (stopped) return;
+      const { extra } = slideSize(SLIDES[i].source, box.w, box.h);
+      // left to right: photo starts showing its right side and moves right
+      const from = SLIDES[i].direction === "ltr" ? -extra : 0;
+      const to = SLIDES[i].direction === "ltr" ? 0 : -extra;
+      shift[i].setValue(from);
+
+      const steps: Animated.CompositeAnimation[] = [
+        Animated.timing(shift[i], {
+          toValue: to,
+          duration: PAN_MS,
+          easing: Easing.linear,
+          useNativeDriver: true,
+        }),
+      ];
+      if (prev !== null) {
+        steps.push(
+          Animated.timing(opacity[i], {
+            toValue: 1,
+            duration: FADE_MS,
+            useNativeDriver: true,
+          }),
+          Animated.timing(opacity[prev], {
+            toValue: 0,
+            duration: FADE_MS,
+            useNativeDriver: true,
+          }),
+        );
+      }
+      running = Animated.parallel(steps);
+      running.start(({ finished }) => {
+        if (finished) play((i + 1) % SLIDES.length, i);
+      });
+    };
+
+    opacity.forEach((o, i) => o.setValue(i === 0 ? 1 : 0));
+    play(0, null);
+    return () => {
+      stopped = true;
+      running?.stop();
+    };
+  }, [box.w, box.h, opacity, shift]);
+
+  return (
+    <View
+      style={StyleSheet.absoluteFill}
+      onLayout={onLayout}
+      pointerEvents="none"
+    >
+      {box.w > 0 &&
+        SLIDES.map((slide, i) => {
+          const size = slideSize(slide.source, box.w, box.h);
+          return (
+            <Animated.Image
+              key={i}
+              source={slide.source}
+              style={{
+                position: "absolute",
+                left: 0,
+                top: size.top,
+                width: size.width,
+                height: size.height,
+                opacity: opacity[i],
+                transform: [{ translateX: shift[i] }],
+              }}
+            />
+          );
+        })}
+      <View
+        style={[StyleSheet.absoluteFill, { backgroundColor: BLUE_LAYER }]}
+      />
+    </View>
+  );
+}
+
 export default function LoginScreen() {
   const router = useRouter();
   const [contactVisible, setContactVisible] = useState(false);
@@ -101,6 +219,7 @@ export default function LoginScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.topSection}>
+        <MovingBackground />
         <TouchableOpacity
           style={styles.floatingContactBtn}
           onPress={() => setContactVisible(true)}
@@ -108,11 +227,16 @@ export default function LoginScreen() {
         >
           <Ionicons name="headset-outline" size={25} color="#2F459B" />
         </TouchableOpacity>
-        <Image
-          source={require("../assets/images/business-idea (1).png")}
-          style={styles.illustration}
-          resizeMode="contain"
-        />
+        <View style={styles.brand}>
+          <View style={styles.logoCircle}>
+            <Image
+              source={require("../assets/icons/splash-icon-dark.png")}
+              style={styles.logoImage}
+              resizeMode="contain"
+            />
+          </View>
+          <Text style={styles.brandName}>Tanglaw</Text>
+        </View>
       </View>
       <View style={styles.bottomSection}>
         <View style={{ height: 50 }} />
@@ -165,14 +289,38 @@ const styles = StyleSheet.create({
   },
   topSection: {
     flex: 1.3,
-    backgroundColor: "#FFD75E",
+    backgroundColor: "#00167a",
     justifyContent: "center",
     alignItems: "center",
-    paddingTop: 50,
+    paddingTop: 30,
+    paddingBottom: 40,
+    overflow: "hidden",
   },
-  illustration: {
-    width: "70%",
-    height: "70%",
+  brand: { alignItems: "center" },
+  logoCircle: {
+    width: 130,
+    height: 130,
+    borderRadius: 80,
+    backgroundColor: "white",
+    justifyContent: "center",
+    alignItems: "center",
+    overflow: "hidden",
+    elevation: 8,
+    shadowColor: "#000",
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+  },
+  logoImage: { width: 240, height: 240, transform: [{ translateX: -2 }] },
+  brandName: {
+    marginTop: 14,
+    color: "white",
+    fontSize: 32,
+    fontWeight: "bold",
+    letterSpacing: 1,
+    textShadowColor: "rgba(0,0,0,0.35)",
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 6,
   },
   bottomSection: {
     flex: 1,

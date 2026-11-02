@@ -1,4 +1,8 @@
+import NetworkStatusBanner from "@/components/NetworkStatusBanner";
+import NotificationToaster from "@/components/NotificationToaster";
+import UpdatePrompt from "@/components/UpdatePrompt";
 import { AdminProvider } from "@/context/AdminContext";
+import { ThemeProvider } from "@/context/ThemeContext";
 import {
   clearLocalSession,
   generateSessionToken,
@@ -6,9 +10,6 @@ import {
   validateSession,
 } from "@/lib/session";
 import { supabase } from "@/lib/supabase";
-import { ThemeProvider } from "@/context/ThemeContext";
-import NetworkStatusBanner from "@/components/NetworkStatusBanner";
-import UpdatePrompt from "@/components/UpdatePrompt";
 import type { Session } from "@supabase/supabase-js";
 import { Stack, usePathname, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
@@ -288,6 +289,7 @@ export default function RootLayout() {
           <UpdatePrompt />
           <View style={{ flex: 1 }}>
             <AuthGate>
+              <NotificationToaster />
               <Stack screenOptions={{ headerShown: false, animation: "fade" }}>
                 <Stack.Screen name="index" />
                 <Stack.Screen name="welcome" />

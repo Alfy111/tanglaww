@@ -95,7 +95,7 @@ export default function RegistrantDetails() {
         ),
         paymentDetails (
           amountTransferred, referenceNumber, dateOfPayment,
-          proofOfPaymentUrl, paymentType, balanceProofUrl, balanceSubmittedAt,
+          proofOfPaymentUrl, additionalPayments, paymentType, balanceProofUrl, balanceSubmittedAt,
           payment_channel!paymentDetails_paymentChannel_id_fkey (paymentChannelName)
         )
       `,
@@ -426,6 +426,21 @@ export default function RegistrantDetails() {
     ? enrollment.paymentDetails[0]
     : enrollment?.paymentDetails;
   const proofUrl = payment?.proofOfPaymentUrl;
+  const extraPayments: any[] = Array.isArray(payment?.additionalPayments)
+    ? payment.additionalPayments
+    : [];
+  const totalPaid = [
+    payment?.amountTransferred,
+    ...extraPayments.map((p) => p.amountTransferred),
+  ].reduce((sum: number, v: any) => sum + (Number(v) || 0), 0);
+  const longDate = (iso?: string | null) =>
+    iso
+      ? new Date(iso).toLocaleDateString("en-PH", {
+          month: "long",
+          day: "numeric",
+          year: "numeric",
+        })
+      : "Not set";
 
   const verification = Array.isArray(enrollment?.verification)
     ? enrollment.verification[0]
@@ -541,6 +556,32 @@ export default function RegistrantDetails() {
             label="Payment Type"
             value={PAYMENT_TYPE_LABELS[payment?.paymentType] ?? "Not specified"}
           />
+          {extraPayments.map((p, i) => (
+            <View key={`pay-${i}`}>
+              <DetailRow
+                label={`Payment ${i + 2} Channel`}
+                value={p.paymentChannelName}
+              />
+              <DetailRow
+                label={`Payment ${i + 2} Amount`}
+                value={p.amountTransferred?.toString()}
+              />
+              <DetailRow
+                label={`Payment ${i + 2} Reference #`}
+                value={p.referenceNumber}
+              />
+              <DetailRow
+                label={`Payment ${i + 2} Date`}
+                value={longDate(p.dateOfPayment)}
+              />
+            </View>
+          ))}
+          {extraPayments.length > 0 && (
+            <DetailRow
+              label="Total Paid"
+              value={`₱${totalPaid.toLocaleString("en-PH", { maximumFractionDigits: 2 })}`}
+            />
+          )}
         </InfoRow>
 
         <Text style={[styles.sectionLabel, { marginTop: 20 }]}>Documents:</Text>
@@ -549,9 +590,23 @@ export default function RegistrantDetails() {
           style={styles.infoRow}
           onPress={() => openDocument(proofUrl, "Proof of Payment")}
         >
-          <Text style={styles.infoRowText}>Proof of Payment</Text>
+          <Text style={styles.infoRowText}>
+            {extraPayments.length ? "Proof of Payment 1" : "Proof of Payment"}
+          </Text>
           <Ionicons name="chevron-forward" size={20} color="#555" />
         </TouchableOpacity>
+        {extraPayments.map((p, i) => (
+          <TouchableOpacity
+            key={`proof-${i}`}
+            style={styles.infoRow}
+            onPress={() =>
+              openDocument(p.proofUrl, `Proof of Payment ${i + 2}`)
+            }
+          >
+            <Text style={styles.infoRowText}>Proof of Payment {i + 2}</Text>
+            <Ionicons name="chevron-forward" size={20} color="#555" />
+          </TouchableOpacity>
+        ))}
 
         <TouchableOpacity
           style={styles.infoRow}
