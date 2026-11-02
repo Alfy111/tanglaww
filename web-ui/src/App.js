@@ -1,4 +1,5 @@
 import { Navigate, Route, Routes } from "react-router-dom";
+import OfflineBanner from "./components/OfflineBanner";
 import { applyUserTheme, getUserThemePreference } from "./lib/userTheme";
 import About from "./pages/About";
 import ActivationSuccess from "./pages/ActivationSuccess";
@@ -41,92 +42,100 @@ import Settings from "./pages/Settings";
 import SignIn from "./pages/SignIn";
 import SignInWithCode from "./pages/SignInWithCode";
 import Terms from "./pages/Terms";
-
 export default function App() {
   applyUserTheme(getUserThemePreference());
 
   return (
-    <Routes>
-      <Route path="/" element={<Home />} />
-      <Route path="/enroll" element={<Enroll />} />
-      <Route path="/signin" element={<SignIn />} />
-      <Route path="/forgot-password" element={<PasswordRecovery />} />
-      <Route
-        path="/reset-password"
-        element={<PasswordRecovery isResetPage />}
-      />
-      <Route path="/signin/code" element={<SignInWithCode />} />
-      <Route path="/dashboard" element={<Dashboard />} />
-      <Route path="/dashboard/Analytics" element={<Analytics />} />
-      <Route path="/dashboard/courses" element={<Courses />} />
-      <Route
-        path="/dashboard/courses/:courseId"
-        element={<CourseMaterials />}
-      />
-      <Route path="/dashboard/quiz/:assessmentId" element={<QuizDetails />} />
-      <Route path="/dashboard/quiz/attempt/:attemptId" element={<QuizTake />} />
-      <Route
-        path="/dashboard/quiz/review/:attemptId"
-        element={<QuizReview />}
-      />
-      <Route path="/dashboard/calendar" element={<Calendar />} />
-      <Route path="/dashboard/profile" element={<Profile />} />
-      <Route path="/dashboard/about" element={<About />} />
-      <Route path="/dashboard/help" element={<Help />} />
-      <Route path="/dashboard/terms" element={<Terms />} />
-      <Route path="/dashboard/settings" element={<Settings />} />
-      <Route
-        path="/dashboard/settings/change-password"
-        element={<ChangePassword />}
-      />
-      <Route path="/dashboard/notifications" element={<Notifications />} />
-      <Route path="/admin/signin" element={<AdminSignIn />} />
-      <Route path="/admin/activate" element={<AdminActivate />} />
-      <Route
-        path="/admin/forgot-password"
-        element={<PasswordRecovery isAdmin />}
-      />
-      <Route
-        path="/admin/reset-password"
-        element={<PasswordRecovery isAdmin isResetPage />}
-      />
-      <Route path="/admin/dashboard" element={<AdminDashboard />} />
-      <Route path="/admin/approvals" element={<AdminApprovals />} />
-      <Route path="/admin/audit-queue" element={<AdminAuditQueue />} />
-      <Route path="/admin/students" element={<AdminStudentRegistry />} />
-      <Route path="/admin/about" element={<AdminAbout />} />
-      <Route path="/admin/calendar" element={<AdminCalendar />} />
-      <Route path="/admin/carousel" element={<AdminCarousel />} />
-      <Route path="/admin/courses" element={<AdminCourses />} />
-      <Route path="/admin/analytics" element={<AdminAnalytics />} />
-      <Route path="/admin/help" element={<AdminHelp />} />
-      <Route path="/admin/policies" element={<AdminPolicies />} />
-      <Route path="/admin/audit-log" element={<AdminAuditLog />} />
-      <Route
-        path="/admin/courses/:courseId/handouts"
-        element={<AdminHandouts />}
-      />
-      <Route
-        path="/our-courses"
-        element={<Navigate to="/#courses" replace />}
-      />
-      <Route path="/about-us" element={<Navigate to="/#about" replace />} />
-      <Route path="/helpdesk" element={<Navigate to="/#helpdesk" replace />} />
-      <Route
-        path="/admin/courses/:courseId/recorded-sessions"
-        element={<AdminRecordedSessions />}
-      />
-      <Route path="/admin/courses/:courseId/quiz" element={<AdminQuiz />} />
-      <Route
-        path="/admin/courses/:courseId/quiz/:assessmentId"
-        element={<AdminQuizEditor />}
-      />
-      <Route
-        path="/admin/courses/:courseId/online-session"
-        element={<AdminOnlineSession />}
-      />
-      <Route path="/admin/manage-admins" element={<AdminManageAdmins />} />
-      <Route path="/signin/success" element={<ActivationSuccess />} />
-    </Routes>
+    <>
+      <OfflineBanner />
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/enroll" element={<Enroll />} />
+        <Route path="/signin" element={<SignIn />} />
+        <Route path="/forgot-password" element={<PasswordRecovery />} />
+        <Route
+          path="/reset-password"
+          element={<PasswordRecovery isResetPage />}
+        />
+        <Route path="/signin/code" element={<SignInWithCode />} />
+        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/dashboard/Analytics" element={<Analytics />} />
+        <Route path="/dashboard/courses" element={<Courses />} />
+        <Route
+          path="/dashboard/courses/:courseId"
+          element={<CourseMaterials />}
+        />
+        <Route path="/dashboard/quiz/:assessmentId" element={<QuizDetails />} />
+        <Route
+          path="/dashboard/quiz/attempt/:attemptId"
+          element={<QuizTake />}
+        />
+        <Route
+          path="/dashboard/quiz/review/:attemptId"
+          element={<QuizReview />}
+        />
+        <Route path="/dashboard/calendar" element={<Calendar />} />
+        <Route path="/dashboard/profile" element={<Profile />} />
+        <Route path="/dashboard/about" element={<About />} />
+        <Route path="/dashboard/help" element={<Help />} />
+        <Route path="/dashboard/terms" element={<Terms />} />
+        <Route path="/dashboard/settings" element={<Settings />} />
+        <Route
+          path="/dashboard/settings/change-password"
+          element={<ChangePassword />}
+        />
+        <Route path="/dashboard/notifications" element={<Notifications />} />
+        <Route path="/admin/signin" element={<AdminSignIn />} />
+        <Route path="/admin/activate" element={<AdminActivate />} />
+        <Route
+          path="/admin/forgot-password"
+          element={<PasswordRecovery isAdmin />}
+        />
+        <Route
+          path="/admin/reset-password"
+          element={<PasswordRecovery isAdmin isResetPage />}
+        />
+        <Route path="/admin/dashboard" element={<AdminDashboard />} />
+        <Route path="/admin/approvals" element={<AdminApprovals />} />
+        <Route path="/admin/audit-queue" element={<AdminAuditQueue />} />
+        <Route path="/admin/students" element={<AdminStudentRegistry />} />
+        <Route path="/admin/about" element={<AdminAbout />} />
+        <Route path="/admin/calendar" element={<AdminCalendar />} />
+        <Route path="/admin/carousel" element={<AdminCarousel />} />
+        <Route path="/admin/courses" element={<AdminCourses />} />
+        <Route path="/admin/analytics" element={<AdminAnalytics />} />
+        <Route path="/admin/help" element={<AdminHelp />} />
+        <Route path="/admin/policies" element={<AdminPolicies />} />
+        <Route path="/admin/audit-log" element={<AdminAuditLog />} />
+        <Route
+          path="/admin/courses/:courseId/handouts"
+          element={<AdminHandouts />}
+        />
+        <Route
+          path="/our-courses"
+          element={<Navigate to="/#courses" replace />}
+        />
+        <Route path="/about-us" element={<Navigate to="/#about" replace />} />
+        <Route
+          path="/helpdesk"
+          element={<Navigate to="/#helpdesk" replace />}
+        />
+        <Route
+          path="/admin/courses/:courseId/recorded-sessions"
+          element={<AdminRecordedSessions />}
+        />
+        <Route path="/admin/courses/:courseId/quiz" element={<AdminQuiz />} />
+        <Route
+          path="/admin/courses/:courseId/quiz/:assessmentId"
+          element={<AdminQuizEditor />}
+        />
+        <Route
+          path="/admin/courses/:courseId/online-session"
+          element={<AdminOnlineSession />}
+        />
+        <Route path="/admin/manage-admins" element={<AdminManageAdmins />} />
+        <Route path="/signin/success" element={<ActivationSuccess />} />
+      </Routes>
+    </>
   );
 }

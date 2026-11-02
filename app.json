@@ -24,9 +24,7 @@
       "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#00167a",
-        "foregroundImage": "./assets/icons/adaptive-icon.png",
-        "backgroundImage": "./assets/icons/adaptive-icon.png",
-        "monochromeImage": "./assets/icons/adaptive-icon.png"
+        "foregroundImage": "./assets/icons/ios-dark.png"
       },
       "predictiveBackGestureEnabled": false,
       "intentFilters": [
@@ -37,10 +35,7 @@
               "scheme": "tanglaw"
             }
           ],
-          "category": [
-            "BROWSABLE",
-            "DEFAULT"
-          ]
+          "category": ["BROWSABLE", "DEFAULT"]
         }
       ]
     },
@@ -62,12 +57,13 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/icons/splash-icon-light.png",
+          "image": "./assets/icons/splash-icon-dark.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#00167a",
+          "backgroundColor": "#ffffff",
           "dark": {
-            "backgroundColor": "#ffffff"
+            "image": "./assets/icons/splash-icon-light.png",
+            "backgroundColor": "#00167a"
           }
         }
       ],

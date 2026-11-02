@@ -139,14 +139,16 @@ export default function Step2Curriculum({ data, setData, onNext, onBack }) {
           <textarea
             id="enroll-comments"
             className="field-input"
-            rows={3}
+            rows={1}
             maxLength={500}
             placeholder="Other specialization"
             value={data.comments ?? ""}
             onChange={(e) =>
               setData({
                 ...data,
-                comments: e.target.value.replace(/\d/g, "").toUpperCase(),
+                comments: e.target.value
+                  .replace(/[^A-Za-zÀ-ÖØ-öø-ÿ\s.,'()&-]/g, "")
+                  .toUpperCase(),
               })
             }
             style={{ resize: "vertical", fontFamily: "inherit" }}

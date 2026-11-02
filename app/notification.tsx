@@ -1,11 +1,16 @@
-import { supabase } from "@/lib/supabase";
+import {
+  FeedItem,
+  KIND_LABELS,
+  useNotificationFeed,
+} from "@/lib/notifications";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Linking,
   Modal,
+  RefreshControl,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -13,15 +18,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-
-interface CalendarEvent {
-  event_id: number;
-  title: string;
-  description: string | null;
-  event_date: string;
-  link: string | null;
-  created_at: string;
-}
 
 const formatDate = (iso: string) =>
   new Date(iso).toLocaleDateString("en-US", {
@@ -57,95 +53,94 @@ const isYesterday = (iso: string) => {
   );
 };
 
+const minutesUntil = (iso: string) =>
+  Math.max(1, Math.round((new Date(iso).getTime() - Date.now()) / 60000));
+
 export default function StudentNotifications() {
   const router = useRouter();
-  const [events, setEvents] = useState<CalendarEvent[]>([]);
-  const [announcements, setAnnouncements] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(
-    null,
-  );
-  const [modalVisible, setModalVisible] = useState(false);
+  const { items, loading, soon, isUnread, markAllRead, refresh } =
+    useNotificationFeed("student");
+  const [refreshing, setRefreshing] = useState(false);
+  const [selected, setSelected] = useState<FeedItem | null>(null);
 
+  // Remember which items were unread when the screen opened (for the dots),
+  // then mark everything as read.
+  const unreadAtOpen = useRef<Set<number> | null>(null);
   useEffect(() => {
-    const fetchAll = async () => {
-      await Promise.all([
-        supabase
-          .from("calendar_events")
-          .select("*")
-          .order("created_at", { ascending: false })
-          .then(({ data, error }) => {
-            if (!error && data) setEvents(data);
-          }),
-        supabase
-          .from("announcements")
-          .select("*")
-          .order("created_at", { ascending: false })
-          .then(({ data, error }) => {
-            if (!error && data) setAnnouncements(data);
-          }),
-      ]);
-      setLoading(false);
-    };
-    fetchAll();
-  }, []);
+    if (loading || unreadAtOpen.current) return;
+    unreadAtOpen.current = new Set(items.filter(isUnread).map((n) => n.id));
+    markAllRead();
+  }, [loading]);
+  // New items that arrive while the screen is open count as unread too
+  const showDot = (n: FeedItem) =>
+    unreadAtOpen.current?.has(n.id) || isUnread(n);
+  useEffect(() => {
+    if (loading || !unreadAtOpen.current) return;
+    const fresh = items.filter(isUnread);
+    if (fresh.length === 0) return;
+    fresh.forEach((n) => unreadAtOpen.current!.add(n.id));
+    markAllRead();
+  }, [items]);
 
-  const todayEvents = events.filter((e) => isToday(e.created_at));
-  const yesterdayEvents = events.filter((e) => isYesterday(e.created_at));
-  const olderEvents = events.filter(
-    (e) => !isToday(e.created_at) && !isYesterday(e.created_at),
-  );
-
-  const todayAnnouncements = announcements.filter((a) => isToday(a.created_at));
-  const yesterdayAnnouncements = announcements.filter((a) =>
-    isYesterday(a.created_at),
-  );
-  const olderAnnouncements = announcements.filter(
-    (a) => !isToday(a.created_at) && !isYesterday(a.created_at),
-  );
-
-  const openModal = (event: CalendarEvent) => {
-    setSelectedEvent(event);
-    setModalVisible(true);
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await refresh();
+    setRefreshing(false);
   };
 
-  const NotificationItem = ({ event }: { event: CalendarEvent }) => (
+  const today = items.filter((n) => isToday(n.created_at));
+  const yesterday = items.filter((n) => isYesterday(n.created_at));
+  const older = items.filter(
+    (n) => !isToday(n.created_at) && !isYesterday(n.created_at),
+  );
+
+  const openItem = (n: FeedItem) => {
+    if (n.kind === "quiz") {
+      router.push("/courses" as any);
+      return;
+    }
+    setSelected(n);
+  };
+
+  const Card = ({ n, highlight }: { n: FeedItem; highlight?: boolean }) => (
     <TouchableOpacity
-      style={styles.notificationCard}
-      onPress={() => openModal(event)}
+      style={[styles.notificationCard, highlight && styles.soonCard]}
+      onPress={() => openItem(n)}
     >
       <View style={styles.textContainer}>
-        <Text style={styles.label}>Calendar Event Posted!</Text>
-        <Text style={styles.notiTitle}>{event.title}</Text>
-        {event.description && (
+        <Text style={styles.label}>
+          {highlight
+            ? `Starting in ${minutesUntil(n.event_at!)} min`
+            : KIND_LABELS[n.kind]}
+        </Text>
+        <Text style={styles.notiTitle}>{n.title}</Text>
+        {!!n.body && (
           <Text style={styles.notiDescription} numberOfLines={1}>
-            {event.description}
+            {n.body}
           </Text>
         )}
       </View>
       <View style={styles.dateTimeContainer}>
-        <Text style={styles.notiDate}>{formatDate(event.event_date)}</Text>
-        <Text style={styles.notiTime}>{formatTime(event.event_date)}</Text>
+        <Text style={styles.notiDate}>
+          {formatDate(n.event_at ?? n.created_at)}
+        </Text>
+        {!!n.event_at && (
+          <Text style={styles.notiTime}>{formatTime(n.event_at)}</Text>
+        )}
+        {!highlight && showDot(n) && <View style={styles.unreadDot} />}
       </View>
     </TouchableOpacity>
   );
 
-  const AnnouncementItem = ({ item }: { item: any }) => (
-    <View style={styles.notificationCard}>
-      <View style={styles.textContainer}>
-        <Text style={styles.label}>Announcement Posted!</Text>
-        <Text style={styles.notiTitle}>{item.title}</Text>
-        {item.content && (
-          <Text style={styles.notiDescription} numberOfLines={1}>
-            {item.content}
-          </Text>
-        )}
-      </View>
-      <View style={styles.dateTimeContainer}>
-        <Text style={styles.notiDate}>{formatDate(item.created_at)}</Text>
-      </View>
-    </View>
-  );
+  const Section = ({ title, list }: { title: string; list: FeedItem[] }) =>
+    list.length === 0 ? null : (
+      <>
+        <Text style={[styles.sectionHeader, { marginTop: 10 }]}>{title}</Text>
+        {list.map((n) => (
+          <Card key={n.id} n={n} />
+        ))}
+      </>
+    );
 
   return (
     <SafeAreaView style={styles.container}>
@@ -160,70 +155,37 @@ export default function StudentNotifications() {
         <View style={styles.centered}>
           <ActivityIndicator size="large" color="#2F459B" />
         </View>
-      ) : events.length === 0 && announcements.length === 0 ? (
+      ) : items.length === 0 ? (
         <View style={styles.centered}>
           <Ionicons name="notifications-off-outline" size={48} color="#DDD" />
           <Text style={styles.emptyText}>No notifications yet</Text>
         </View>
       ) : (
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          {(todayEvents.length > 0 || todayAnnouncements.length > 0) && (
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+        >
+          {soon.length > 0 && (
             <>
-              <Text style={styles.sectionHeader}>Today</Text>
-              {todayEvents.map((e) => (
-                <NotificationItem key={`event-${e.event_id}`} event={e} />
-              ))}
-              {todayAnnouncements.map((a) => (
-                <AnnouncementItem
-                  key={`announcement-${a.announcement_id}`}
-                  item={a}
-                />
+              <Text style={styles.sectionHeader}>Starting Soon</Text>
+              {soon.map((n) => (
+                <Card key={`soon-${n.id}`} n={n} highlight />
               ))}
             </>
           )}
-
-          {(yesterdayEvents.length > 0 ||
-            yesterdayAnnouncements.length > 0) && (
-            <>
-              <Text style={[styles.sectionHeader, { marginTop: 10 }]}>
-                Yesterday
-              </Text>
-              {yesterdayEvents.map((e) => (
-                <NotificationItem key={`event-${e.event_id}`} event={e} />
-              ))}
-              {yesterdayAnnouncements.map((a) => (
-                <AnnouncementItem
-                  key={`announcement-${a.announcement_id}`}
-                  item={a}
-                />
-              ))}
-            </>
-          )}
-
-          {(olderEvents.length > 0 || olderAnnouncements.length > 0) && (
-            <>
-              <Text style={[styles.sectionHeader, { marginTop: 10 }]}>
-                Earlier
-              </Text>
-              {olderEvents.map((e) => (
-                <NotificationItem key={`event-${e.event_id}`} event={e} />
-              ))}
-              {olderAnnouncements.map((a) => (
-                <AnnouncementItem
-                  key={`announcement-${a.announcement_id}`}
-                  item={a}
-                />
-              ))}
-            </>
-          )}
+          <Section title="Today" list={today} />
+          <Section title="Yesterday" list={yesterday} />
+          <Section title="Earlier" list={older} />
         </ScrollView>
       )}
 
-      <Modal visible={modalVisible} transparent animationType="fade">
+      <Modal visible={!!selected} transparent animationType="fade">
         <TouchableOpacity
           style={styles.modalOverlay}
           activeOpacity={1}
-          onPress={() => setModalVisible(false)}
+          onPress={() => setSelected(null)}
         >
           <View
             style={styles.eventModal}
@@ -236,10 +198,12 @@ export default function StudentNotifications() {
                 marginBottom: 4,
               }}
             >
-              <Text style={styles.eventModalTitle}>{selectedEvent?.title}</Text>
+              <Text style={[styles.eventModalTitle, { flex: 1 }]}>
+                {selected?.title}
+              </Text>
               <TouchableOpacity
-                onPress={() => setModalVisible(false)}
-                style={{ marginLeft: "auto" }}
+                onPress={() => setSelected(null)}
+                style={{ marginLeft: 8 }}
               >
                 <Ionicons name="close" size={24} color="#555" />
               </TouchableOpacity>
@@ -248,31 +212,38 @@ export default function StudentNotifications() {
             <View style={styles.eventModalRow}>
               <Ionicons name="time-outline" size={16} color="#2F459B" />
               <Text style={styles.eventModalMeta}>
-                {selectedEvent ? formatDate(selectedEvent.event_date) : ""}
-                {" · "}
-                {selectedEvent ? formatTime(selectedEvent.event_date) : ""}
+                {selected?.event_at
+                  ? `${formatDate(selected.event_at)} · ${formatTime(selected.event_at)}`
+                  : selected
+                    ? `Posted ${formatDate(selected.created_at)}`
+                    : ""}
               </Text>
             </View>
 
-            {selectedEvent?.description && (
+            {!!selected?.body && (
               <View style={styles.eventModalDescBox}>
-                <Text style={styles.eventModalDescLabel}>Description</Text>
-                <Text style={styles.eventModalDesc}>
-                  {selectedEvent.description}
+                <Text style={styles.eventModalDescLabel}>
+                  {selected.kind === "announcement"
+                    ? "Announcement"
+                    : "Description"}
                 </Text>
+                <Text style={styles.eventModalDesc}>{selected.body}</Text>
               </View>
             )}
 
-            {selectedEvent?.link && (
+            {!!selected?.link && (
               <TouchableOpacity
                 style={styles.eventModalLinkBtn}
-                onPress={() =>
-                  selectedEvent.link && Linking.openURL(selectedEvent.link)
-                }
+                onPress={() => {
+                  const link = selected.link!;
+                  Linking.openURL(
+                    /^https?:\/\//i.test(link) ? link : `https://${link}`,
+                  );
+                }}
               >
                 <Ionicons name="link-outline" size={16} color="#2F459B" />
                 <Text style={styles.eventModalLinkText} numberOfLines={1}>
-                  {selectedEvent.link}
+                  {selected.link}
                 </Text>
                 <Ionicons name="open-outline" size={14} color="#2F459B" />
               </TouchableOpacity>
@@ -280,7 +251,7 @@ export default function StudentNotifications() {
 
             <TouchableOpacity
               style={styles.eventModalCloseBtn}
-              onPress={() => setModalVisible(false)}
+              onPress={() => setSelected(null)}
             >
               <Text style={styles.eventModalCloseBtnText}>Close</Text>
             </TouchableOpacity>
@@ -408,6 +379,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   eventModalCloseBtnText: { color: "white", fontWeight: "bold", fontSize: 14 },
+  soonCard: { backgroundColor: "#EEF1FF", borderWidth: 2 },
+  unreadDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#2F459B",
+    marginTop: 6,
+  },
   label: {
     fontSize: 11,
     fontWeight: "700",

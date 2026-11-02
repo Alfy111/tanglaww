@@ -1,197 +1,166 @@
-import { Bell, CheckCheck, X } from "lucide-react";
+import { Bell, CheckCheck } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { KIND_LABELS, useNotificationFeed } from "../lib/notifications";
 
-const MOCK_NOTIFICATIONS = [
-  {
-    id: 1,
-    type: "Calendar Event",
-    title: "Test meeting",
-    date: "May 22, 2026",
-    time: "6:45 PM",
-    read: false,
-  },
-  {
-    id: 2,
-    type: "Calendar Event",
-    title: "Tanglaw Meeting",
-    date: "May 22, 2026",
-    time: "6:30 PM",
-    read: false,
-  },
-  {
-    id: 3,
-    type: "Announcement",
-    title: "Testing",
-    subtitle: "Greetings!",
-    date: "May 22, 2026",
-    time: "",
-    read: false,
-  },
-  {
-    id: 4,
-    type: "Calendar Event",
-    title: "Testing",
-    subtitle: "Testing",
-    date: "May 31, 2026",
-    time: "6:30 AM",
-    read: true,
-  },
-  {
-    id: 5,
-    type: "Calendar Event",
-    title: "Test",
-    subtitle: "Testing",
-    date: "May 29, 2026",
-    time: "12:00 PM",
-    read: true,
-  },
-  {
-    id: 6,
-    type: "Calendar Event",
-    title: "LEPT Advanced",
-    subtitle: "Meeting",
-    date: "May 2, 2026",
-    time: "12:00 AM",
-    read: true,
-  },
-  {
-    id: 7,
-    type: "Calendar Event",
-    title: "LEPT On Boarding",
-    subtitle: "Meeting",
-    date: "Apr 25, 2026",
-    time: "6:17 PM",
-    read: true,
-  },
-];
+const formatDate = (iso) =>
+  new Date(iso).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+const formatTime = (iso) =>
+  new Date(iso).toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+const dayStart = (d) => {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  return x.getTime();
+};
+
+// Where clicking an item goes
+const routeFor = (n) => {
+  if (n.kind === "enrollment") return "/admin/approvals";
+  if (n.kind === "balance_receipt") return "/admin/students";
+  if (n.kind === "quiz") return "/dashboard/courses";
+  return null;
+};
 
 export default function NotificationBell({ isAdmin = false }) {
   const [open, setOpen] = useState(false);
-  const [notifs, setNotifs] = useState(MOCK_NOTIFICATIONS);
+  const [confirmClear, setConfirmClear] = useState(false);
   const ref = useRef();
   const navigate = useNavigate();
-
-  const unreadCount = notifs.filter((n) => !n.read).length;
-
-  // Group notifications by date (Yesterday/Earlier)
-  const groupByDate = () => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-    yesterday.setHours(0, 0, 0, 0);
-
-    const grouped = { yesterday: [], earlier: [] };
-    notifs.forEach((n) => {
-      const notifDate = new Date(n.date);
-      notifDate.setHours(0, 0, 0, 0);
-      if (notifDate.getTime() === yesterday.getTime()) {
-        grouped.yesterday.push(n);
-      } else {
-        grouped.earlier.push(n);
-      }
-    });
-    return grouped;
-  };
-
-  const grouped = groupByDate();
+  const { items, unreadCount, isUnread, markAllRead, clearAll } =
+    useNotificationFeed(isAdmin ? "admin" : "student");
 
   useEffect(() => {
     const handler = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+      if (ref.current && !ref.current.contains(e.target)) {
+        setOpen(false);
+        setConfirmClear(false);
+      }
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const markAllRead = () =>
-    setNotifs((n) => n.map((item) => ({ ...item, read: true })));
-  const dismiss = (id) => setNotifs((n) => n.filter((item) => item.id !== id));
+  const today = dayStart(Date.now());
+  const yesterday = today - 24 * 60 * 60 * 1000;
+  const groups = [
+    ["Today", items.filter((n) => dayStart(n.created_at) === today)],
+    ["Yesterday", items.filter((n) => dayStart(n.created_at) === yesterday)],
+    ["Earlier", items.filter((n) => dayStart(n.created_at) < yesterday)],
+  ];
 
-  if (isAdmin) {
+  const renderNotificationItem = (n) => {
+    const route = routeFor(n);
     return (
       <div
-        onClick={() => navigate("/admin/announcements")}
-        style={{ position: "relative", cursor: "pointer" }}
-      >
-        <Bell size={20} color="#fff" />
-      </div>
-    );
-  }
-
-  // Render notification item with blue-bordered box design
-  const renderNotificationItem = (n) => (
-    <div
-      key={n.id}
-      style={{
-        border: "1px solid #1a1a6e",
-        borderRadius: "12px",
-        padding: "16px",
-        marginBottom: "12px",
-        backgroundColor: "#fff",
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "flex-start",
-        gap: "12px",
-        fontFamily: "Poppins, sans-serif",
-      }}
-    >
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div
-          style={{
-            fontSize: "11px",
-            color: "#1a1a6e",
-            fontStyle: "italic",
-            fontWeight: "600",
-          }}
-        >
-          {n.type}
-        </div>
-        <div
-          style={{
-            fontSize: "14px",
-            fontWeight: "700",
-            color: "#1a1a6e",
-            marginTop: "4px",
-          }}
-        >
-          {n.title}
-        </div>
-        {n.subtitle && (
-          <div style={{ fontSize: "12px", color: "#666", marginTop: "2px" }}>
-            {n.subtitle}
-          </div>
-        )}
-        <div style={{ fontSize: "12px", color: "#aaa", marginTop: "6px" }}>
-          {n.date} {n.time && `· ${n.time}`}
-        </div>
-      </div>
-      <button
-        onClick={() => dismiss(n.id)}
+        key={n.id}
+        onClick={
+          route
+            ? () => {
+                setOpen(false);
+                navigate(route);
+              }
+            : undefined
+        }
         style={{
-          background: "none",
-          border: "none",
-          cursor: "pointer",
-          color: "#ccc",
-          padding: "4px",
-          flexShrink: 0,
+          border: "1px solid #1a1a6e",
+          borderRadius: "12px",
+          padding: "16px",
+          marginBottom: "12px",
+          backgroundColor: "#fff",
           display: "flex",
-          alignItems: "center",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          gap: "12px",
+          fontFamily: "Poppins, sans-serif",
+          cursor: route ? "pointer" : "default",
         }}
       >
-        <X size={16} />
-      </button>
-    </div>
-  );
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div
+            style={{
+              fontSize: "11px",
+              color: "#1a1a6e",
+              fontStyle: "italic",
+              fontWeight: "600",
+            }}
+          >
+            {KIND_LABELS[n.kind]}
+          </div>
+          <div
+            style={{
+              fontSize: "14px",
+              fontWeight: "700",
+              color: "#1a1a6e",
+              marginTop: "4px",
+            }}
+          >
+            {n.title}
+          </div>
+          {n.body && (
+            <div
+              style={{
+                fontSize: "12px",
+                color: "#666",
+                marginTop: "2px",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {n.body}
+            </div>
+          )}
+          <div style={{ fontSize: "12px", color: "#aaa", marginTop: "6px" }}>
+            {n.event_at
+              ? `${formatDate(n.event_at)} · ${formatTime(n.event_at)}`
+              : formatDate(n.created_at)}
+          </div>
+        </div>
+        {isUnread(n) && (
+          <div
+            style={{
+              width: "8px",
+              height: "8px",
+              borderRadius: "50%",
+              backgroundColor: "#1a1a6e",
+              flexShrink: 0,
+              marginTop: "4px",
+            }}
+          />
+        )}
+      </div>
+    );
+  };
+
+  const sectionTitle = {
+    fontSize: "12px",
+    fontWeight: "700",
+    color: "#666",
+    marginBottom: "12px",
+    textTransform: "uppercase",
+    letterSpacing: "0.5px",
+  };
 
   return (
     <div ref={ref} style={{ position: "relative" }}>
       <div
+        role="button"
+        tabIndex={0}
+        aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ""}`}
         onClick={() => setOpen((o) => !o)}
-        style={{ position: "relative", cursor: "pointer" }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") setOpen((o) => !o);
+        }}
+        style={{ position: "relative", cursor: "pointer", display: "flex" }}
       >
-        <Bell size={20} color="#fff" />
+        <Bell size={20} color={isAdmin ? "#1a1a2e" : "#fff"} />
         {unreadCount > 0 && (
           <div
             style={{
@@ -200,9 +169,11 @@ export default function NotificationBell({ isAdmin = false }) {
               right: "-6px",
               backgroundColor: "#e53935",
               color: "#fff",
-              borderRadius: "50%",
-              width: "16px",
+              borderRadius: "8px",
+              minWidth: "16px",
               height: "16px",
+              padding: "0 3px",
+              boxSizing: "border-box",
               fontSize: "10px",
               fontWeight: "700",
               display: "flex",
@@ -210,7 +181,7 @@ export default function NotificationBell({ isAdmin = false }) {
               justifyContent: "center",
             }}
           >
-            {unreadCount}
+            {unreadCount > 99 ? "99+" : unreadCount}
           </div>
         )}
       </div>
@@ -221,7 +192,7 @@ export default function NotificationBell({ isAdmin = false }) {
             position: "absolute",
             top: "36px",
             right: 0,
-            width: "420px",
+            width: "min(420px, calc(100vw - 32px))",
             backgroundColor: "#fff",
             borderRadius: "14px",
             boxShadow: "0 8px 32px rgba(0,0,0,0.15)",
@@ -230,7 +201,6 @@ export default function NotificationBell({ isAdmin = false }) {
             fontFamily: "Poppins, sans-serif",
           }}
         >
-          {/* Header */}
           <div
             style={{
               padding: "20px",
@@ -246,32 +216,34 @@ export default function NotificationBell({ isAdmin = false }) {
             >
               Notifications
             </span>
-            <button
-              onClick={markAllRead}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "4px",
-                backgroundColor: "#f0f3ff",
-                color: "#1a1a6e",
-                border: "none",
-                borderRadius: "6px",
-                padding: "6px 10px",
-                fontSize: "11px",
-                fontWeight: "600",
-                cursor: "pointer",
-                fontFamily: "Poppins, sans-serif",
-              }}
-            >
-              <CheckCheck size={13} /> Mark all read
-            </button>
+            {unreadCount > 0 && (
+              <button
+                type="button"
+                onClick={markAllRead}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "4px",
+                  backgroundColor: "#f0f3ff",
+                  color: "#1a1a6e",
+                  border: "none",
+                  borderRadius: "6px",
+                  padding: "6px 10px",
+                  fontSize: "11px",
+                  fontWeight: "600",
+                  cursor: "pointer",
+                  fontFamily: "Poppins, sans-serif",
+                }}
+              >
+                <CheckCheck size={13} /> Mark all read
+              </button>
+            )}
           </div>
 
-          {/* Notifications content */}
           <div
             style={{ maxHeight: "500px", overflowY: "auto", padding: "16px" }}
           >
-            {notifs.length === 0 ? (
+            {items.length === 0 ? (
               <div
                 style={{
                   padding: "32px",
@@ -283,95 +255,77 @@ export default function NotificationBell({ isAdmin = false }) {
                 No notifications
               </div>
             ) : (
-              <>
-                {/* Yesterday Section */}
-                {grouped.yesterday.length > 0 && (
-                  <div style={{ marginBottom: "20px" }}>
-                    <div
-                      style={{
-                        fontSize: "12px",
-                        fontWeight: "700",
-                        color: "#666",
-                        marginBottom: "12px",
-                        textTransform: "uppercase",
-                        letterSpacing: "0.5px",
-                      }}
-                    >
-                      Yesterday
-                    </div>
-                    {grouped.yesterday.map(renderNotificationItem)}
+              groups.map(([title, list]) =>
+                list.length > 0 ? (
+                  <div key={title} style={{ marginBottom: "20px" }}>
+                    <div style={sectionTitle}>{title}</div>
+                    {list.map(renderNotificationItem)}
                   </div>
-                )}
-
-                {/* Earlier Section */}
-                {grouped.earlier.length > 0 && (
-                  <div>
-                    <div
-                      style={{
-                        fontSize: "12px",
-                        fontWeight: "700",
-                        color: "#666",
-                        marginBottom: "12px",
-                        textTransform: "uppercase",
-                        letterSpacing: "0.5px",
-                      }}
-                    >
-                      Earlier
-                    </div>
-                    {grouped.earlier.map(renderNotificationItem)}
-                  </div>
-                )}
-              </>
+                ) : null,
+              )
             )}
           </div>
 
-          {/* Footer buttons */}
-          <div
-            style={{
-              padding: "12px 16px",
-              borderTop: "1px solid #f0f0f0",
-              display: "flex",
-              gap: "8px",
-              backgroundColor: "#fafafa",
-            }}
-          >
-            <button
-              onClick={() => {
-                navigate("/dashboard/notifications");
-                setOpen(false);
-              }}
+          {items.length > 0 && (
+            <div
               style={{
-                flex: 1,
-                padding: "10px",
-                backgroundColor: "#1a1a6e",
-                color: "#fff",
-                border: "none",
-                borderRadius: "8px",
-                fontSize: "13px",
-                fontWeight: "600",
-                cursor: "pointer",
-                fontFamily: "Poppins, sans-serif",
+                padding: "12px 16px",
+                borderTop: "1px solid #f0f0f0",
+                display: "flex",
+                gap: "8px",
+                backgroundColor: "#fafafa",
               }}
             >
-              Read All
-            </button>
-            <button
-              onClick={() => setNotifs([])}
-              style={{
-                padding: "10px 16px",
-                backgroundColor: "#fff",
-                color: "#e53935",
-                border: "1px solid #e53935",
-                borderRadius: "8px",
-                fontSize: "13px",
-                fontWeight: "600",
-                cursor: "pointer",
-                fontFamily: "Poppins, sans-serif",
-              }}
-            >
-              Clear All
-            </button>
-          </div>
+              {!isAdmin && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigate("/dashboard/notifications");
+                    setOpen(false);
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: "10px",
+                    backgroundColor: "#1a1a6e",
+                    color: "#fff",
+                    border: "none",
+                    borderRadius: "8px",
+                    fontSize: "13px",
+                    fontWeight: "600",
+                    cursor: "pointer",
+                    fontFamily: "Poppins, sans-serif",
+                  }}
+                >
+                  View All
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  if (!confirmClear) {
+                    setConfirmClear(true);
+                    return;
+                  }
+                  clearAll();
+                  setConfirmClear(false);
+                }}
+                style={{
+                  flex: isAdmin ? 1 : undefined,
+                  padding: "10px 16px",
+                  backgroundColor: confirmClear ? "#e53935" : "#fff",
+                  color: confirmClear ? "#fff" : "#e53935",
+                  border: "1px solid #e53935",
+                  borderRadius: "8px",
+                  fontSize: "13px",
+                  fontWeight: "600",
+                  cursor: "pointer",
+                  fontFamily: "Poppins, sans-serif",
+                }}
+              >
+                {confirmClear ? "Click again to clear" : "Clear All"}
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -61,7 +61,36 @@ interface dataTypes {
   amountTransferred: string;
   paymentNoticeAgreement: boolean;
   receipt: PickedFile;
+  extraPayments: ExtraPayment[];
 }
+
+// A second, third... payment (different method or split downpayment)
+type ExtraPayment = {
+  key: string;
+  paymentChannel: string;
+  paymentChannelId: number | null;
+  transactionDate: Date | null;
+  amountTransferred: string;
+  referenceNumber: string;
+  receipt: PickedFile;
+};
+const MAX_PAYMENTS = 5;
+const newExtraPayment = (): ExtraPayment => ({
+  key: String(Date.now() + Math.random()),
+  paymentChannel: "",
+  paymentChannelId: null,
+  transactionDate: null,
+  amountTransferred: "",
+  referenceNumber: "",
+  receipt: null,
+});
+const extraPaymentMissing = (p: ExtraPayment) => ({
+  paymentChannel: !p.paymentChannelId,
+  transactionDate: !p.transactionDate,
+  amountTransferred: !(parseFloat(p.amountTransferred) > 0),
+  referenceNumber: !p.referenceNumber.trim(),
+  receipt: !p.receipt,
+});
 
 const defaultValues: dataTypes = {
   privacyAgreement: null,
@@ -92,12 +121,15 @@ const defaultValues: dataTypes = {
   amountTransferred: "",
   paymentNoticeAgreement: false,
   receipt: null,
+  extraPayments: [],
 };
 
 type FieldErrors = Partial<Record<keyof dataTypes, string>>;
 
 const REQUIRED = "Required.";
 const hasNumber = (v: string) => /\d/.test(v);
+const hasBadMarks = (v: string) =>
+  !/[A-Za-zÀ-ÖØ-öø-ÿ]/.test(v) || /[.,'()&-]{2,}/.test(v);
 
 function checkText(
   errors: FieldErrors,
@@ -108,6 +140,8 @@ function checkText(
 ) {
   if (required && !value.trim()) errors[key] = REQUIRED;
   else if (hasNumber(value)) errors[key] = numberMessage;
+  else if (value.trim() && hasBadMarks(value))
+    errors[key] = "Please use letters, not just symbols.";
 }
 
 function validateStep(step: number, form: dataTypes): FieldErrors {
@@ -169,6 +203,13 @@ function validateStep(step: number, form: dataTypes): FieldErrors {
       errors.amountTransferred = "Please enter a valid amount.";
     if (!form.referenceNumber.trim()) errors.referenceNumber = REQUIRED;
     if (!form.receipt) errors.receipt = REQUIRED;
+    if (
+      form.extraPayments.some((p) =>
+        Object.values(extraPaymentMissing(p)).some(Boolean),
+      )
+    )
+      errors.extraPayments =
+        "Please complete every added payment, or remove it.";
     if (!form.paymentNoticeAgreement)
       errors.paymentNoticeAgreement = "Kindly confirm before proceeding.";
   }
@@ -184,8 +225,13 @@ const formatDate = (d: Date | null) =>
       })
     : "";
 
-const toUpper = (v: string) => v.toUpperCase();
-const lettersUpper = (v: string) => v.replace(/\d/g, "").toUpperCase();
+const cleanName = (v: string) => v.replace(/[^A-Za-zÀ-ÖØ-öø-ÿ\s.'-]/g, "");
+const cleanText = (v: string) =>
+  v.replace(/[^A-Za-zÀ-ÖØ-öø-ÿ0-9\s.,'()&-]/g, "");
+const nameUpper = (v: string) => cleanName(v).toUpperCase();
+const toUpper = (v: string) => cleanText(v).toUpperCase();
+const lettersUpper = (v: string) =>
+  cleanText(v).replace(/\d/g, "").toUpperCase();
 
 const PAYMENT_TYPES = [
   { value: "downpayment" as const, name: "Downpayment" },
@@ -201,9 +247,8 @@ const CHANNEL_DETAILS: {
     match: "bdo",
     color: "#0D2A94",
     rows: [
-      { label: "Account Name", value: "Ruel M. Atun" },
-      { label: "Account Number", value: "004250314645" },
-      { label: "Place", value: "Legaspi" },
+      { label: "Account Name", value: "Teacher A Educare Review and Training" },
+      { label: "Account Number", value: "010240208269" },
     ],
   },
   {
@@ -212,7 +257,6 @@ const CHANNEL_DETAILS: {
     rows: [
       { label: "Account Name", value: "Ruel M. Atun" },
       { label: "Account Number", value: "1669343481" },
-      { label: "Place", value: "Makati" },
     ],
   },
   {
@@ -236,7 +280,6 @@ const CHANNEL_DETAILS: {
 const channelDetails = (name: string) =>
   CHANNEL_DETAILS.find((c) => name.toLowerCase().includes(c.match)) ?? null;
 
-const onlyDigits = (v: string) => v.replace(/\D/g, "");
 const onlyAmount = (v: string) =>
   v.replace(/[^0-9.]/g, "").replace(/(\..*)\./g, "$1");
 
@@ -361,11 +404,42 @@ export default function EnrollmentScreen() {
     key: "receipt" | "validId" | "formalPhoto",
     title: string,
     allowFiles: boolean,
+  ) => chooseFile(title, allowFiles, (f) => setField(key, f));
+
+  const [openMethodFor, setOpenMethodFor] = useState<string | null>(null);
+  const [dateFor, setDateFor] = useState<string | null>(null);
+
+  const addExtraPayment = () =>
+    setDataTypes((prev) =>
+      prev.extraPayments.length + 1 >= MAX_PAYMENTS
+        ? prev
+        : {
+            ...prev,
+            extraPayments: [...prev.extraPayments, newExtraPayment()],
+          },
+    );
+  const updateExtraPayment = (key: string, changes: Partial<ExtraPayment>) =>
+    setDataTypes((prev) => ({
+      ...prev,
+      extraPayments: prev.extraPayments.map((p) =>
+        p.key === key ? { ...p, ...changes } : p,
+      ),
+    }));
+  const removeExtraPayment = (key: string) =>
+    setDataTypes((prev) => ({
+      ...prev,
+      extraPayments: prev.extraPayments.filter((p) => p.key !== key),
+    }));
+
+  const chooseFile = (
+    title: string,
+    allowFiles: boolean,
+    onPicked: (file: NonNullable<PickedFile>) => void,
   ) => {
     const fromImage = (result: ImagePicker.ImagePickerResult) => {
       if (result.canceled) return;
       const asset = result.assets[0];
-      setField(key, {
+      onPicked({
         uri: asset.uri,
         name: asset.fileName ?? "photo.jpg",
         type: asset.mimeType ?? "image/jpeg",
@@ -404,7 +478,7 @@ export default function EnrollmentScreen() {
                 });
                 if (result.canceled) return;
                 const file = result.assets[0];
-                setField(key, {
+                onPicked({
                   uri: file.uri,
                   name: file.name,
                   type: file.mimeType ?? "application/octet-stream",
@@ -478,11 +552,23 @@ export default function EnrollmentScreen() {
         }
       }
 
-      const [proofUrl, validIdUrl, formalPhotoUrl] = await Promise.all([
-        uploadFile(dataTypes.receipt, "payments", "receipt"),
-        uploadFile(dataTypes.validId, "payments/ids", "valid ID"),
-        uploadFile(dataTypes.formalPhoto, "payments/photos", "photo"),
-      ]);
+      const [proofUrl, validIdUrl, formalPhotoUrl, ...extraProofUrls] =
+        await Promise.all([
+          uploadFile(dataTypes.receipt, "payments", "receipt"),
+          uploadFile(dataTypes.validId, "payments/ids", "valid ID"),
+          uploadFile(dataTypes.formalPhoto, "payments/photos", "photo"),
+          ...dataTypes.extraPayments.map((p, i) =>
+            uploadFile(p.receipt, "payments", `payment ${i + 2} receipt`),
+          ),
+        ]);
+      const additionalPayments = dataTypes.extraPayments.map((p, i) => ({
+        paymentChannel_id: p.paymentChannelId,
+        paymentChannelName: p.paymentChannel,
+        dateOfPayment: (p.transactionDate ?? new Date()).toISOString(),
+        amountTransferred: parseFloat(p.amountTransferred),
+        referenceNumber: p.referenceNumber.trim(),
+        proofUrl: extraProofUrls[i],
+      }));
 
       const studentFields = {
         firstName: dataTypes.firstName.trim().toUpperCase(),
@@ -597,6 +683,7 @@ export default function EnrollmentScreen() {
         amountTransferred: parseFloat(dataTypes.amountTransferred),
         dateOfPayment: (dataTypes.transactionDate ?? new Date()).toISOString(),
         proofOfPaymentUrl: proofUrl,
+        additionalPayments,
         paymentType: dataTypes.paymentType,
         balanceProofUrl: null,
         balanceSubmittedAt: null,
@@ -743,8 +830,9 @@ export default function EnrollmentScreen() {
   const filePreview = (
     key: "receipt" | "validId" | "formalPhoto",
     noun: string,
-  ) => {
-    const file = dataTypes[key];
+  ) => previewOf(dataTypes[key], key, noun);
+
+  const previewOf = (file: PickedFile, key: string, noun: string) => {
     if (!file) return null;
     if (file.type === "application/pdf" || !file.type.startsWith("image/")) {
       return (
@@ -1121,9 +1209,8 @@ export default function EnrollmentScreen() {
 
               {textField({
                 key: "comments",
-                label: "Comments:",
-                placeholder: "Optional",
-                hint: "Anything the admin should know about your program or majorship (optional).",
+                label: "Others:",
+                placeholder: "Other specializations...",
                 autoCapitalize: "characters",
                 clean: lettersUpper,
               })}
@@ -1141,14 +1228,14 @@ export default function EnrollmentScreen() {
                 placeholder: "Given Name",
                 required: true,
                 autoCapitalize: "characters",
-                clean: toUpper,
+                clean: nameUpper,
               })}
               {textField({
                 key: "middleName",
                 label: "Middle Name:",
                 placeholder: "Middle Name",
                 autoCapitalize: "characters",
-                clean: toUpper,
+                clean: nameUpper,
               })}
               {textField({
                 key: "lastName",
@@ -1156,7 +1243,7 @@ export default function EnrollmentScreen() {
                 placeholder: "Last Name",
                 required: true,
                 autoCapitalize: "characters",
-                clean: toUpper,
+                clean: nameUpper,
               })}
               {textField({
                 key: "email",
@@ -1168,8 +1255,14 @@ export default function EnrollmentScreen() {
               })}
               {textField({
                 key: "bachelorsDegree",
-                label: "Bachelor's Degree and Majorship Taken:",
-                hint: "Format: [Full Degree/Program Title] Major in [Specialization if applicable]",
+                label: "Program Name / Course:",
+                hint:
+                  "Examples:\n" +
+                  "\u2022 Bachelor of Elementary Education\n" +
+                  "\u2022 Bachelor of Secondary Education Major in (Specialization)\n" +
+                  "\u2022 Certificate in Professional Teaching Program Major in (Specialization)\n" +
+                  "\u2022 Teacher Certificate Program\n\n" +
+                  "Only include courses related to Education. If you are a Unit Earner, list the school where you earned your teaching units immediately after the program name (e.g. Teacher Certificate Program - Philippine Normal University).",
                 placeholder:
                   "E.g.: Bachelor of Secondary Education Major in English",
                 required: true,
@@ -1389,7 +1482,7 @@ export default function EnrollmentScreen() {
               {fieldError("paymentType")}
               {dataTypes.paymentType === "downpayment" && (
                 <Text style={styles.payTypeNote}>
-                  With a downpayment, you can access the courses up to LET
+                  With a downpayment, you can access the courses up to LEPT
                   Express. Upload your remaining balance receipt later in your
                   Profile to unlock the rest.
                 </Text>
@@ -1409,7 +1502,7 @@ export default function EnrollmentScreen() {
                 placeholder: "Enter Ref #",
                 required: true,
                 keyboardType: "number-pad",
-                clean: onlyDigits,
+                clean: (v: string) => v.replace(/\D/g, ""),
               })}
 
               {uploadField({
@@ -1420,6 +1513,215 @@ export default function EnrollmentScreen() {
                 allowFiles: true,
                 noun: "Receipt",
               })}
+              {dataTypes.extraPayments.map((p, i) => {
+                const missing = extraPaymentMissing(p);
+                const bad = (k: keyof typeof missing) =>
+                  showErrors && missing[k];
+                return (
+                  <View key={p.key} style={styles.extraPaymentCard}>
+                    <View style={styles.extraPaymentHeader}>
+                      <Text style={styles.extraPaymentTitle}>
+                        Payment {i + 2}
+                      </Text>
+                      <TouchableOpacity
+                        onPress={() => removeExtraPayment(p.key)}
+                        hitSlop={8}
+                      >
+                        <Text style={styles.extraPaymentRemove}>Remove</Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    <Text
+                      style={[
+                        styles.label,
+                        bad("transactionDate") && styles.labelError,
+                      ]}
+                    >
+                      Date of Transaction:*
+                    </Text>
+                    <TouchableOpacity
+                      style={[
+                        styles.dropdown,
+                        bad("transactionDate") && styles.inputError,
+                      ]}
+                      onPress={() => setDateFor(p.key)}
+                    >
+                      <Text
+                        style={{ color: p.transactionDate ? "#000" : "#999" }}
+                      >
+                        {formatDate(p.transactionDate) || "Select date"}
+                      </Text>
+                      <Ionicons
+                        name="calendar-outline"
+                        size={20}
+                        color="#666"
+                      />
+                    </TouchableOpacity>
+                    {dateFor === p.key && (
+                      <DateTimePicker
+                        value={p.transactionDate ?? new Date()}
+                        mode="date"
+                        maximumDate={new Date()}
+                        onChange={(event, selected) => {
+                          setDateFor(null);
+                          if (event.type === "set" && selected)
+                            updateExtraPayment(p.key, {
+                              transactionDate: selected,
+                            });
+                        }}
+                      />
+                    )}
+
+                    <Text
+                      style={[
+                        styles.label,
+                        bad("paymentChannel") && styles.labelError,
+                      ]}
+                    >
+                      Payment Method:*
+                    </Text>
+                    <TouchableOpacity
+                      style={[
+                        styles.dropdown,
+                        bad("paymentChannel") && styles.inputError,
+                      ]}
+                      onPress={() =>
+                        setOpenMethodFor(openMethodFor === p.key ? null : p.key)
+                      }
+                    >
+                      <Text
+                        style={{ color: p.paymentChannel ? "#000" : "#999" }}
+                      >
+                        {p.paymentChannel || "Select method"}
+                      </Text>
+                      <Ionicons name="chevron-down" size={20} color="#666" />
+                    </TouchableOpacity>
+                    {openMethodFor === p.key && (
+                      <View style={styles.dropdownMenu}>
+                        {paymentChannels.map((method) => (
+                          <TouchableOpacity
+                            key={method.id}
+                            style={styles.dropdownItem}
+                            onPress={() => {
+                              updateExtraPayment(p.key, {
+                                paymentChannel: method.name,
+                                paymentChannelId: method.id,
+                              });
+                              setOpenMethodFor(null);
+                            }}
+                          >
+                            <Text>{method.name}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    )}
+
+                    <Text
+                      style={[
+                        styles.label,
+                        bad("amountTransferred") && styles.labelError,
+                      ]}
+                    >
+                      Amount Transferred:*
+                    </Text>
+                    <TextInput
+                      style={[
+                        styles.input,
+                        bad("amountTransferred") && styles.inputError,
+                      ]}
+                      placeholder="E.g.: 1000"
+                      placeholderTextColor="#999"
+                      keyboardType="decimal-pad"
+                      value={p.amountTransferred}
+                      onChangeText={(v) =>
+                        updateExtraPayment(p.key, {
+                          amountTransferred: onlyAmount(v),
+                        })
+                      }
+                    />
+
+                    <Text
+                      style={[
+                        styles.label,
+                        bad("referenceNumber") && styles.labelError,
+                      ]}
+                    >
+                      Reference Number:*
+                    </Text>
+                    <TextInput
+                      style={[
+                        styles.input,
+                        bad("referenceNumber") && styles.inputError,
+                      ]}
+                      placeholder="Enter Ref #"
+                      placeholderTextColor="#999"
+                      keyboardType="number-pad"
+                      value={p.referenceNumber}
+                      onChangeText={(v) =>
+                        updateExtraPayment(p.key, {
+                          referenceNumber: v.replace(/\D/g, ""),
+                        })
+                      }
+                    />
+
+                    <Text
+                      style={[
+                        styles.label,
+                        bad("receipt") && styles.labelError,
+                      ]}
+                    >
+                      Verification/Receipt:*
+                    </Text>
+                    <TouchableOpacity
+                      style={[
+                        styles.uploadBtn,
+                        bad("receipt") && styles.uploadBtnError,
+                      ]}
+                      onPress={() =>
+                        chooseFile(`Payment ${i + 2} Receipt`, true, (f) =>
+                          updateExtraPayment(p.key, { receipt: f }),
+                        )
+                      }
+                    >
+                      <Ionicons
+                        name="attach-outline"
+                        size={20}
+                        color="#666"
+                        style={{ marginBottom: 5 }}
+                      />
+                      <Text style={styles.uploadText} numberOfLines={1}>
+                        {p.receipt
+                          ? `✓ ${p.receipt.name}`
+                          : "Upload attachment"}
+                      </Text>
+                    </TouchableOpacity>
+                    {p.receipt && (
+                      <View style={{ marginTop: 6 }}>
+                        {previewOf(p.receipt, `extra-${p.key}`, "Receipt")}
+                      </View>
+                    )}
+                  </View>
+                );
+              })}
+              {fieldError("extraPayments")}
+
+              {dataTypes.extraPayments.length + 1 < MAX_PAYMENTS && (
+                <TouchableOpacity
+                  style={styles.addPaymentBtn}
+                  onPress={addExtraPayment}
+                >
+                  <Ionicons
+                    name="add-circle-outline"
+                    size={18}
+                    color="#2F459B"
+                  />
+                  <Text style={styles.addPaymentText}>Add another payment</Text>
+                </TouchableOpacity>
+              )}
+              <Text style={styles.formatHint}>
+                Paid in parts or through a different method? Add each payment
+                separately.
+              </Text>
 
               {checkbox(
                 "paymentNoticeAgreement",
@@ -1471,7 +1773,7 @@ export default function EnrollmentScreen() {
                     })}
                     {summaryRow({ label: "Email", value: dataTypes.email })}
                     {summaryRow({
-                      label: "Bachelor's Degree and Majorship",
+                      label: "Program Name / Course",
                       value: dataTypes.bachelorsDegree,
                     })}
                     {summaryRow({
@@ -1534,6 +1836,37 @@ export default function EnrollmentScreen() {
                       value: dataTypes.receipt?.name ?? "—",
                     })}
                     {filePreview("receipt", "Receipt")}
+                    {dataTypes.extraPayments.map((p, i) => (
+                      <View
+                        key={`sum-${p.key}`}
+                        style={styles.summaryPaymentBlock}
+                      >
+                        <Text style={styles.extraPaymentTitle}>
+                          Payment {i + 2}
+                        </Text>
+                        {summaryRow({
+                          label: "Date of Transaction",
+                          value: formatDate(p.transactionDate),
+                        })}
+                        {summaryRow({
+                          label: "Payment Method",
+                          value: p.paymentChannel,
+                        })}
+                        {summaryRow({
+                          label: "Amount Transferred",
+                          value: p.amountTransferred,
+                        })}
+                        {summaryRow({
+                          label: "Reference Number",
+                          value: p.referenceNumber,
+                        })}
+                        {summaryRow({
+                          label: "Receipt",
+                          value: p.receipt?.name ?? "—",
+                        })}
+                        {previewOf(p.receipt, `sum-${p.key}`, "Receipt")}
+                      </View>
+                    ))}
                   </>
                 ),
               })}
@@ -1792,6 +2125,35 @@ const styles = StyleSheet.create({
     color: "#0D2A94",
     fontWeight: "600",
     fontSize: 13,
+  },
+  extraPaymentCard: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 10,
+    padding: 14,
+    marginTop: 16,
+  },
+  extraPaymentHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  extraPaymentTitle: { fontWeight: "bold", fontSize: 15, color: "#2F459B" },
+  extraPaymentRemove: { color: "#e53935", fontWeight: "600", fontSize: 13 },
+  addPaymentBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 14,
+    marginBottom: 8,
+    alignSelf: "flex-start",
+  },
+  addPaymentText: { color: "#2F459B", fontWeight: "700", fontSize: 14 },
+  summaryPaymentBlock: {
+    marginTop: 12,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: "#eee",
   },
   receiptThumbnail: {
     width: "100%",

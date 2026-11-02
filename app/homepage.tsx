@@ -1,3 +1,4 @@
+import { useNotificationFeed } from "@/lib/notifications";
 import { supabase } from "@/lib/supabase";
 import {
   FontAwesome5,
@@ -31,7 +32,7 @@ export default function Homepage() {
   });
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [affirmations, setAffirmations] = useState<any[]>([]);
-  const [notifCount, setNotifCount] = useState(0);
+  const { unreadCount: notifCount } = useNotificationFeed("student");
   const [refresh, setRefresh] = useState(false);
   const [carouselKey, setCarouselKey] = useState(0);
   const [lastMaterial, setLastMaterial] = useState<{
@@ -116,67 +117,14 @@ export default function Homepage() {
     if (data) setAffirmations(data);
   }, []);
 
-  const fetchNotifCount = useCallback(async () => {
-    const lastSeen = await AsyncStorage.getItem("notifLastSeen");
-
-    const { data: enrollments } = await supabase.from("enrollment").select(`
-      enrollment_id,
-      verification!enrollment_verification_id_fkey (verificationStatus, verificationNotes, created_at)
-    `);
-
-    const pendingCount = (enrollments ?? []).filter((e: any) => {
-      const v = Array.isArray(e.verification)
-        ? e.verification[0]
-        : e.verification;
-      const isUnseen = lastSeen
-        ? new Date(v?.created_at) > new Date(lastSeen)
-        : true;
-      return (
-        v?.verificationStatus === false && !v?.verificationNotes && isUnseen
-      );
-    }).length;
-
-    const announcementsQuery = supabase
-      .from("announcements")
-      .select("*", { count: "exact", head: true });
-
-    if (lastSeen) {
-      announcementsQuery.gt("created_at", lastSeen);
-    }
-
-    const { count: announcementCount } = await announcementsQuery;
-
-    const now = new Date();
-    const twoDaysLater = new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000);
-    const eventsQuery = supabase
-      .from("calendar_events")
-      .select("*", { count: "exact", head: true })
-      .gte("event_date", now.toISOString())
-      .lte("event_date", twoDaysLater.toISOString());
-
-    if (lastSeen) {
-      eventsQuery.gt("created_at", lastSeen);
-    }
-
-    const { count: eventCount } = await eventsQuery;
-
-    setNotifCount(pendingCount + (eventCount ?? 0) + (announcementCount ?? 0));
-  }, []);
-
   const onRefresh = useCallback(async () => {
     setRefresh(true);
     setCarouselKey((k) => k + 1);
     await fetchAnnouncements();
     await fetchAffirmations();
-    await fetchNotifCount();
     await fetchLastMaterial();
     setRefresh(false);
-  }, [
-    fetchAnnouncements,
-    fetchAffirmations,
-    fetchNotifCount,
-    fetchLastMaterial,
-  ]);
+  }, [fetchAnnouncements, fetchAffirmations, fetchLastMaterial]);
 
   useEffect(() => {
     const fetchStudent = async () => {
@@ -202,9 +150,8 @@ export default function Homepage() {
 
   useFocusEffect(
     useCallback(() => {
-      fetchNotifCount();
       fetchLastMaterial();
-    }, [fetchNotifCount, fetchLastMaterial]),
+    }, [fetchLastMaterial]),
   );
 
   return (
@@ -240,7 +187,6 @@ export default function Homepage() {
                 "notifLastSeen",
                 new Date().toISOString(),
               );
-              setNotifCount(0);
               router.push("/notification");
             }}
           >

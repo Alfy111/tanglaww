@@ -49,7 +49,7 @@ export default function Step4Payment({ data, onNext, onBack }) {
             ["Middle Name", data.middleName],
             ["Last Name", data.lastName],
             ["Email", data.email],
-            ["Bachelor's Degree and Majorship", data.degree],
+            ["Program Name / Course", data.degree],
             ["Last School Attended", data.school],
             ["Province", data.province],
             ["Valid ID", data.validId?.name || "Not provided"],
@@ -66,6 +66,14 @@ export default function Step4Payment({ data, onNext, onBack }) {
             ["Amount Transferred", data.amount],
             ["Reference Number", data.referenceNumber],
             ["Receipt", data.proofOfPayment?.name || "—"],
+            ...(data.extraPayments || []).flatMap((p, i) => [
+              { heading: `Payment ${i + 2}` },
+              ["Date of Transaction", p.paymentDate],
+              ["Payment Method", p.paymentChannel],
+              ["Amount Transferred", p.amount],
+              ["Reference Number", p.referenceNumber],
+              ["Receipt", p.proofOfPayment?.name || "—"],
+            ]),
           ]}
         />
         {error && (

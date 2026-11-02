@@ -1,3 +1,4 @@
+import { useNotificationFeed } from "@/lib/notifications";
 import { supabase } from "@/lib/supabase";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -21,7 +22,7 @@ export default function AdminDashboard() {
   const [isMenuVisible, setIsMenuVisible] = useState(false);
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [affirmations, setAffirmations] = useState<any[]>([]);
-  const [notifCount, setNotifCount] = useState(0);
+  const { unreadCount: notifCount } = useNotificationFeed("admin");
   const [adminName, setAdminName] = useState({
     firstName: "",
     lastName: "",
@@ -87,49 +88,13 @@ export default function AdminDashboard() {
     setPendingEnrollments(pending);
   };
 
-  const fetchNotifCount = useCallback(async () => {
-    const lastSeen = await AsyncStorage.getItem("notifLastSeen");
-
-    const { data: enrollments } = await supabase.from("enrollment").select(`
-    enrollment_id,
-    verification!enrollment_verification_id_fkey (status, created_at)
-  `);
-
-    const pendingCount = (enrollments ?? []).filter((e: any) => {
-      const v = Array.isArray(e.verification)
-        ? e.verification[0]
-        : e.verification;
-      const isUnseen = lastSeen
-        ? new Date(v?.created_at) > new Date(lastSeen)
-        : true;
-      return v?.status === "pending" && isUnseen;
-    }).length;
-
-    const now = new Date();
-    const twoDaysLater = new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000);
-    const eventsQuery = supabase
-      .from("calendar_events")
-      .select("*", { count: "exact", head: true })
-      .gte("event_date", now.toISOString())
-      .lte("event_date", twoDaysLater.toISOString());
-
-    if (lastSeen) {
-      eventsQuery.gt("created_at", lastSeen);
-    }
-
-    const { count: eventCount } = await eventsQuery;
-
-    setNotifCount(pendingCount + (eventCount ?? 0));
-  }, []);
-
   useFocusEffect(
     useCallback(() => {
       fetchAdmin();
       fetchAnnouncements();
       fetchAffirmations();
       fetchPending();
-      fetchNotifCount();
-    }, [fetchAnnouncements, fetchAffirmations, fetchNotifCount]),
+    }, [fetchAnnouncements, fetchAffirmations]),
   );
 
   const onRefresh = useCallback(async () => {
@@ -139,9 +104,8 @@ export default function AdminDashboard() {
     await fetchAnnouncements();
     await fetchAdmin();
     await fetchPending();
-    await fetchNotifCount();
     setRefresh(false);
-  }, [fetchAffirmations, fetchAnnouncements, fetchNotifCount]);
+  }, [fetchAffirmations, fetchAnnouncements]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -157,7 +121,6 @@ export default function AdminDashboard() {
                 "notifLastSeen",
                 new Date().toISOString(),
               );
-              setNotifCount(0);
               router.push("/admin/notification");
             }}
           >

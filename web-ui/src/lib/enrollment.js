@@ -27,9 +27,8 @@ export const CHANNEL_DETAILS = [
     match: "bdo",
     color: "#0D2A94",
     rows: [
-      { label: "Account Name", value: "Ruel M. Atun" },
-      { label: "Account Number", value: "004250314645" },
-      { label: "Place", value: "Legaspi" },
+      { label: "Account Name", value: "Teacher A Educare Review and Training" },
+      { label: "Account Number", value: "010240208269" },
     ],
   },
   {
@@ -38,7 +37,6 @@ export const CHANNEL_DETAILS = [
     rows: [
       { label: "Account Name", value: "Ruel M. Atun" },
       { label: "Account Number", value: "1669343481" },
-      { label: "Place", value: "Makati" },
     ],
   },
   {
@@ -164,11 +162,23 @@ export async function submitEnrollment(data) {
     }
   }
 
-  const [proofUrl, validIdUrl, formalPhotoUrl] = await Promise.all([
-    uploadFile(data.proofOfPayment, "payments", "receipt"),
-    uploadFile(data.validId, "payments/ids", "valid ID"),
-    uploadFile(data.graduationPhoto, "payments/photos", "photo"),
-  ]);
+  const [proofUrl, validIdUrl, formalPhotoUrl, ...extraProofUrls] =
+    await Promise.all([
+      uploadFile(data.proofOfPayment, "payments", "receipt"),
+      uploadFile(data.validId, "payments/ids", "valid ID"),
+      uploadFile(data.graduationPhoto, "payments/photos", "photo"),
+      ...(data.extraPayments || []).map((p, i) =>
+        uploadFile(p.proofOfPayment, "payments", `payment ${i + 2} receipt`),
+      ),
+    ]);
+  const additionalPayments = (data.extraPayments || []).map((p, i) => ({
+    paymentChannel_id: p.paymentChannelId,
+    paymentChannelName: p.paymentChannel,
+    dateOfPayment: new Date(p.paymentDate).toISOString(),
+    amountTransferred: parseFloat(p.amount),
+    referenceNumber: p.referenceNumber.trim(),
+    proofUrl: extraProofUrls[i],
+  }));
 
   const now = new Date().toISOString();
   const studentFields = {
@@ -273,6 +283,7 @@ export async function submitEnrollment(data) {
     amountTransferred: parseFloat(data.amount),
     dateOfPayment: new Date(data.paymentDate).toISOString(),
     proofOfPaymentUrl: proofUrl,
+    additionalPayments,
     paymentType: data.paymentType,
     balanceProofUrl: null,
     balanceSubmittedAt: null,
