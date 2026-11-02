@@ -39,7 +39,7 @@ export const ENROLLMENT_SELECT = `
   ),
   paymentDetails (
     amountTransferred, referenceNumber, dateOfPayment, proofOfPaymentUrl,
-    paymentType, balanceProofUrl, balanceSubmittedAt,
+    additionalPayments, paymentType, balanceProofUrl, balanceSubmittedAt,
     payment_channel!paymentDetails_paymentChannel_id_fkey (paymentChannelName)
   )
 `;

@@ -10,11 +10,12 @@
   Menu,
   Settings,
   User,
-  X,
+  X
 } from "lucide-react";
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import logo from "../assets/logo.png";
+import { useNotificationFeed } from "../lib/notifications";
 import { supabase } from "../lib/supabase";
 
 const navItems = [
@@ -45,6 +46,7 @@ export default function Sidebar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+  const { unreadCount } = useNotificationFeed("student");
 
   const go = (path) => {
     setMobileMenuOpen(false);
@@ -58,7 +60,8 @@ export default function Sidebar() {
     navigate("/signin", { replace: true });
   };
 
-  const renderLink = ({ label, path, icon: Icon }) => {
+  const renderLink = ({ label, path, icon: Icon, badge }) => {
+    const count = badge === "notifications" ? unreadCount : 0;
     const active = isActive(location.pathname, path);
     return (
       <div
@@ -74,6 +77,28 @@ export default function Sidebar() {
       >
         <Icon size={18} />
         {label}
+        {count > 0 && (
+          <span
+            aria-label={`${count} unread`}
+            style={{
+              marginLeft: "auto",
+              minWidth: "20px",
+              height: "20px",
+              padding: "0 6px",
+              borderRadius: "10px",
+              backgroundColor: "#e53935",
+              color: "#fff",
+              fontSize: "11px",
+              fontWeight: 700,
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              boxSizing: "border-box",
+            }}
+          >
+            {count > 99 ? "99+" : count}
+          </span>
+        )}
       </div>
     );
   };

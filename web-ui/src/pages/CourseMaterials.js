@@ -87,7 +87,11 @@ const formatClock = (seconds) =>
 
 const downloadUrl = (url) => `${url}${url.includes("?") ? "&" : "?"}download=`;
 
-function DoneBadge({ done }) {
+function DoneBadge({
+  done,
+  doneText = "Completed",
+  notDoneText = "Not completed yet",
+}) {
   return (
     <span
       style={{
@@ -101,7 +105,7 @@ function DoneBadge({ done }) {
       }}
     >
       {done ? <CheckCircle2 size={14} /> : <Clock size={14} />}
-      {done ? "Completed" : "Not completed yet"}
+      {done ? doneText : notDoneText}
     </span>
   );
 }
@@ -402,7 +406,6 @@ function VideoPlayer({
   const startedAt = useRef(null);
   const playing = useRef(false);
   const finished = useRef(false);
-  const [coverage, setCoverage] = useState(0);
   const [completed, setCompleted] = useState(alreadyCompleted);
   const tracking = !!studentId;
   const percentNeeded = Math.round(VIDEO_COMPLETION_THRESHOLD * 100);
@@ -440,7 +443,6 @@ function VideoPlayer({
       for (let s = from; s <= to; s++) watched.current.add(s);
     }
     lastPos.current = current;
-    setCoverage(videoCoverage(watched.current, mediaDuration.current));
   }, [tracking]);
 
   const finalize = useCallback(async () => {
@@ -544,8 +546,8 @@ function VideoPlayer({
       hint={
         tracking
           ? completed
-            ? "Completed"
-            : `Watch at least ${percentNeeded}% to complete · ${Math.round(coverage * 100)}% watched this time`
+            ? "Watched"
+            : `Watch at least ${percentNeeded}% to complete`
           : null
       }
       onClose={close}
@@ -829,7 +831,13 @@ function SessionsSection({ courseId, studentId }) {
                 >
                   {formatDate(item.uploadedAt)}
                 </div>
-                {studentId && <DoneBadge done={done.has(item.material_id)} />}
+                {studentId && (
+                  <DoneBadge
+                    done={done.has(item.material_id)}
+                    doneText="Watched"
+                    notDoneText="Not watched yet"
+                  />
+                )}
               </div>
             </div>
           ))}

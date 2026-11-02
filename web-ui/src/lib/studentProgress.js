@@ -1,7 +1,7 @@
 import { supabase } from "./supabase";
 
 export const SEGMENT_SECONDS = 5;
-export const VIDEO_COMPLETION_THRESHOLD = 0.8;
+export const VIDEO_COMPLETION_THRESHOLD = 0.7;
 export const MAX_SESSION_SECONDS = 30 * 60;
 
 const MIN_VIEW_SECONDS = 60;

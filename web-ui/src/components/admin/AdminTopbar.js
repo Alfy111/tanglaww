@@ -37,7 +37,7 @@ export default function AdminTopbar({ title, actions }) {
         }}
       >
         {actions}
-        <NotificationBell />
+        <NotificationBell isAdmin />
       </div>
     </div>
   );

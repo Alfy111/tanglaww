@@ -1,3 +1,4 @@
+import { PlusCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import ContinueButton from "../../components/ContinueButton";
 import FormField from "../../components/FormField";
@@ -17,8 +18,28 @@ const UPPERCASE_FIELDS = [
   "school",
   "province",
 ];
+const cleanText = (v) => v.replace(/[^A-Za-zÀ-ÖØ-öø-ÿ0-9\s.,'()&-]/g, "");
+const cleanName = (v) => v.replace(/[^A-Za-zÀ-ÖØ-öø-ÿ\s.'-]/g, "");
+const NAME_FIELDS = ["firstName", "middleName", "lastName"];
 const hasNumber = (v) => /\p{N}/u.test(v || "");
 const onlyDigits = (v) => v.replace(/\D/g, "");
+const MAX_PAYMENTS = 5;
+const newExtraPayment = () => ({
+  key: String(Date.now() + Math.random()),
+  paymentDate: "",
+  paymentChannelId: null,
+  paymentChannel: "",
+  amount: "",
+  referenceNumber: "",
+  proofOfPayment: null,
+});
+const extraPaymentMissing = (p) => ({
+  paymentDate: !p.paymentDate,
+  paymentChannel: !p.paymentChannelId,
+  amount: !(parseFloat(p.amount) > 0),
+  referenceNumber: !p.referenceNumber?.trim(),
+  proofOfPayment: !p.proofOfPayment,
+});
 const onlyAmount = (v) => v.replace(/[^0-9.]/g, "").replace(/(\..*)\./g, "$1");
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -57,8 +78,12 @@ export default function Step3Personal({
     setData({ ...data, [key]: value });
     clearError(key);
   };
-  const handleChange = (key, value) =>
-    set(key, UPPERCASE_FIELDS.includes(key) ? value.toUpperCase() : value);
+  const handleChange = (key, value) => {
+    if (NAME_FIELDS.includes(key)) value = cleanName(value).toUpperCase();
+    else if (UPPERCASE_FIELDS.includes(key))
+      value = cleanText(value).toUpperCase();
+    set(key, value);
+  };
 
   const validatePersonal = () => {
     const e = {};
@@ -102,6 +127,12 @@ export default function Step3Personal({
       e.amount = "Please enter a valid amount.";
     if (!data.referenceNumber?.trim()) e.referenceNumber = "Required.";
     if (!data.proofOfPayment) e.proofOfPayment = "Please upload your receipt.";
+    if (
+      (data.extraPayments || []).some((p) =>
+        Object.values(extraPaymentMissing(p)).some(Boolean),
+      )
+    )
+      e.extraPayments = "Please complete every added payment, or remove it.";
     if (!data.paymentNoticeAgreement)
       e.paymentNoticeAgreement = "Kindly confirm before proceeding.";
     if (Object.keys(e).length) {
@@ -135,6 +166,28 @@ export default function Step3Personal({
       {error(key)}
     </div>
   );
+
+  const extraPayments = data.extraPayments || [];
+  const addExtraPayment = () => {
+    if (extraPayments.length + 1 >= MAX_PAYMENTS) return;
+    setData({ ...data, extraPayments: [...extraPayments, newExtraPayment()] });
+  };
+  const updateExtraPayment = (key, changes) => {
+    setData({
+      ...data,
+      extraPayments: extraPayments.map((p) =>
+        p.key === key ? { ...p, ...changes } : p,
+      ),
+    });
+    clearError("extraPayments");
+  };
+  const removeExtraPayment = (key) => {
+    setData({
+      ...data,
+      extraPayments: extraPayments.filter((p) => p.key !== key),
+    });
+    clearError("extraPayments");
+  };
 
   const picked = (key) =>
     data[key] && (
@@ -191,10 +244,33 @@ export default function Step3Personal({
               errors={errors}
             />
             <FormField
-              label="Bachelor's Degree and Majorship Taken:*"
+              label="Program Name / Course:*"
               fieldKey="degree"
               placeholder="E.g.: Bachelor of Secondary Education Major in English"
-              hint="Format: [Full Degree/Program Title] Major in [Specialization if applicable]"
+              hint={
+                <>
+                  Examples:
+                  <span style={{ display: "block", paddingLeft: "10px" }}>
+                    • Bachelor of Elementary Education
+                  </span>
+                  <span style={{ display: "block", paddingLeft: "10px" }}>
+                    • Bachelor of Secondary Education Major in (Specialization)
+                  </span>
+                  <span style={{ display: "block", paddingLeft: "10px" }}>
+                    • Certificate in Professional Teaching Program Major in
+                    (Specialization)
+                  </span>
+                  <span style={{ display: "block", paddingLeft: "10px" }}>
+                    • Teacher Certificate Program
+                  </span>
+                  <span style={{ display: "block", marginTop: "6px" }}>
+                    Only include courses related to Education. If you are a Unit
+                    Earner, list the school where you earned your teaching units
+                    right after the program name (e.g. Teacher Certificate
+                    Program - Philippine Normal University).
+                  </span>
+                </>
+              }
               value={data.degree}
               onChange={handleChange}
               errors={errors}
@@ -385,7 +461,7 @@ export default function Step3Personal({
               {error("paymentType")}
               {data.paymentType === "downpayment" && (
                 <p style={noteStyle}>
-                  With a downpayment, you can access the courses up to LET
+                  With a downpayment, you can access the courses up to LEPT
                   Express. Upload your remaining balance receipt later in your
                   Profile to unlock the rest.
                 </p>
@@ -428,6 +504,173 @@ export default function Step3Personal({
               />
               {picked("proofOfPayment")}
               {error("proofOfPayment")}
+            </div>
+
+            {extraPayments.map((p, i) => {
+              const missing = extraPaymentMissing(p);
+              const bad = (k) => !!errors.extraPayments && missing[k];
+              const fieldLabel = (k, text) => (
+                <span className={`field-label ${bad(k) ? "error" : ""}`}>
+                  {text}
+                </span>
+              );
+              return (
+                <div
+                  key={p.key}
+                  style={{
+                    border: "1px solid #ccc",
+                    borderRadius: "10px",
+                    padding: "14px 16px",
+                    marginBottom: "16px",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}
+                  >
+                    <strong style={{ color: "#2F459B", fontSize: "15px" }}>
+                      Payment {i + 2}
+                    </strong>
+                    <button
+                      type="button"
+                      onClick={() => removeExtraPayment(p.key)}
+                      style={{
+                        border: 0,
+                        background: "none",
+                        color: "#e53935",
+                        fontWeight: 600,
+                        fontSize: "13px",
+                        cursor: "pointer",
+                        fontFamily: "inherit",
+                      }}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                  <div className="field-group">
+                    {fieldLabel("paymentDate", "Date of Transaction:*")}
+                    <input
+                      type="date"
+                      max={today()}
+                      className={`field-input ${bad("paymentDate") ? "error" : ""}`}
+                      value={p.paymentDate}
+                      onChange={(e) =>
+                        updateExtraPayment(p.key, {
+                          paymentDate: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="field-group">
+                    {fieldLabel("paymentChannel", "Payment Method:*")}
+                    <select
+                      className={`field-input ${bad("paymentChannel") ? "error" : ""}`}
+                      value={p.paymentChannelId ?? ""}
+                      onChange={(e) => {
+                        const channel = channels.find(
+                          (c) => c.id === Number(e.target.value),
+                        );
+                        updateExtraPayment(p.key, {
+                          paymentChannelId: channel?.id ?? null,
+                          paymentChannel: channel?.name ?? "",
+                        });
+                      }}
+                    >
+                      <option value="">Select method</option>
+                      {channels.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="field-group">
+                    {fieldLabel("amount", "Amount Transferred:*")}
+                    <input
+                      inputMode="decimal"
+                      className={`field-input ${bad("amount") ? "error" : ""}`}
+                      placeholder="E.g.: 1000"
+                      value={p.amount}
+                      onChange={(e) =>
+                        updateExtraPayment(p.key, {
+                          amount: onlyAmount(e.target.value),
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="field-group">
+                    {fieldLabel("referenceNumber", "Reference Number:*")}
+                    <input
+                      inputMode="numeric"
+                      className={`field-input ${bad("referenceNumber") ? "error" : ""}`}
+                      placeholder="Enter Ref #"
+                      value={p.referenceNumber}
+                      onChange={(e) =>
+                        updateExtraPayment(p.key, {
+                          referenceNumber: onlyDigits(e.target.value),
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="field-group" style={{ marginBottom: 0 }}>
+                    {fieldLabel("proofOfPayment", "Verification/Receipt:*")}
+                    <input
+                      type="file"
+                      accept="image/*,.pdf"
+                      className={`field-input ${bad("proofOfPayment") ? "error" : ""}`}
+                      style={{ padding: "8px" }}
+                      onChange={(e) =>
+                        updateExtraPayment(p.key, {
+                          proofOfPayment: e.target.files[0] || null,
+                        })
+                      }
+                    />
+                    {p.proofOfPayment && (
+                      <p
+                        style={{
+                          margin: "4px 0 0",
+                          fontSize: "12px",
+                          color: "#2F459B",
+                        }}
+                      >
+                        ✓ {p.proofOfPayment.name}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+            {error("extraPayments")}
+
+            <div className="field-group">
+              {extraPayments.length + 1 < MAX_PAYMENTS && (
+                <button
+                  type="button"
+                  onClick={addExtraPayment}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    border: 0,
+                    padding: 0,
+                    background: "none",
+                    color: "#2F459B",
+                    fontWeight: 700,
+                    fontSize: "14px",
+                    cursor: "pointer",
+                    fontFamily: "inherit",
+                  }}
+                >
+                  Add another payment <PlusCircle size={20} strokeWidth={2.2} />
+                </button>
+              )}
+              <p style={{ margin: "4px 0 0", fontSize: "12px", color: "#777" }}>
+                Paid in parts or through a different method? Add each payment
+                separately.
+              </p>
             </div>
             {checkbox(
               "paymentNoticeAgreement",

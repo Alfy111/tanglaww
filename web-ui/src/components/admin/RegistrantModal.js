@@ -662,6 +662,13 @@ export default function RegistrantModal({ enrollmentId, onClose, onChanged }) {
   const status = enrollment ? getStatus(enrollment) : null;
   const name = fullName(student);
   const hasAccess = status === "approved" || status === "partially_approved";
+  const extraPayments = Array.isArray(payment?.additionalPayments)
+    ? payment.additionalPayments
+    : [];
+  const totalPaid = [
+    payment?.amountTransferred,
+    ...extraPayments.map((p) => p.amountTransferred),
+  ].reduce((sum, v) => sum + (Number(v) || 0), 0);
   const showBalanceRow =
     payment?.paymentType === "downpayment" ||
     status === "partially_approved" ||
@@ -940,16 +947,46 @@ export default function RegistrantModal({ enrollmentId, onClose, onChanged }) {
                   "Payment Type",
                   PAYMENT_TYPE_LABELS[payment?.paymentType] ?? "Not specified",
                 ],
+                ...extraPayments.flatMap((p, i) => [
+                  [`Payment ${i + 2} Channel`, p.paymentChannelName || "—"],
+                  [
+                    `Payment ${i + 2} Amount`,
+                    p.amountTransferred == null
+                      ? ""
+                      : String(p.amountTransferred),
+                  ],
+                  [`Payment ${i + 2} Reference #`, p.referenceNumber || "—"],
+                  [`Payment ${i + 2} Date`, formatLongDate(p.dateOfPayment)],
+                ]),
+                ...(extraPayments.length
+                  ? [
+                      [
+                        "Total Paid",
+                        `₱${totalPaid.toLocaleString("en-PH", { maximumFractionDigits: 2 })}`,
+                      ],
+                    ]
+                  : []),
               ]}
             />
 
             <p style={{ ...sectionLabel, marginTop: "20px" }}>Documents:</p>
             <DocumentRow
-              title="Proof of Payment"
+              title={
+                extraPayments.length ? "Proof of Payment 1" : "Proof of Payment"
+              }
               onClick={() =>
                 openDocument(payment?.proofOfPaymentUrl, "Proof of Payment")
               }
             />
+            {extraPayments.map((p, i) => (
+              <DocumentRow
+                key={`proof-${i}`}
+                title={`Proof of Payment ${i + 2}`}
+                onClick={() =>
+                  openDocument(p.proofUrl, `Proof of Payment ${i + 2}`)
+                }
+              />
+            ))}
             <DocumentRow
               title="Graduation or Formal Photo"
               onClick={() =>
