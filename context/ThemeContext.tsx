@@ -113,6 +113,7 @@ function restoreInlineStyle(
 
 function applyWebTheme(element: Element, isDark: boolean) {
   if (!(element instanceof HTMLElement)) return;
+  if (element.closest("[data-theme-fixed='true']")) return;
 
   if (!isDark) {
     restoreInlineStyle(element, "background-color");
@@ -201,6 +202,12 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }
 
     const updateTree = (node: Element) => {
+      if (
+        node instanceof HTMLElement &&
+        node.closest("[data-theme-fixed='true']")
+      ) {
+        return;
+      }
       applyWebTheme(node, colorScheme === "dark");
       node.querySelectorAll("*").forEach((child) =>
         applyWebTheme(child, colorScheme === "dark"),

@@ -75,12 +75,14 @@ export const clearSession = async (studentId?: number): Promise<void> => {
   await clearLocalSession();
 
   if (studentId && storedToken) {
-    const { error } = await supabase
+    void supabase
       .from("student")
       .update({ session_token: null, session_created_at: null })
       .eq("id", studentId)
-      .eq("session_token", storedToken);
-    if (error) console.warn("[session] clearSession failed", error);
+      .eq("session_token", storedToken)
+      .then(({ error }) => {
+        if (error) console.warn("[session] clearSession failed", error);
+      });
   }
 };
 
@@ -91,7 +93,11 @@ export const logoutStudent = async (): Promise<void> => {
   } catch (err) {
     console.warn("[session] logout cleanup failed", err);
   }
-  await supabase.auth.signOut({ scope: "local" });
+  try {
+    await supabase.auth.signOut({ scope: "local" });
+  } catch (err) {
+    console.warn("[session] auth signOut failed", err);
+  }
 };
 
 export const getStoredStudentId = async (): Promise<number | null> => {
