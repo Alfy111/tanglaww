@@ -126,7 +126,7 @@ export default function AdminSignIn() {
     }
   };
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView {...({ "data-theme-fixed": "true" } as any)} style={styles.container}>
       <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
         <Ionicons name="arrow-back" size={24} color="#0D2A94" />
       </TouchableOpacity>

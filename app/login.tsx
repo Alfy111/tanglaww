@@ -107,7 +107,23 @@ const FADE_MS = 1000;
 const BLUE_LAYER = "rgba(0, 22, 122, 0.62)";
 
 function slideSize(source: ImageSourcePropType, boxW: number, boxH: number) {
-  const { width: iw, height: ih } = Image.resolveAssetSource(source);
+  const imageWithResolver = Image as typeof Image & {
+    resolveAssetSource?: (asset: ImageSourcePropType) => {
+      width: number;
+      height: number;
+    };
+  };
+  const resolved = imageWithResolver.resolveAssetSource?.(source);
+  if (!resolved || resolved.width <= 0 || resolved.height <= 0) {
+    const extra = boxW * 0.08;
+    return {
+      width: boxW + extra,
+      height: boxH,
+      extra,
+      top: 0,
+    };
+  }
+  const { width: iw, height: ih } = resolved;
   const scale = Math.max(boxW / iw, boxH / ih);
   const width = iw * scale;
   const height = ih * scale;
@@ -192,6 +208,7 @@ function MovingBackground() {
             <Animated.Image
               key={i}
               source={slide.source}
+              resizeMode="cover"
               style={{
                 position: "absolute",
                 left: 0,
@@ -216,7 +233,7 @@ export default function LoginScreen() {
   const [contactVisible, setContactVisible] = useState(false);
 
   return (
-    <View style={styles.container}>
+    <View {...({ "data-theme-fixed": "true" } as any)} style={styles.container}>
       <View style={styles.topSection}>
         <MovingBackground />
         <TouchableOpacity

@@ -195,7 +195,9 @@ export default function AdminHamburger({
                           text: "Sign Out",
                           style: "destructive",
                           onPress: async () => {
-                            await supabase.auth.signOut();
+                            void supabase.auth.signOut({ scope: "local" }).catch(
+                              () => {},
+                            );
                             Toast.show({
                               type: "success",
                               text1: "You have logged out successfully",
