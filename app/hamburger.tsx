@@ -100,14 +100,15 @@ export default function HamburgerMenu({ onClose }: HamburgerProps) {
         style: "destructive",
         onPress: async () => {
           if (student.id) {
-            await logAudit({
+            void logAudit({
               actorType: "student",
               actorId: String(student.id),
               actorName: `${student.firstName} ${student.lastName}`,
               action: "student_logout",
-            });
+            }).catch(() => {});
           }
-          await logoutStudent();
+          onClose();
+          void logoutStudent().catch(() => {});
 
           Toast.show({
             type: "success",
@@ -115,7 +116,7 @@ export default function HamburgerMenu({ onClose }: HamburgerProps) {
             position: "bottom",
             visibilityTime: 4000,
           });
-          router.replace("/login");
+          router.replace("/login" as any);
         },
       },
     ]);

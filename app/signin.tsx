@@ -163,7 +163,10 @@ export default function SignInScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView
+      {...({ "data-theme-fixed": "true" } as any)}
+      style={styles.container}
+    >
       <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
         <Ionicons name="arrow-back" size={24} color="#2F459B" />
       </TouchableOpacity>

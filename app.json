@@ -76,6 +76,14 @@
     },
     "plugins": [
       [
+        "expo-notifications",
+        {
+          "icon": "./assets/icons/android-icon-foreground.png",
+          "color": "#00167a",
+          "defaultChannel": "default"
+        }
+      ],
+      [
         "expo-media-library",
         {
           "photosPermission": "Allow Tanglaw to save student photos.",
