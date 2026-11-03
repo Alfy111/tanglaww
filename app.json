@@ -35,8 +35,39 @@
               "scheme": "tanglaw"
             }
           ],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        },
+        {
+          "action": "VIEW",
+          "data": [
+            {
+              "scheme": "tanglaw"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
+      ],
+      "permissions": [
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_MEDIA_AUDIO",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_MEDIA_AUDIO",
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "web": {
@@ -88,12 +119,12 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "ae6c9ab0-c2e0-404d-a32c-af6761d04427"
+        "projectId": "fceed51d-e69c-4535-87d0-3d3f4ca511e5"
       }
     },
-    "owner": "alffeee",
+    "owner": "sanois",
     "updates": {
-      "url": "https://u.expo.dev/ae6c9ab0-c2e0-404d-a32c-af6761d04427"
+      "url": "https://u.expo.dev/fceed51d-e69c-4535-87d0-3d3f4ca511e5"
     }
   }
 }

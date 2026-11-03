@@ -35,10 +35,7 @@ const newExtraPayment = () => ({
   proofOfPayment: null,
 });
 const extraPaymentMissing = (p) => ({
-  paymentDate: !p.paymentDate,
-  paymentChannel: !p.paymentChannelId,
-  amount: !(parseFloat(p.amount) > 0),
-  referenceNumber: !p.referenceNumber?.trim(),
+  amount: !!p.amount?.trim() && !(parseFloat(p.amount) > 0),
 });
 const onlyAmount = (v) => v.replace(/[^0-9.]/g, "").replace(/(\..*)\./g, "$1");
 const today = () => new Date().toISOString().slice(0, 10);
@@ -146,13 +143,8 @@ export default function Step3Personal({
 
   const validatePromotionsAndPayment = () => {
     const e = {};
-    if (!data.paymentDate) e.paymentDate = "Required.";
-    if (!data.paymentChannelId) e.paymentChannel = "Required.";
-    if (!data.paymentType) e.paymentType = "Required.";
-    if (!data.amount?.trim()) e.amount = "Required.";
-    else if (!(parseFloat(data.amount) > 0))
+    if (data.amount?.trim() && !(parseFloat(data.amount) > 0))
       e.amount = "Please enter a valid amount.";
-    if (!data.referenceNumber?.trim()) e.referenceNumber = "Required.";
     if (
       (data.extraPayments || []).some((p) =>
         Object.values(extraPaymentMissing(p)).some(Boolean),
@@ -443,7 +435,7 @@ export default function Step3Personal({
               </select>
             </div>
             <div className="field-group">
-              {label("paymentDate", "Date of Transaction:*")}
+              {label("paymentDate", "Date of Transaction:")}
               <input
                 type="date"
                 max={today()}
@@ -454,7 +446,7 @@ export default function Step3Personal({
               {error("paymentDate")}
             </div>
             <div className="field-group">
-              {label("paymentChannel", "Payment Method:*")}
+              {label("paymentChannel", "Payment Method:")}
               <select
                 className={`field-input ${errors.paymentChannel ? "error" : ""}`}
                 value={data.paymentChannelId ?? ""}
@@ -522,7 +514,7 @@ export default function Step3Personal({
               )}
             </div>
             <div className="field-group">
-              {label("paymentType", "Payment Type:*")}
+              {label("paymentType", "Payment Type:")}
               <select
                 className={`field-input ${errors.paymentType ? "error" : ""}`}
                 value={data.paymentType || ""}
@@ -545,7 +537,7 @@ export default function Step3Personal({
               )}
             </div>
             <div className="field-group">
-              {label("amount", "Amount Transferred:*")}
+              {label("amount", "Amount Transferred:")}
               <input
                 inputMode="decimal"
                 className={`field-input ${errors.amount ? "error" : ""}`}
@@ -556,7 +548,7 @@ export default function Step3Personal({
               {error("amount")}
             </div>
             <div className="field-group">
-              {label("referenceNumber", "Reference Number:*")}
+              {label("referenceNumber", "Reference Number:")}
               <input
                 inputMode="numeric"
                 className={`field-input ${errors.referenceNumber ? "error" : ""}`}

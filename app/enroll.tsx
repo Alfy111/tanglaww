@@ -89,10 +89,11 @@ const newExtraPayment = (): ExtraPayment => ({
   receipt: null,
 });
 const extraPaymentMissing = (p: ExtraPayment) => ({
-  paymentChannel: !p.paymentChannelId,
-  transactionDate: !p.transactionDate,
-  amountTransferred: !(parseFloat(p.amountTransferred) > 0),
-  referenceNumber: !p.referenceNumber.trim(),
+  paymentChannel: false,
+  transactionDate: false,
+  amountTransferred:
+    !!p.amountTransferred.trim() && !(parseFloat(p.amountTransferred) > 0),
+  referenceNumber: false,
 });
 
 const defaultValues: dataTypes = {
@@ -221,13 +222,11 @@ function validateStep(step: number, form: dataTypes): FieldErrors {
   }
 
   if (step === 4) {
-    if (!form.transactionDate) errors.transactionDate = REQUIRED;
-    if (!form.paymentChannelId) errors.paymentChannel = REQUIRED;
-    if (!form.paymentType) errors.paymentType = REQUIRED;
-    if (!form.amountTransferred.trim()) errors.amountTransferred = REQUIRED;
-    else if (!(parseFloat(form.amountTransferred) > 0))
+    if (
+      form.amountTransferred.trim() &&
+      !(parseFloat(form.amountTransferred) > 0)
+    )
       errors.amountTransferred = "Please enter a valid amount.";
-    if (!form.referenceNumber.trim()) errors.referenceNumber = REQUIRED;
     if (
       form.extraPayments.some((p) =>
         Object.values(extraPaymentMissing(p)).some(Boolean),
@@ -730,9 +729,14 @@ export default function EnrollmentScreen() {
 
       const paymentFields = {
         paymentChannel_id: dataTypes.paymentChannelId,
-        referenceNumber: dataTypes.referenceNumber,
-        amountTransferred: parseFloat(dataTypes.amountTransferred),
-        dateOfPayment: (dataTypes.transactionDate ?? new Date()).toISOString(),
+        referenceNumber: dataTypes.referenceNumber.trim() || null,
+        amountTransferred:
+          parseFloat(dataTypes.amountTransferred) > 0
+            ? parseFloat(dataTypes.amountTransferred)
+            : null,
+        dateOfPayment: dataTypes.transactionDate
+          ? dataTypes.transactionDate.toISOString()
+          : null,
         proofOfPaymentUrl: proofUrl,
         additionalPayments,
         paymentType: dataTypes.paymentType,
@@ -1447,7 +1451,7 @@ export default function EnrollmentScreen() {
                 </View>
               )}
 
-              {fieldLabel("transactionDate", "Date of Transaction:", true)}
+              {fieldLabel("transactionDate", "Date of Transaction:")}
               <TouchableOpacity
                 style={[
                   styles.dropdown,
@@ -1472,7 +1476,7 @@ export default function EnrollmentScreen() {
                 />
               )}
 
-              {fieldLabel("paymentChannel", "Payment Method:", true)}
+              {fieldLabel("paymentChannel", "Payment Method:")}
               <TouchableOpacity
                 style={[
                   styles.dropdown,
@@ -1577,7 +1581,7 @@ export default function EnrollmentScreen() {
                 key: "amountTransferred",
                 label: "Amount Transferred:",
                 placeholder: "E.g.: 3500",
-                required: true,
+                required: false,
                 keyboardType: "decimal-pad",
                 clean: onlyAmount,
               })}
@@ -1585,7 +1589,7 @@ export default function EnrollmentScreen() {
                 key: "referenceNumber",
                 label: "Reference Number:",
                 placeholder: "Enter Ref #",
-                required: true,
+                required: false,
                 keyboardType: "number-pad",
                 clean: (v: string) => v.replace(/\D/g, ""),
               })}
@@ -1622,7 +1626,7 @@ export default function EnrollmentScreen() {
                         bad("transactionDate") && styles.labelError,
                       ]}
                     >
-                      Date of Transaction:*
+                      Date of Transaction:
                     </Text>
                     <TouchableOpacity
                       style={[
@@ -1663,7 +1667,7 @@ export default function EnrollmentScreen() {
                         bad("paymentChannel") && styles.labelError,
                       ]}
                     >
-                      Payment Method:*
+                      Payment Method:
                     </Text>
                     <TouchableOpacity
                       style={[
@@ -1707,7 +1711,7 @@ export default function EnrollmentScreen() {
                         bad("amountTransferred") && styles.labelError,
                       ]}
                     >
-                      Amount Transferred:*
+                      Amount Transferred:
                     </Text>
                     <TextInput
                       style={[
@@ -1731,7 +1735,7 @@ export default function EnrollmentScreen() {
                         bad("referenceNumber") && styles.labelError,
                       ]}
                     >
-                      Reference Number:*
+                      Reference Number:
                     </Text>
                     <TextInput
                       style={[

@@ -313,9 +313,12 @@ export async function submitEnrollment(data) {
 
   const paymentFields = {
     paymentChannel_id: data.paymentChannelId,
-    referenceNumber: data.referenceNumber,
-    amountTransferred: parseFloat(data.amount),
-    dateOfPayment: new Date(data.paymentDate).toISOString(),
+    referenceNumber: data.referenceNumber?.trim() || null,
+    amountTransferred:
+      parseFloat(data.amount) > 0 ? parseFloat(data.amount) : null,
+    dateOfPayment: data.paymentDate
+      ? new Date(data.paymentDate).toISOString()
+      : null,
     proofOfPaymentUrl: proofUrl,
     additionalPayments,
     paymentType: data.paymentType,
