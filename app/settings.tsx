@@ -25,7 +25,6 @@ export default function SettingsScreen() {
   const { isConnected, isInternetReachable } = useNetInfo();
   const [pushEnabled, setPushEnabled] = useState(true);
 
-  // In-app alerts on/off (saved on this phone)
   useEffect(() => {
     AsyncStorage.getItem(POPUPS_KEY)
       .then((v) => setPushEnabled(v !== "off"))

@@ -1,6 +1,3 @@
-// Shows a small pop-up (toast) anywhere in the app when a new notification
-// arrives, and a reminder when an event or online session starts within
-// the next hour. Renders nothing on screen by itself.
 import { FeedItem, KIND_LABELS } from "@/lib/notifications";
 import { supabase } from "@/lib/supabase";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -11,7 +8,6 @@ import { AppState } from "react-native";
 import Toast from "react-native-toast-message";
 
 const REMINDED_KEY = "notifSoonReminded";
-// Settings > Push Notifications switch ("off" hides these pop-ups)
 export const POPUPS_KEY = "notifPopups";
 const popupsOn = async () => {
   try {
@@ -115,7 +111,6 @@ export default function NotificationToaster() {
 
     start();
     const { data: auth } = supabase.auth.onAuthStateChange((event) => {
-      // Run outside the auth callback (Supabase can lock up otherwise)
       setTimeout(() => {
         if (event === "SIGNED_OUT") stop();
         else if (event === "SIGNED_IN") start();

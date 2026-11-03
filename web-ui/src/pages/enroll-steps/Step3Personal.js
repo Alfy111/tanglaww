@@ -10,18 +10,19 @@ import {
   getPromos,
 } from "../../lib/enrollment";
 
-const UPPERCASE_FIELDS = [
-  "firstName",
-  "middleName",
-  "lastName",
-  "degree",
-  "school",
-  "province",
-];
-const cleanText = (v) => v.replace(/[^A-Za-zÀ-ÖØ-öø-ÿ0-9\s.,'()&-]/g, "");
-const cleanName = (v) => v.replace(/[^A-Za-zÀ-ÖØ-öø-ÿ\s.'-]/g, "");
 const NAME_FIELDS = ["firstName", "middleName", "lastName"];
+const SCHOOL_FIELDS = ["degree", "school", "tcpProgram", "tcpSchool"];
 const hasNumber = (v) => /\p{N}/u.test(v || "");
+// True if the text has no letters, or has symbols stacked like "..", "-(", "&&"
+const hasBadMarks = (v) =>
+  !/[A-Za-zÀ-ÖØ-öø-ÿ]/.test(v) || /[.,'()&-]{2,}/.test(v);
+// Names: letters (incl. Ñ/accents), spaces and . - ' only
+const cleanName = (v) => v.replace(/[^A-Za-zÀ-ÖØ-öø-ÿ\s.'-]/g, "");
+const cleanText = (v) => v.replace(/[^A-Za-zÀ-ÖØ-öø-ÿ0-9\s.,'()&-]/g, "");
+const isFacebookLink = (v) =>
+  /^(https?:\/\/)?([a-z0-9-]+\.)?(facebook|fb)\.com\/\S+/i.test(
+    (v || "").trim(),
+  );
 const onlyDigits = (v) => v.replace(/\D/g, "");
 const MAX_PAYMENTS = 5;
 const newExtraPayment = () => ({
@@ -38,7 +39,6 @@ const extraPaymentMissing = (p) => ({
   paymentChannel: !p.paymentChannelId,
   amount: !(parseFloat(p.amount) > 0),
   referenceNumber: !p.referenceNumber?.trim(),
-  proofOfPayment: !p.proofOfPayment,
 });
 const onlyAmount = (v) => v.replace(/[^0-9.]/g, "").replace(/(\..*)\./g, "$1");
 const today = () => new Date().toISOString().slice(0, 10);
@@ -78,10 +78,25 @@ export default function Step3Personal({
     setData({ ...data, [key]: value });
     clearError(key);
   };
+  // "Same school" box: keep the TCP fields equal to the college fields
+  useEffect(() => {
+    if (!data.tcpSameAsCollege) return;
+    if (data.tcpProgram === data.degree && data.tcpSchool === data.school)
+      return;
+    setData({
+      ...data,
+      tcpProgram: data.degree ?? "",
+      tcpSchool: data.school ?? "",
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data.tcpSameAsCollege, data.degree, data.school]);
+
   const handleChange = (key, value) => {
     if (NAME_FIELDS.includes(key)) value = cleanName(value).toUpperCase();
-    else if (UPPERCASE_FIELDS.includes(key))
+    else if (SCHOOL_FIELDS.includes(key))
       value = cleanText(value).toUpperCase();
+    else if (key === "facebookName") value = cleanText(value);
+    else if (key === "facebookLink") value = value.replace(/\s/g, "");
     set(key, value);
   };
 
@@ -98,17 +113,29 @@ export default function Step3Personal({
     if (!data.email?.trim()) e.email = "Required.";
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email.trim()))
       e.email = "Please enter a valid email address.";
+    // Facebook fields are optional, but must look right if filled in
+    if (data.facebookName?.trim() && hasBadMarks(data.facebookName))
+      e.facebookName = "Please use letters, not just symbols.";
+    if (data.facebookLink?.trim() && !isFacebookLink(data.facebookLink))
+      e.facebookLink =
+        "Please paste your Facebook profile link (facebook.com/...).";
     if (!data.degree?.trim()) e.degree = "Required.";
     else if (hasNumber(data.degree))
       e.degree = "Degree cannot contain numbers.";
     if (!data.school?.trim()) e.school = "Required.";
     else if (hasNumber(data.school))
       e.school = "School name cannot contain numbers.";
-    if (!data.province?.trim()) e.province = "Required.";
-    else if (hasNumber(data.province))
-      e.province = "Province cannot contain numbers.";
-    if (!data.graduationPhoto) e.graduationPhoto = "Required.";
-    if (!data.photoConsent) e.photoConsent = "Kindly agree before proceeding.";
+    if (data.tcpProgram?.trim() && hasNumber(data.tcpProgram))
+      e.tcpProgram = "Program cannot contain numbers.";
+    if (data.tcpSchool?.trim() && hasNumber(data.tcpSchool))
+      e.tcpSchool = "School name cannot contain numbers.";
+    [...NAME_FIELDS, ...SCHOOL_FIELDS].forEach((k) => {
+      if (!e[k] && data[k]?.trim() && hasBadMarks(data[k]))
+        e[k] = "Please use letters, not just symbols.";
+    });
+    // Only needed when they actually uploaded a photo or ID
+    if ((data.graduationPhoto || data.validId) && !data.photoConsent)
+      e.photoConsent = "Kindly agree before proceeding.";
     if (Object.keys(e).length) {
       setErrors(e);
       return;
@@ -126,7 +153,6 @@ export default function Step3Personal({
     else if (!(parseFloat(data.amount) > 0))
       e.amount = "Please enter a valid amount.";
     if (!data.referenceNumber?.trim()) e.referenceNumber = "Required.";
-    if (!data.proofOfPayment) e.proofOfPayment = "Please upload your receipt.";
     if (
       (data.extraPayments || []).some((p) =>
         Object.values(extraPaymentMissing(p)).some(Boolean),
@@ -212,6 +238,14 @@ export default function Step3Personal({
         {subStep === 0 ? (
           <>
             <FormField
+              label="Email Address:*"
+              fieldKey="email"
+              placeholder="Email Address"
+              value={data.email}
+              onChange={handleChange}
+              errors={errors}
+            />
+            <FormField
               label="First Name:*"
               fieldKey="firstName"
               placeholder="Given Name"
@@ -236,62 +270,118 @@ export default function Step3Personal({
               errors={errors}
             />
             <FormField
-              label="Email Address:*"
-              fieldKey="email"
-              placeholder="Email Address"
-              value={data.email}
+              label="Facebook Name:"
+              fieldKey="facebookName"
+              placeholder="Name on your Facebook account (optional)"
+              value={data.facebookName ?? ""}
               onChange={handleChange}
               errors={errors}
             />
             <FormField
-              label="Program Name / Course:*"
+              label="Facebook Link:"
+              fieldKey="facebookLink"
+              placeholder="E.g.: https://www.facebook.com/your.name (optional)"
+              value={data.facebookLink ?? ""}
+              onChange={handleChange}
+              errors={errors}
+            />
+            <FormField
+              label="Bachelor's Degree (College):*"
               fieldKey="degree"
-              placeholder="E.g.: Bachelor of Secondary Education Major in English"
-              hint={
-                <>
-                  Examples:
-                  <span style={{ display: "block", paddingLeft: "10px" }}>
-                    • Bachelor of Elementary Education
-                  </span>
-                  <span style={{ display: "block", paddingLeft: "10px" }}>
-                    • Bachelor of Secondary Education Major in (Specialization)
-                  </span>
-                  <span style={{ display: "block", paddingLeft: "10px" }}>
-                    • Certificate in Professional Teaching Program Major in
-                    (Specialization)
-                  </span>
-                  <span style={{ display: "block", paddingLeft: "10px" }}>
-                    • Teacher Certificate Program
-                  </span>
-                  <span style={{ display: "block", marginTop: "6px" }}>
-                    Only include courses related to Education. If you are a Unit
-                    Earner, list the school where you earned your teaching units
-                    right after the program name (e.g. Teacher Certificate
-                    Program - Philippine Normal University).
-                  </span>
-                </>
-              }
-              value={data.degree}
+              placeholder="E.g.: Bachelor of Arts in Psychology"
+              value={data.degree ?? ""}
               onChange={handleChange}
               errors={errors}
             />
             <FormField
-              label="Last School Attended:*"
+              label="Name of School:*"
               fieldKey="school"
-              placeholder="E.g.: Polytechnic University of the Philippines - Main Campus"
-              hint="Format: [Full School Name] - [Branch if applicable]"
-              value={data.school}
+              placeholder="E.g.: Polytechnic University of the Philippines"
+              value={data.school ?? ""}
               onChange={handleChange}
               errors={errors}
             />
-            <FormField
-              label="Province:*"
-              fieldKey="province"
-              placeholder="Province"
-              value={data.province}
-              onChange={handleChange}
-              errors={errors}
-            />
+            {checkbox(
+              "tcpSameAsCollege",
+              "I took my Teacher Certificate Program (TCP) at the same school. Use my Bachelor's Degree and Name of School above.",
+            )}
+            {data.tcpSameAsCollege ? (
+              <p
+                style={{
+                  margin: "4px 0 18px 10px",
+                  fontSize: "12px",
+                  color: "#777",
+                }}
+              >
+                TCP Program and School will be the same as your Bachelor's
+                Degree and Name of School.
+              </p>
+            ) : (
+              <>
+                <FormField
+                  label="Program Name/Course (for Teacher Certificate Program (TCP)):"
+                  fieldKey="tcpProgram"
+                  placeholder="Optional"
+                  hint={
+                    <>
+                      Examples:
+                      <span style={{ display: "block", paddingLeft: "10px" }}>
+                        • Bachelor of Secondary Education Major in
+                        (Specialization)
+                      </span>
+                      <span style={{ display: "block", paddingLeft: "10px" }}>
+                        • Certificate in Professional Teaching Program Major in
+                        (Specialization)
+                      </span>
+                      <span style={{ display: "block", paddingLeft: "10px" }}>
+                        • Teacher Certificate Program Major in (Specialization)
+                      </span>
+                      <span style={{ display: "block", marginTop: "6px" }}>
+                        Note: Only include courses related to Education.
+                      </span>
+                    </>
+                  }
+                  value={data.tcpProgram ?? ""}
+                  onChange={handleChange}
+                  errors={errors}
+                />
+                <FormField
+                  label="Last School Attended (for TCP):"
+                  fieldKey="tcpSchool"
+                  placeholder="Optional"
+                  hint={
+                    <>
+                      Note: If you are a Unit Earner, list the school where you
+                      earned your teaching units.
+                      <span style={{ display: "block" }}>
+                        Format: [Full School Name] - [Branch if applicable]
+                      </span>
+                    </>
+                  }
+                  value={data.tcpSchool ?? ""}
+                  onChange={handleChange}
+                  errors={errors}
+                />
+              </>
+            )}
+            <div className="field-group">
+              <span className="field-label">
+                Upload Graduation or Formal Photo: (optional)
+              </span>
+              <input
+                type="file"
+                accept="image/*"
+                className="field-input"
+                style={{ padding: "8px" }}
+                onChange={(e) =>
+                  setData({
+                    ...data,
+                    graduationPhoto: e.target.files[0] || null,
+                  })
+                }
+              />
+              {picked("graduationPhoto")}
+            </div>
             <div className="field-group">
               <span className="field-label">Upload Valid ID: (optional)</span>
               <input
@@ -305,24 +395,11 @@ export default function Step3Personal({
               />
               {picked("validId")}
             </div>
-            <div className="field-group">
-              {label("graduationPhoto", "Upload Graduation or Formal Photo:*")}
-              <input
-                type="file"
-                accept="image/*"
-                className={`field-input ${errors.graduationPhoto ? "error" : ""}`}
-                style={{ padding: "8px" }}
-                onChange={(e) =>
-                  set("graduationPhoto", e.target.files[0] || null)
-                }
-              />
-              {picked("graduationPhoto")}
-              {error("graduationPhoto")}
-            </div>
-            {checkbox(
-              "photoConsent",
-              "I agree that my graduation/formal photo and valid ID may be used in promotional materials and verification purposes.",
-            )}
+            {(data.graduationPhoto || data.validId) &&
+              checkbox(
+                "photoConsent",
+                "I agree that my graduation/formal photo and valid ID may be used in promotional materials and verification purposes.",
+              )}
             <ContinueButton onClick={validatePersonal} onBack={onBack} />
           </>
         ) : (
@@ -492,7 +569,7 @@ export default function Step3Personal({
               {error("referenceNumber")}
             </div>
             <div className="field-group">
-              {label("proofOfPayment", "Verification/Receipt:*")}
+              {label("proofOfPayment", "Verification/Receipt:")}
               <input
                 type="file"
                 accept="image/*,.pdf"
@@ -616,11 +693,11 @@ export default function Step3Personal({
                     />
                   </div>
                   <div className="field-group" style={{ marginBottom: 0 }}>
-                    {fieldLabel("proofOfPayment", "Verification/Receipt:*")}
+                    {fieldLabel("proofOfPayment", "Verification/Receipt:")}
                     <input
                       type="file"
                       accept="image/*,.pdf"
-                      className={`field-input ${bad("proofOfPayment") ? "error" : ""}`}
+                      className="field-input"
                       style={{ padding: "8px" }}
                       onChange={(e) =>
                         updateExtraPayment(p.key, {

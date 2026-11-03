@@ -83,11 +83,12 @@ export default function RegistrantDetails() {
         student (
           firstName, lastName, middleName,
           email, bachelorsDegree, lastSchoolAttended,
-          province, profilephotourl, phoneNumber,
+          province, facebookName, facebookLink, tcpProgram, tcpSchool,
+          profilephotourl, phoneNumber,
           validIdUrl, formalPhotoUrl
         ),
         curriculum!enrollment_curriculum_id_fkey (curriculumName),
-        specialization!enrollment_specialization_id_fkey (specializationName),
+        specialization!enrollment_specialization_id_fkey (specializationName, exam_label),
         type_of_taker!enrollment_typeOfTaker_id_fkey (typeOfTaker),
         promo!enrollment_promo_id_fkey (promo),
         verification!enrollment_verification_id_fkey (
@@ -498,18 +499,24 @@ export default function RegistrantDetails() {
 
         <InfoRow sectionKey="program" title="Program & Curriculum">
           <DetailRow
-            label="Curriculum"
-            value={enrollment?.curriculum?.curriculumName}
-          />
-          <DetailRow
-            label="Specialization"
-            value={enrollment?.specialization?.specializationName}
-          />
-          <DetailRow
             label="Type of Taker"
             value={enrollment?.type_of_taker?.typeOfTaker}
           />
-          <DetailRow label="Comments" value={enrollment?.comments || "None"} />
+          <DetailRow
+            label="Examination Program"
+            value={
+              enrollment?.specialization?.exam_label ??
+              [
+                enrollment?.curriculum?.curriculumName,
+                enrollment?.specialization?.specializationName,
+              ]
+                .filter(Boolean)
+                .join(" – ")
+            }
+          />
+          {!!enrollment?.comments && (
+            <DetailRow label="Specified Program" value={enrollment.comments} />
+          )}
         </InfoRow>
 
         <InfoRow sectionKey="personal" title="Personal Information">
@@ -517,9 +524,38 @@ export default function RegistrantDetails() {
           <DetailRow label="Middle Name" value={student?.middleName} />
           <DetailRow label="Last Name" value={student?.lastName} />
           <DetailRow label="Email" value={student?.email} />
-          <DetailRow label="Degree" value={student?.bachelorsDegree} />
-          <DetailRow label="Last School" value={student?.lastSchoolAttended} />
-          <DetailRow label="Province" value={student?.province} />
+          <DetailRow
+            label="Bachelor's Degree"
+            value={student?.bachelorsDegree}
+          />
+          <DetailRow
+            label="Name of School"
+            value={student?.lastSchoolAttended}
+          />
+          <DetailRow
+            label="Program/Course (TCP)"
+            value={student?.tcpProgram || "Not provided"}
+          />
+          <DetailRow
+            label="Last School (TCP)"
+            value={student?.tcpSchool || "Not provided"}
+          />
+          <DetailRow
+            label="Facebook Name"
+            value={student?.facebookName || "Not provided"}
+          />
+          <TouchableOpacity
+            disabled={!student?.facebookLink}
+            onPress={() => Linking.openURL(student.facebookLink)}
+          >
+            <DetailRow
+              label="Facebook Link"
+              value={student?.facebookLink || "Not provided"}
+            />
+          </TouchableOpacity>
+          {!!student?.province && (
+            <DetailRow label="Province" value={student.province} />
+          )}
           <DetailRow
             label="Contact Number"
             value={student.phoneNumber?.trim() || "Not set"}

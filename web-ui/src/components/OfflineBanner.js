@@ -1,10 +1,6 @@
 import { CloudOff, Wifi } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-// Red bar at the top when there is no internet; a short green
-// "Back online" message when it returns.
-// navigator.onLine alone can say "online" on Wi-Fi with no internet,
-// so we also do a tiny check request every 30 seconds.
 const CHECK_MS = 30_000;
 
 async function canReachInternet() {

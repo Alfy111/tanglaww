@@ -1,12 +1,9 @@
-// Red bar at the top when the phone has no internet. Shows a short green
-// "Back online" message when the connection returns.
 import { Ionicons } from "@expo/vector-icons";
 import NetInfo, { NetInfoState } from "@react-native-community/netinfo";
 import { useEffect, useRef, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-// null = still checking; only treat a definite "no" as offline
 const isOffline = (s: NetInfoState) =>
   s.isConnected === false || s.isInternetReachable === false;
 

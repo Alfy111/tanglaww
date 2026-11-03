@@ -139,7 +139,6 @@ function MovingBackground() {
     const play = (i: number, prev: number | null) => {
       if (stopped) return;
       const { extra } = slideSize(SLIDES[i].source, box.w, box.h);
-      // left to right: photo starts showing its right side and moves right
       const from = SLIDES[i].direction === "ltr" ? -extra : 0;
       const to = SLIDES[i].direction === "ltr" ? 0 : -extra;
       shift[i].setValue(from);

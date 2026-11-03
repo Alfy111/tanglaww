@@ -28,10 +28,10 @@ export const ENROLLMENT_SELECT = `
   comments,
   student (
     id, firstName, middleName, lastName, email, bachelorsDegree, majorshipTaken,
-    lastSchoolAttended, province, profilephotourl, phoneNumber, validIdUrl, formalPhotoUrl
+    lastSchoolAttended, province, facebookName, facebookLink, tcpProgram, tcpSchool, profilephotourl, phoneNumber, validIdUrl, formalPhotoUrl
   ),
   curriculum!enrollment_curriculum_id_fkey (curriculumName),
-  specialization!enrollment_specialization_id_fkey (specializationName),
+  specialization!enrollment_specialization_id_fkey (specializationName, exam_label),
   type_of_taker!enrollment_typeOfTaker_id_fkey (typeOfTaker),
   promo!enrollment_promo_id_fkey (promo),
   verification!enrollment_verification_id_fkey (

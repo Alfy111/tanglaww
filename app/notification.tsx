@@ -63,15 +63,12 @@ export default function StudentNotifications() {
   const [refreshing, setRefreshing] = useState(false);
   const [selected, setSelected] = useState<FeedItem | null>(null);
 
-  // Remember which items were unread when the screen opened (for the dots),
-  // then mark everything as read.
   const unreadAtOpen = useRef<Set<number> | null>(null);
   useEffect(() => {
     if (loading || unreadAtOpen.current) return;
     unreadAtOpen.current = new Set(items.filter(isUnread).map((n) => n.id));
     markAllRead();
   }, [loading]);
-  // New items that arrive while the screen is open count as unread too
   const showDot = (n: FeedItem) =>
     unreadAtOpen.current?.has(n.id) || isUnread(n);
   useEffect(() => {
