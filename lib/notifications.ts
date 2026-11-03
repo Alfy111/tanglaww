@@ -1,6 +1,3 @@
-// Realtime notification feed (mobile).
-// Reads the "app_notification" table and listens for new rows, so the
-// list and the unread badge update instantly.
 import { supabase } from "@/lib/supabase";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppState } from "react-native";
@@ -49,8 +46,6 @@ export const startingSoon = (items: FeedItem[], now = Date.now()) =>
 const ms = (iso: string | null | undefined) =>
   iso ? new Date(iso).getTime() : 0;
 
-// Lets every open copy of the feed (e.g. home bell + notifications screen)
-// stay in sync when one of them marks as read or clears.
 type StateChange = { last_read_at?: string; cleared_at?: string };
 const stateListeners = new Set<(c: StateChange) => void>();
 
@@ -96,7 +91,6 @@ export function useNotificationFeed(audience: Audience) {
   useEffect(() => {
     load();
 
-    // Live updates
     const channel = supabase
       .channel(`notif-${audience}-${Date.now()}-${Math.random()}`)
       .on(
@@ -125,11 +119,9 @@ export function useNotificationFeed(audience: Audience) {
       )
       .subscribe();
 
-    // Catch up after the app was in the background
     const appState = AppState.addEventListener("change", (s) => {
       if (s === "active") load();
     });
-    // Keeps "starting soon" accurate
     const tick = setInterval(() => setNow(Date.now()), 60_000);
     const onState = (c: StateChange) => {
       if (c.last_read_at) setLastReadAt(c.last_read_at);

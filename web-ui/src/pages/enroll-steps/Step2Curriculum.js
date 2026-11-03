@@ -1,29 +1,27 @@
 import { useEffect, useState } from "react";
 import ContinueButton from "../../components/ContinueButton";
 import StepBanner from "../../components/StepBanner";
-import {
-  CURRICULUM_NAMES,
-  getSpecializations,
-  specializationsFor,
-} from "../../lib/enrollment";
+import { getExamPrograms } from "../../lib/enrollment";
 
 export default function Step2Curriculum({ data, setData, onNext, onBack }) {
   const [errors, setErrors] = useState({});
-  const [allSpecializations, setAllSpecializations] = useState([]);
+  const [programs, setPrograms] = useState([]);
   const clearError = (key) => setErrors((e) => ({ ...e, [key]: null }));
 
   useEffect(() => {
-    getSpecializations().then(setAllSpecializations);
+    getExamPrograms().then(setPrograms);
   }, []);
 
-  const options = specializationsFor(allSpecializations, data.curriculum);
+  // "Others (Please Specify)" has no curriculum
+  const isOthers = !!data.specializationId && data.curriculumId === null;
 
   const validate = () => {
     const e = {};
-    if (!data.curriculum) e.curriculum = "Required.";
-    if (!data.specialization || !data.specializationId)
-      e.specialization = "Please select a specialization.";
     if (!data.takerType) e.takerType = "Required.";
+    if (!data.specializationId)
+      e.specialization = "Please select your examination program.";
+    if (isOthers && !data.comments?.trim())
+      e.comments = "Please specify your examination program.";
     if (Object.keys(e).length) {
       setErrors(e);
       return;
@@ -31,12 +29,17 @@ export default function Step2Curriculum({ data, setData, onNext, onBack }) {
     onNext();
   };
 
-  const pickSpecialization = (id) => {
-    const picked = options.find((o) => o.id === Number(id));
+  const pickProgram = (id) => {
+    const p = programs.find((o) => o.id === Number(id));
     setData({
       ...data,
-      specialization: picked?.name ?? "",
-      specializationId: picked?.id ?? null,
+      examProgram: p?.label ?? "",
+      specialization: p?.name ?? "",
+      specializationId: p?.id ?? null,
+      curriculumId: p ? p.curriculumId : undefined,
+      curriculum:
+        p?.curriculumId === 1 ? "BEEd" : p?.curriculumId === 2 ? "BSEd" : "",
+      comments: p && p.curriculumId === null ? data.comments : "",
     });
     clearError("specialization");
   };
@@ -73,55 +76,20 @@ export default function Step2Curriculum({ data, setData, onNext, onBack }) {
           )}
         </div>
         <div className="field-group">
-          <span className={`field-label ${errors.curriculum ? "error" : ""}`}>
-            Curriculum:*
-          </span>
-          <div className="radio-group">
-            {Object.entries(CURRICULUM_NAMES).map(([val, label]) => (
-              <label key={val} className="radio-label">
-                <input
-                  type="radio"
-                  name="curriculum"
-                  checked={data.curriculum === val}
-                  onChange={() => {
-                    if (data.curriculum !== val)
-                      setData({
-                        ...data,
-                        curriculum: val,
-                        specialization: "",
-                        specializationId: null,
-                      });
-                    clearError("curriculum");
-                  }}
-                />
-                {label}
-              </label>
-            ))}
-          </div>
-          {errors.curriculum && (
-            <p className="field-error">{errors.curriculum}</p>
-          )}
-        </div>
-        <div className="field-group">
           <span
             className={`field-label ${errors.specialization ? "error" : ""}`}
           >
-            Specialization:*
+            Examination Program:*
           </span>
           <select
             className={`field-input ${errors.specialization ? "error" : ""}`}
             value={data.specializationId ?? ""}
-            disabled={!data.curriculum}
-            onChange={(e) => pickSpecialization(e.target.value)}
+            onChange={(e) => pickProgram(e.target.value)}
           >
-            <option value="">
-              {data.curriculum
-                ? "Select Specialization"
-                : "Select a curriculum first"}
-            </option>
-            {options.map((o) => (
+            <option value="">Select Examination Program</option>
+            {programs.map((o) => (
               <option key={o.id} value={o.id}>
-                {o.name}
+                {o.label}
               </option>
             ))}
           </select>
@@ -129,31 +97,35 @@ export default function Step2Curriculum({ data, setData, onNext, onBack }) {
             <p className="field-error">{errors.specialization}</p>
           )}
         </div>
-        <div className="field-group">
-          <label htmlFor="enroll-comments" className="field-label">
-            Others:{" "}
-            <span style={{ fontWeight: 400, color: "#95A5A6" }}>
-              (optional)
-            </span>
-          </label>
-          <textarea
-            id="enroll-comments"
-            className="field-input"
-            rows={1}
-            maxLength={500}
-            placeholder="Other specialization"
-            value={data.comments ?? ""}
-            onChange={(e) =>
-              setData({
-                ...data,
-                comments: e.target.value
-                  .replace(/[^A-Za-zÀ-ÖØ-öø-ÿ\s.,'()&-]/g, "")
-                  .toUpperCase(),
-              })
-            }
-            style={{ resize: "vertical", fontFamily: "inherit" }}
-          />
-        </div>
+        {isOthers && (
+          <div className="field-group">
+            <label
+              htmlFor="enroll-comments"
+              className={`field-label ${errors.comments ? "error" : ""}`}
+            >
+              Please specify:*
+            </label>
+            <input
+              id="enroll-comments"
+              className={`field-input ${errors.comments ? "error" : ""}`}
+              maxLength={200}
+              placeholder="Your examination program"
+              value={data.comments ?? ""}
+              onChange={(e) => {
+                setData({
+                  ...data,
+                  comments: e.target.value
+                    .replace(/[^A-Za-zÀ-ÖØ-öø-ÿ\s.,'()&-]/g, "")
+                    .toUpperCase(),
+                });
+                clearError("comments");
+              }}
+            />
+            {errors.comments && (
+              <p className="field-error">{errors.comments}</p>
+            )}
+          </div>
+        )}
         <ContinueButton onClick={validate} onBack={onBack} />
       </div>
     </>

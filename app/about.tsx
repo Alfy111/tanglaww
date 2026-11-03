@@ -1,7 +1,16 @@
+import ContentText from "@/components/ContentText";
+import {
+  formatUpdated,
+  getSiteContent,
+  SiteContent,
+} from "@/services/siteContentService";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
+  ActivityIndicator,
+  Image,
+  RefreshControl,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -12,6 +21,23 @@ import {
 
 export default function AboutScreen() {
   const router = useRouter();
+  const [content, setContent] = useState<SiteContent | null>(null);
+  const [error, setError] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      setContent(await getSiteContent(["about_tanglaw", "about_tarc"]));
+      setError("");
+    } catch (e: any) {
+      setError(e.message ?? "Could not load this page.");
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -21,15 +47,62 @@ export default function AboutScreen() {
         <Text style={styles.headerTitle}>About</Text>
         <View style={{ width: 24 }} />
       </View>
-      <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.title}>About the App</Text>
-        <Text style={styles.text}>
-          Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do
-          eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad
-          minim veniam, quis nostrud exercitation ullamco laboris nisi ut
-          aliquip ex ea commodo consequat.
-        </Text>
-      </ScrollView>
+
+      {!content && !error ? (
+        <View style={styles.centered}>
+          <ActivityIndicator size="large" color="#0D2A94" />
+        </View>
+      ) : (
+        <ScrollView
+          contentContainerStyle={styles.content}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={async () => {
+                setRefreshing(true);
+                await load();
+                setRefreshing(false);
+              }}
+            />
+          }
+        >
+          {!!error && <Text style={styles.error}>{error}</Text>}
+
+          <View style={styles.brand}>
+            <Image
+              source={require("../assets/icons/splash-icon-dark.png")}
+              style={styles.logo}
+              resizeMode="contain"
+            />
+            <Text style={styles.brandName}>Tanglaw</Text>
+            <Text style={styles.tagline}>
+              &quot;Where a Dreamer Becomes an Achiever&quot;
+            </Text>
+          </View>
+
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Ionicons name="bulb-outline" size={26} color="#0D2A94" />
+              <Text style={styles.sectionTitle}>About Tanglaw</Text>
+            </View>
+            <ContentText text={content?.about_tanglaw} />
+          </View>
+
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Ionicons name="school-outline" size={26} color="#0D2A94" />
+              <Text style={styles.sectionTitle}>About TARC</Text>
+            </View>
+            <ContentText text={content?.about_tarc} />
+          </View>
+
+          {!!content?.updatedAt && (
+            <Text style={styles.updated}>
+              {formatUpdated(content.updatedAt)}
+            </Text>
+          )}
+        </ScrollView>
+      )}
     </SafeAreaView>
   );
 }
@@ -45,12 +118,29 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   headerTitle: { color: "white", fontSize: 20, fontWeight: "bold" },
-  content: { padding: 20 },
-  title: {
+  centered: { flex: 1, justifyContent: "center", alignItems: "center" },
+  content: { padding: 25 },
+  brand: { alignItems: "center", marginBottom: 30 },
+  logo: { width: 110, height: 110 },
+  brandName: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#0D2A94",
+    marginTop: 4,
+  },
+  tagline: { fontSize: 13, color: "#777", fontStyle: "italic", marginTop: 4 },
+  section: { marginBottom: 30 },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  sectionTitle: {
     fontSize: 22,
     fontWeight: "bold",
     color: "#0D2A94",
-    marginBottom: 15,
+    marginLeft: 10,
   },
-  text: { fontSize: 16, color: "#555", lineHeight: 24 },
+  updated: { fontSize: 12, color: "#999", textAlign: "center", marginTop: 4 },
+  error: { color: "#E74C3C", fontSize: 13, marginBottom: 16 },
 });

@@ -39,6 +39,9 @@ interface dataTypes {
   specialization: string;
   specializationId: number | null;
   comments: string;
+  examProgram: string;
+  tcpProgram: string;
+  tcpSchool: string;
   takerType: string | null;
   takerTypeId: number | null;
   firstName: string;
@@ -47,10 +50,12 @@ interface dataTypes {
   email: string;
   bachelorsDegree: string;
   lastSchool: string;
-  province: string;
+  facebookName: string;
+  facebookLink: string;
   validId: PickedFile;
   formalPhoto: PickedFile;
   photoConsent: boolean;
+  tcpSameAsCollege: boolean;
   promo: string;
   promoId: number | null;
   transactionDate: Date | null;
@@ -64,7 +69,6 @@ interface dataTypes {
   extraPayments: ExtraPayment[];
 }
 
-// A second, third... payment (different method or split downpayment)
 type ExtraPayment = {
   key: string;
   paymentChannel: string;
@@ -89,7 +93,6 @@ const extraPaymentMissing = (p: ExtraPayment) => ({
   transactionDate: !p.transactionDate,
   amountTransferred: !(parseFloat(p.amountTransferred) > 0),
   referenceNumber: !p.referenceNumber.trim(),
-  receipt: !p.receipt,
 });
 
 const defaultValues: dataTypes = {
@@ -99,6 +102,9 @@ const defaultValues: dataTypes = {
   specialization: "",
   specializationId: null,
   comments: "",
+  examProgram: "",
+  tcpProgram: "",
+  tcpSchool: "",
   takerType: null,
   takerTypeId: null,
   firstName: "",
@@ -107,10 +113,12 @@ const defaultValues: dataTypes = {
   email: "",
   bachelorsDegree: "",
   lastSchool: "",
-  province: "",
+  facebookName: "",
+  facebookLink: "",
   validId: null,
   formalPhoto: null,
   photoConsent: false,
+  tcpSameAsCollege: false,
   promo: "",
   promoId: null,
   transactionDate: null,
@@ -130,6 +138,8 @@ const REQUIRED = "Required.";
 const hasNumber = (v: string) => /\d/.test(v);
 const hasBadMarks = (v: string) =>
   !/[A-Za-zÀ-ÖØ-öø-ÿ]/.test(v) || /[.,'()&-]{2,}/.test(v);
+const isFacebookLink = (v: string) =>
+  /^(https?:\/\/)?([a-z0-9-]+\.)?(facebook|fb)\.com\/\S+/i.test(v.trim());
 
 function checkText(
   errors: FieldErrors,
@@ -156,8 +166,13 @@ function validateStep(step: number, form: dataTypes): FieldErrors {
 
   if (step === 2) {
     if (!form.takerTypeId) errors.takerType = REQUIRED;
-    if (!form.curriculumId) errors.curriculum = REQUIRED;
     if (!form.specializationId) errors.specialization = REQUIRED;
+    if (
+      form.specializationId &&
+      form.curriculumId === null &&
+      !form.comments.trim()
+    )
+      errors.comments = REQUIRED;
   }
 
   if (step === 3) {
@@ -168,6 +183,8 @@ function validateStep(step: number, form: dataTypes): FieldErrors {
     if (!form.email.trim()) errors.email = REQUIRED;
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim()))
       errors.email = "Please enter a valid email address.";
+    if (form.facebookName.trim() && hasBadMarks(form.facebookName))
+      errors.facebookName = "Please use letters, not just symbols.";
     checkText(
       errors,
       "bachelorsDegree",
@@ -184,13 +201,22 @@ function validateStep(step: number, form: dataTypes): FieldErrors {
     );
     checkText(
       errors,
-      "province",
-      form.province,
-      true,
-      "Province cannot contain numbers.",
+      "tcpProgram",
+      form.tcpProgram,
+      false,
+      "Program cannot contain numbers.",
     );
-    if (!form.formalPhoto) errors.formalPhoto = REQUIRED;
-    if (!form.photoConsent)
+    checkText(
+      errors,
+      "tcpSchool",
+      form.tcpSchool,
+      false,
+      "School name cannot contain numbers.",
+    );
+    if (form.facebookLink.trim() && !isFacebookLink(form.facebookLink))
+      errors.facebookLink =
+        "Please paste your Facebook profile link (facebook.com/...).";
+    if ((form.formalPhoto || form.validId) && !form.photoConsent)
       errors.photoConsent = "Kindly agree before proceeding.";
   }
 
@@ -202,7 +228,6 @@ function validateStep(step: number, form: dataTypes): FieldErrors {
     else if (!(parseFloat(form.amountTransferred) > 0))
       errors.amountTransferred = "Please enter a valid amount.";
     if (!form.referenceNumber.trim()) errors.referenceNumber = REQUIRED;
-    if (!form.receipt) errors.receipt = REQUIRED;
     if (
       form.extraPayments.some((p) =>
         Object.values(extraPaymentMissing(p)).some(Boolean),
@@ -232,6 +257,8 @@ const nameUpper = (v: string) => cleanName(v).toUpperCase();
 const toUpper = (v: string) => cleanText(v).toUpperCase();
 const lettersUpper = (v: string) =>
   cleanText(v).replace(/\d/g, "").toUpperCase();
+const withHttps = (v: string) =>
+  /^https?:\/\//i.test(v.trim()) ? v.trim() : `https://${v.trim()}`;
 
 const PAYMENT_TYPES = [
   { value: "downpayment" as const, name: "Downpayment" },
@@ -312,45 +339,61 @@ export default function EnrollmentScreen() {
     value: dataTypes[field],
   ) => setDataTypes((prev) => ({ ...prev, [key]: value }));
 
+  useEffect(() => {
+    if (!dataTypes.tcpSameAsCollege) return;
+    setDataTypes((prev) =>
+      prev.tcpProgram === prev.bachelorsDegree &&
+      prev.tcpSchool === prev.lastSchool
+        ? prev
+        : {
+            ...prev,
+            tcpProgram: prev.bachelorsDegree,
+            tcpSchool: prev.lastSchool,
+          },
+    );
+  }, [
+    dataTypes.tcpSameAsCollege,
+    dataTypes.bachelorsDegree,
+    dataTypes.lastSchool,
+  ]);
+
   const typeOfTakerOptions = [
     { id: 1, name: "First time" },
     { id: 2, name: "Retaker" },
   ];
 
-  const curriculumOptions = [
-    { id: 1, name: "Bachelor of Elementary Education (BEEd)" },
-    { id: 2, name: "Bachelor of Secondary Education (BSEd)" },
-  ];
-
-  const [specializations, setSpecializations] = useState<
-    { id: number; name: string; curriculumId: number }[]
+  const [examPrograms, setExamPrograms] = useState<
+    { id: number; name: string; label: string; curriculumId: number | null }[]
   >([]);
 
   useEffect(() => {
     supabase
       .from("specialization")
-      .select("specialization_id, specializationName, curriculum_id")
-      .order("specialization_id")
+      .select(
+        "specialization_id, specializationName, curriculum_id, exam_label, exam_order",
+      )
+      .not("exam_label", "is", null)
+      .order("exam_order")
       .then(({ data, error }) => {
         if (error) {
           console.error("specialization:", error.message);
           return;
         }
-        setSpecializations(
+        setExamPrograms(
           (data ?? []).map((r: any) => ({
             id: Number(r.specialization_id),
             name: String(r.specializationName),
-            curriculumId: Number(r.curriculum_id),
+            label: String(r.exam_label),
+            curriculumId:
+              r.curriculum_id == null ? null : Number(r.curriculum_id),
           })),
         );
       });
   }, []);
 
-  const majorshipOptions = specializations.filter(
-    (o) => o.curriculumId === dataTypes.curriculumId,
-  );
+  const isOthers =
+    !!dataTypes.specializationId && dataTypes.curriculumId === null;
 
-  // Promos come from the "promo" table, so new ones only need a DB change.
   const [promoOptions, setPromoOptions] = useState<
     { id: number; name: string }[]
   >([]);
@@ -577,10 +620,18 @@ export default function EnrollmentScreen() {
         bachelorsDegree: dataTypes.bachelorsDegree.trim().toUpperCase(),
         majorshipTaken: dataTypes.specialization,
         lastSchoolAttended: dataTypes.lastSchool.trim().toUpperCase(),
-        province: dataTypes.province.trim().toUpperCase(),
+        tcpProgram: dataTypes.tcpProgram.trim().toUpperCase() || null,
+        tcpSchool: dataTypes.tcpSchool.trim().toUpperCase() || null,
+        facebookName: dataTypes.facebookName.trim() || null,
+        facebookLink: dataTypes.facebookLink.trim()
+          ? withHttps(dataTypes.facebookLink)
+          : null,
         validIdUrl,
         formalPhotoUrl,
-        photoConsentAt: new Date().toISOString(),
+        photoConsentAt:
+          dataTypes.photoConsent && (dataTypes.formalPhoto || dataTypes.validId)
+            ? new Date().toISOString()
+            : null,
         dataprivacyconsent: new Date().toISOString(),
       };
 
@@ -799,7 +850,10 @@ export default function EnrollmentScreen() {
       | "email"
       | "bachelorsDegree"
       | "lastSchool"
-      | "province"
+      | "facebookName"
+      | "facebookLink"
+      | "tcpProgram"
+      | "tcpSchool"
       | "amountTransferred"
       | "referenceNumber"
       | "comments";
@@ -936,7 +990,7 @@ export default function EnrollmentScreen() {
     ));
 
   const checkbox = (
-    key: "photoConsent" | "paymentNoticeAgreement",
+    key: "photoConsent" | "paymentNoticeAgreement" | "tcpSameAsCollege",
     text: string,
   ) => (
     <>
@@ -1149,71 +1203,65 @@ export default function EnrollmentScreen() {
               )}
               {fieldError("takerType")}
 
-              {fieldLabel("curriculum", "Curriculum:", true)}
-              {radioGroup(
-                curriculumOptions.map((o) => ({ value: o.id, name: o.name })),
-                dataTypes.curriculumId,
-                (id) => {
-                  if (id !== dataTypes.curriculumId) {
-                    setField("specialization", "");
-                    setField("specializationId", null);
-                    setIsMajorOpen(false);
-                  }
-                  setField("curriculumId", id);
-                  setField(
-                    "curriculum",
-                    curriculumOptions.find((o) => o.id === id)!.name,
-                  );
-                },
-              )}
-              {fieldError("curriculum")}
-
-              {fieldLabel("specialization", "Specialization:", true)}
+              {fieldLabel("specialization", "Examination Program:", true)}
               <TouchableOpacity
                 style={[
                   styles.dropdown,
                   !!errors.specialization && styles.inputError,
                 ]}
-                onPress={() =>
-                  dataTypes.curriculumId && setIsMajorOpen(!isMajorOpen)
-                }
+                onPress={() => setIsMajorOpen(!isMajorOpen)}
               >
                 <Text
-                  style={{ color: dataTypes.specialization ? "#000" : "#999" }}
+                  style={{
+                    flex: 1,
+                    color: dataTypes.examProgram ? "#000" : "#999",
+                  }}
                 >
-                  {dataTypes.specialization ||
-                    (dataTypes.curriculumId
-                      ? "Select Specialization"
-                      : "Select a curriculum first")}
+                  {dataTypes.examProgram || "Select Examination Program"}
                 </Text>
                 <Ionicons name="chevron-down" size={20} color="#666" />
               </TouchableOpacity>
               {isMajorOpen && (
                 <View style={styles.dropdownMenu}>
-                  {majorshipOptions.map((opt) => (
+                  {examPrograms.map((opt) => (
                     <TouchableOpacity
                       key={opt.id}
                       style={styles.dropdownItem}
                       onPress={() => {
-                        setField("specialization", opt.name);
-                        setField("specializationId", opt.id);
+                        setDataTypes((prev) => ({
+                          ...prev,
+                          examProgram: opt.label,
+                          specialization: opt.name,
+                          specializationId: opt.id,
+                          curriculumId: opt.curriculumId,
+                          curriculum:
+                            opt.curriculumId === 1
+                              ? "BEEd"
+                              : opt.curriculumId === 2
+                                ? "BSEd"
+                                : null,
+                          comments:
+                            opt.curriculumId === null ? prev.comments : "",
+                        }));
                         setIsMajorOpen(false);
                       }}
                     >
-                      <Text>{opt.name}</Text>
+                      <Text>{opt.label}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
               )}
               {fieldError("specialization")}
 
-              {textField({
-                key: "comments",
-                label: "Others:",
-                placeholder: "Other specializations...",
-                autoCapitalize: "characters",
-                clean: lettersUpper,
-              })}
+              {isOthers &&
+                textField({
+                  key: "comments",
+                  label: "Please specify:",
+                  placeholder: "Your examination program",
+                  required: true,
+                  autoCapitalize: "characters",
+                  clean: lettersUpper,
+                })}
             </View>
           </View>
         )}
@@ -1222,6 +1270,14 @@ export default function EnrollmentScreen() {
           <View>
             {renderProgressHeader("Personal Information & Verification")}
             <View style={styles.formBody}>
+              {textField({
+                key: "email",
+                label: "Email Address:",
+                placeholder: "Email Address",
+                required: true,
+                keyboardType: "email-address",
+                autoCapitalize: "none",
+              })}
               {textField({
                 key: "firstName",
                 label: "First Name:",
@@ -1246,48 +1302,84 @@ export default function EnrollmentScreen() {
                 clean: nameUpper,
               })}
               {textField({
-                key: "email",
-                label: "Email Address:",
-                placeholder: "Email Address",
-                required: true,
-                keyboardType: "email-address",
+                key: "facebookName",
+                label: "Facebook Name:",
+                placeholder: "Name on your Facebook account (optional)",
+                required: false,
+                autoCapitalize: "words",
+                clean: cleanText,
+              })}
+              {textField({
+                key: "facebookLink",
+                label: "Facebook Link:",
+                placeholder: "E.g.: https://www.facebook.com/your.name",
+                required: false,
+                keyboardType: "url",
                 autoCapitalize: "none",
+                clean: (v: string) => v.replace(/\s/g, ""),
               })}
               {textField({
                 key: "bachelorsDegree",
-                label: "Program Name / Course:",
-                hint:
-                  "Examples:\n" +
-                  "\u2022 Bachelor of Elementary Education\n" +
-                  "\u2022 Bachelor of Secondary Education Major in (Specialization)\n" +
-                  "\u2022 Certificate in Professional Teaching Program Major in (Specialization)\n" +
-                  "\u2022 Teacher Certificate Program\n\n" +
-                  "Only include courses related to Education. If you are a Unit Earner, list the school where you earned your teaching units immediately after the program name (e.g. Teacher Certificate Program - Philippine Normal University).",
-                placeholder:
-                  "E.g.: Bachelor of Secondary Education Major in English",
+                label: "Bachelor's Degree (College):",
+                placeholder: "E.g.: Bachelor of Arts in Psychology",
                 required: true,
                 autoCapitalize: "characters",
                 clean: toUpper,
               })}
               {textField({
                 key: "lastSchool",
-                label: "Last School Attended:",
-                hint: "Format: [Full School Name] - [Branch if applicable]",
-                placeholder:
-                  "E.g.: Polytechnic University of the Philippines - Main Campus",
+                label: "Name of School:",
+                placeholder: "E.g.: Polytechnic University of the Philippines",
                 required: true,
                 autoCapitalize: "characters",
                 clean: toUpper,
               })}
-              {textField({
-                key: "province",
-                label: "Province:",
-                placeholder: "Province",
-                required: true,
-                autoCapitalize: "characters",
-                clean: toUpper,
-              })}
+              {checkbox(
+                "tcpSameAsCollege",
+                "I took my Teacher Certificate Program (TCP) at the same school. Use my Bachelor's Degree and Name of School above.",
+              )}
+              {dataTypes.tcpSameAsCollege ? (
+                <Text style={styles.formatHint}>
+                  TCP Program and School will be the same as your Bachelor's
+                  Degree and Name of School.
+                </Text>
+              ) : (
+                <>
+                  {textField({
+                    key: "tcpProgram",
+                    label:
+                      "Program Name/Course (for Teacher Certificate Program (TCP)):",
+                    hint:
+                      "Examples:\n" +
+                      "\u2022 Bachelor of Secondary Education Major in (Specialization)\n" +
+                      "\u2022 Certificate in Professional Teaching Program Major in (Specialization)\n" +
+                      "\u2022 Teacher Certificate Program Major in (Specialization)\n\n" +
+                      "Note: Only include courses related to Education.",
+                    placeholder: "Optional",
+                    autoCapitalize: "characters",
+                    clean: toUpper,
+                  })}
+                  {textField({
+                    key: "tcpSchool",
+                    label: "Last School Attended (for TCP):",
+                    hint:
+                      "Note: If you are a Unit Earner, list the school where you earned your teaching units.\n" +
+                      "Format: [Full School Name] - [Branch if applicable]",
+                    placeholder: "Optional",
+                    autoCapitalize: "characters",
+                    clean: toUpper,
+                  })}
+                </>
+              )}
 
+              {uploadField({
+                key: "formalPhoto",
+                label: "Upload Graduation or Formal Photo (optional):",
+                required: false,
+                buttonText: "Upload photo",
+                allowFiles: false,
+                noun: "Photo",
+              })}
               {uploadField({
                 key: "validId",
                 label: "Upload Valid ID (optional):",
@@ -1296,19 +1388,12 @@ export default function EnrollmentScreen() {
                 allowFiles: true,
                 noun: "ID",
               })}
-              {uploadField({
-                key: "formalPhoto",
-                label: "Upload Graduation or Formal Photo:",
-                required: true,
-                buttonText: "Upload photo",
-                allowFiles: false,
-                noun: "Photo",
-              })}
 
-              {checkbox(
-                "photoConsent",
-                "I agree that my graduation/formal photo and valid ID may be used in promotional materials and verification purposes.",
-              )}
+              {(!!dataTypes.formalPhoto || !!dataTypes.validId) &&
+                checkbox(
+                  "photoConsent",
+                  "I agree that my graduation/formal photo and valid ID may be used in promotional materials and verification purposes.",
+                )}
             </View>
           </View>
         )}
@@ -1508,7 +1593,7 @@ export default function EnrollmentScreen() {
               {uploadField({
                 key: "receipt",
                 label: "Verification/Receipt:",
-                required: true,
+                required: false,
                 buttonText: "Upload attachment",
                 allowFiles: true,
                 noun: "Receipt",
@@ -1664,19 +1749,9 @@ export default function EnrollmentScreen() {
                       }
                     />
 
-                    <Text
-                      style={[
-                        styles.label,
-                        bad("receipt") && styles.labelError,
-                      ]}
-                    >
-                      Verification/Receipt:*
-                    </Text>
+                    <Text style={styles.label}>Verification/Receipt:</Text>
                     <TouchableOpacity
-                      style={[
-                        styles.uploadBtn,
-                        bad("receipt") && styles.uploadBtnError,
-                      ]}
+                      style={styles.uploadBtn}
                       onPress={() =>
                         chooseFile(`Payment ${i + 2} Receipt`, true, (f) =>
                           updateExtraPayment(p.key, { receipt: f }),
@@ -1748,17 +1823,14 @@ export default function EnrollmentScreen() {
                       value: dataTypes.takerType ?? "—",
                     })}
                     {summaryRow({
-                      label: "Curriculum",
-                      value: dataTypes.curriculum ?? "—",
+                      label: "Examination Program",
+                      value: dataTypes.examProgram,
                     })}
-                    {summaryRow({
-                      label: "Specialization",
-                      value: dataTypes.specialization,
-                    })}
-                    {summaryRow({
-                      label: "Comments",
-                      value: dataTypes.comments.trim() || "—",
-                    })}
+                    {isOthers &&
+                      summaryRow({
+                        label: "Specified Program",
+                        value: dataTypes.comments.trim(),
+                      })}
                   </>
                 ),
               })}
@@ -1773,27 +1845,39 @@ export default function EnrollmentScreen() {
                     })}
                     {summaryRow({ label: "Email", value: dataTypes.email })}
                     {summaryRow({
-                      label: "Program Name / Course",
+                      label: "Facebook Name",
+                      value: dataTypes.facebookName.trim() || "Not provided",
+                    })}
+                    {summaryRow({
+                      label: "Facebook Link",
+                      value: dataTypes.facebookLink.trim() || "Not provided",
+                    })}
+                    {summaryRow({
+                      label: "Bachelor's Degree (College)",
                       value: dataTypes.bachelorsDegree,
                     })}
                     {summaryRow({
-                      label: "Last School Attended",
+                      label: "Name of School",
                       value: dataTypes.lastSchool,
                     })}
                     {summaryRow({
-                      label: "Province",
-                      value: dataTypes.province,
+                      label: "Program Name/Course (TCP)",
+                      value: dataTypes.tcpProgram.trim() || "Not provided",
                     })}
+                    {summaryRow({
+                      label: "Last School Attended (TCP)",
+                      value: dataTypes.tcpSchool.trim() || "Not provided",
+                    })}
+                    {summaryRow({
+                      label: "Graduation or Formal Photo",
+                      value: dataTypes.formalPhoto?.name ?? "Not provided",
+                    })}
+                    {filePreview("formalPhoto", "Photo")}
                     {summaryRow({
                       label: "Valid ID",
                       value: dataTypes.validId?.name ?? "Not provided",
                     })}
                     {filePreview("validId", "ID")}
-                    {summaryRow({
-                      label: "Graduation or Formal Photo",
-                      value: dataTypes.formalPhoto?.name ?? "—",
-                    })}
-                    {filePreview("formalPhoto", "Photo")}
                   </>
                 ),
               })}

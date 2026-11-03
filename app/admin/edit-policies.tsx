@@ -1,37 +1,67 @@
+import {
+  formatUpdated,
+  getSiteContent,
+  saveSiteContent,
+} from "@/services/siteContentService";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import { useEffect, useState } from "react";
 import {
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
+
+type Tab = "Privacy" | "Terms";
+const TAB_LABELS: Record<Tab, string> = {
+  Privacy: "Privacy Policy",
+  Terms: "Terms of Use",
+};
 
 export default function AdminEditPolicies() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<"Privacy" | "Terms">("Privacy");
+  const [activeTab, setActiveTab] = useState<Tab>("Privacy");
+  const [privacyPolicy, setPrivacyPolicy] = useState("");
+  const [termsOfUse, setTermsOfUse] = useState("");
+  const [updatedAt, setUpdatedAt] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
-  const [privacyPolicy, setPrivacyPolicy] = useState(
-    "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.",
-  );
+  useEffect(() => {
+    getSiteContent(["privacy_policy", "terms_of_use"])
+      .then((c) => {
+        setPrivacyPolicy(c.privacy_policy ?? "");
+        setTermsOfUse(c.terms_of_use ?? "");
+        setUpdatedAt(c.updatedAt ?? null);
+      })
+      .catch((e) => Alert.alert("Couldn't load", e.message))
+      .finally(() => setLoading(false));
+  }, []);
 
-  const [termsOfUse, setTermsOfUse] = useState(
-    "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.",
-  );
-
-  const handleSave = () => {
-    Alert.alert(
-      "Changes Saved",
-      "The policies have been updated successfully.",
-      [{ text: "OK", onPress: () => router.back() }],
-    );
+  const handleSave = async () => {
+    if (saving) return;
+    setSaving(true);
+    try {
+      await saveSiteContent({
+        privacy_policy: privacyPolicy,
+        terms_of_use: termsOfUse,
+      });
+      Alert.alert("Saved", "The Terms & Policies page has been updated.", [
+        { text: "OK", onPress: () => router.back() },
+      ]);
+    } catch (e: any) {
+      Alert.alert("Couldn't save", e.message);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -41,71 +71,73 @@ export default function AdminEditPolicies() {
           <Ionicons name="arrow-back" size={24} color="black" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Legal & Policies</Text>
-        <TouchableOpacity onPress={handleSave}>
-          <Text style={styles.saveText}>Update</Text>
+        <TouchableOpacity onPress={handleSave} disabled={saving || loading}>
+          {saving ? (
+            <ActivityIndicator color="#2F459B" />
+          ) : (
+            <Text style={styles.saveText}>Save</Text>
+          )}
         </TouchableOpacity>
       </View>
 
       <View style={styles.tabContainer}>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === "Privacy" && styles.activeTab]}
-          onPress={() => setActiveTab("Privacy")}
-        >
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === "Privacy" && styles.activeTabText,
-            ]}
+        {(["Privacy", "Terms"] as Tab[]).map((tab) => (
+          <TouchableOpacity
+            key={tab}
+            style={[styles.tab, activeTab === tab && styles.activeTab]}
+            onPress={() => setActiveTab(tab)}
           >
-            Privacy Policy
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === "Terms" && styles.activeTab]}
-          onPress={() => setActiveTab("Terms")}
-        >
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === "Terms" && styles.activeTabText,
-            ]}
-          >
-            Terms of Use
-          </Text>
-        </TouchableOpacity>
+            <Text
+              style={[
+                styles.tabText,
+                activeTab === tab && styles.activeTabText,
+              ]}
+            >
+              {TAB_LABELS[tab]}
+            </Text>
+          </TouchableOpacity>
+        ))}
       </View>
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={{ flex: 1 }}
-      >
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          <View style={styles.editorContainer}>
-            <Text style={styles.label}>
-              Editing:{" "}
-              {activeTab === "Privacy" ? "Privacy Policy" : "Terms of Use"}
-            </Text>
-            <TextInput
-              style={styles.textArea}
-              multiline
-              textAlignVertical="top"
-              value={activeTab === "Privacy" ? privacyPolicy : termsOfUse}
-              onChangeText={
-                activeTab === "Privacy" ? setPrivacyPolicy : setTermsOfUse
-              }
-              placeholder="Paste or type the policy content here..."
-            />
-          </View>
+      {loading ? (
+        <View style={styles.centered}>
+          <ActivityIndicator size="large" color="#2F459B" />
+        </View>
+      ) : (
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={{ flex: 1 }}
+        >
+          <ScrollView contentContainerStyle={styles.scrollContent}>
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Editing: {TAB_LABELS[activeTab]}</Text>
+              <TextInput
+                style={styles.textArea}
+                multiline
+                textAlignVertical="top"
+                value={activeTab === "Privacy" ? privacyPolicy : termsOfUse}
+                onChangeText={
+                  activeTab === "Privacy" ? setPrivacyPolicy : setTermsOfUse
+                }
+                placeholder="Paste or type the policy here..."
+              />
+            </View>
 
-          <View style={styles.warningBox}>
-            <Ionicons name="alert-circle-outline" size={20} color="#E74C3C" />
-            <Text style={styles.warningText}>
-              Legal documents affect user rights. Ensure all changes are
-              verified by the university administration.
-            </Text>
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+            <View style={styles.warningBox}>
+              <Ionicons name="alert-circle-outline" size={20} color="#E74C3C" />
+              <Text style={styles.warningText}>
+                Legal documents affect user rights. Make sure changes are
+                approved by TARC management before saving. Leave a blank line
+                between paragraphs, and start a line with &quot;- &quot; for a
+                bullet.
+              </Text>
+            </View>
+            {!!updatedAt && (
+              <Text style={styles.updated}>{formatUpdated(updatedAt)}</Text>
+            )}
+          </ScrollView>
+        </KeyboardAvoidingView>
+      )}
     </SafeAreaView>
   );
 }
@@ -124,58 +156,47 @@ const styles = StyleSheet.create({
   saveText: { fontSize: 16, fontWeight: "bold", color: "#2F459B" },
   tabContainer: {
     flexDirection: "row",
-    padding: 10,
-    backgroundColor: "#F0F0F0",
-    margin: 15,
-    borderRadius: 10,
+    padding: 15,
+    backgroundColor: "#F8F9FA",
   },
-  tab: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: "center",
-    borderRadius: 8,
-  },
-  activeTab: {
-    backgroundColor: "white",
-    elevation: 2,
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowOffset: { width: 0, height: 1 },
-  },
-  tabText: {
-    fontSize: 13,
-    fontWeight: "bold",
-    color: "#888",
-  },
-  activeTabText: {
-    color: "#2F459B",
-  },
-  scrollContent: { paddingHorizontal: 20, paddingBottom: 40 },
-  editorContainer: { marginTop: 10 },
-  label: {
-    fontSize: 12,
-    fontWeight: "bold",
-    color: "#999",
-    textTransform: "uppercase",
-    marginBottom: 10,
-  },
+  tab: { flex: 1, paddingVertical: 10, alignItems: "center", borderRadius: 8 },
+  activeTab: { backgroundColor: "#2F459B" },
+  tabText: { fontSize: 14, fontWeight: "bold", color: "#666" },
+  activeTabText: { color: "white" },
+  centered: { flex: 1, justifyContent: "center", alignItems: "center" },
+  scrollContent: { padding: 20 },
+  inputContainer: { marginBottom: 20 },
+  label: { fontSize: 14, fontWeight: "bold", color: "#333", marginBottom: 10 },
   textArea: {
-    backgroundColor: "#FDFDFD",
+    backgroundColor: "#F9F9F9",
     borderWidth: 1,
-    borderColor: "#EEE",
-    borderRadius: 15,
-    padding: 20,
+    borderColor: "#DDD",
+    borderRadius: 12,
+    padding: 15,
     fontSize: 15,
     color: "#333",
     minHeight: 400,
     lineHeight: 22,
+  },
+  infoBox: {
+    flexDirection: "row",
+    backgroundColor: "#F0F4FF",
+    padding: 15,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+  infoText: {
+    flex: 1,
+    marginLeft: 10,
+    fontSize: 12,
+    color: "#2F459B",
+    lineHeight: 18,
   },
   warningBox: {
     flexDirection: "row",
     backgroundColor: "#FFF5F5",
     padding: 15,
     borderRadius: 10,
-    marginTop: 20,
     alignItems: "center",
     borderWidth: 1,
     borderColor: "#FFEBEB",
@@ -185,5 +206,7 @@ const styles = StyleSheet.create({
     marginLeft: 10,
     fontSize: 12,
     color: "#E74C3C",
+    lineHeight: 18,
   },
+  updated: { fontSize: 12, color: "#999", textAlign: "center", marginTop: 14 },
 });

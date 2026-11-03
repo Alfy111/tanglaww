@@ -37,9 +37,10 @@ export default function Step4Payment({ data, onNext, onBack }) {
           title="Program & Curriculum"
           fields={[
             ["Type of Taker", data.takerType],
-            ["Curriculum", data.curriculum],
-            ["Specialization", data.specialization],
-            ["Comments", data.comments?.trim() || "—"],
+            ["Examination Program", data.examProgram || data.specialization],
+            ...(data.curriculumId === null && data.comments?.trim()
+              ? [["Specified Program", data.comments.trim()]]
+              : []),
           ]}
         />
         <SummarySection
@@ -49,11 +50,23 @@ export default function Step4Payment({ data, onNext, onBack }) {
             ["Middle Name", data.middleName],
             ["Last Name", data.lastName],
             ["Email", data.email],
-            ["Program Name / Course", data.degree],
-            ["Last School Attended", data.school],
-            ["Province", data.province],
+            ["Facebook Name", data.facebookName?.trim() || "Not provided"],
+            ["Facebook Link", data.facebookLink?.trim() || "Not provided"],
+            ["Bachelor's Degree (College)", data.degree],
+            ["Name of School", data.school],
+            [
+              "Program Name/Course (TCP)",
+              data.tcpProgram?.trim() || "Not provided",
+            ],
+            [
+              "Last School Attended (TCP)",
+              data.tcpSchool?.trim() || "Not provided",
+            ],
+            [
+              "Graduation or Formal Photo",
+              data.graduationPhoto?.name || "Not provided",
+            ],
             ["Valid ID", data.validId?.name || "Not provided"],
-            ["Graduation or Formal Photo", data.graduationPhoto?.name || "—"],
           ]}
         />
         <SummarySection
@@ -65,14 +78,14 @@ export default function Step4Payment({ data, onNext, onBack }) {
             ["Payment Type", paymentType],
             ["Amount Transferred", data.amount],
             ["Reference Number", data.referenceNumber],
-            ["Receipt", data.proofOfPayment?.name || "—"],
+            ["Receipt", data.proofOfPayment?.name || "Not provided"],
             ...(data.extraPayments || []).flatMap((p, i) => [
               { heading: `Payment ${i + 2}` },
               ["Date of Transaction", p.paymentDate],
               ["Payment Method", p.paymentChannel],
               ["Amount Transferred", p.amount],
               ["Reference Number", p.referenceNumber],
-              ["Receipt", p.proofOfPayment?.name || "—"],
+              ["Receipt", p.proofOfPayment?.name || "Not provided"],
             ]),
           ]}
         />

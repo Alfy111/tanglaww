@@ -101,6 +101,28 @@ export async function getSpecializations() {
   }));
 }
 
+// Examination Program dropdown (rows with exam_label, see examination_program.sql).
+// curriculumId null = "Others (Please Specify)".
+export async function getExamPrograms() {
+  const { data, error } = await supabase
+    .from("specialization")
+    .select(
+      "specialization_id, specializationName, curriculum_id, exam_label, exam_order",
+    )
+    .not("exam_label", "is", null)
+    .order("exam_order");
+  if (error) {
+    console.error("specialization:", error.message);
+    return [];
+  }
+  return (data ?? []).map((r) => ({
+    id: Number(r.specialization_id),
+    name: String(r.specializationName),
+    label: String(r.exam_label),
+    curriculumId: r.curriculum_id == null ? null : Number(r.curriculum_id),
+  }));
+}
+
 export const specializationsFor = (all, curriculum) =>
   all.filter((s) => s.curriculumId === CURRICULUM_IDS[curriculum]);
 
@@ -131,6 +153,11 @@ async function uploadFile(file, folder, label) {
 
   return supabase.storage.from("receipts").getPublicUrl(path).data.publicUrl;
 }
+
+const withHttps = (v) => {
+  const t = (v || "").trim();
+  return !t || /^https?:\/\//i.test(t) ? t : `https://${t}`;
+};
 
 const upper = (v) => (v || "").trim().toUpperCase();
 
@@ -188,10 +215,14 @@ export async function submitEnrollment(data) {
     bachelorsDegree: upper(data.degree),
     majorshipTaken: data.specialization,
     lastSchoolAttended: upper(data.school),
-    province: upper(data.province),
+    tcpProgram: upper(data.tcpProgram) || null,
+    tcpSchool: upper(data.tcpSchool) || null,
+    facebookName: (data.facebookName || "").trim() || null,
+    facebookLink: withHttps(data.facebookLink) || null,
     validIdUrl,
     formalPhotoUrl,
-    photoConsentAt: now,
+    photoConsentAt:
+      data.photoConsent && (data.graduationPhoto || data.validId) ? now : null,
     dataprivacyconsent: now,
   };
 
@@ -216,7 +247,10 @@ export async function submitEnrollment(data) {
   }
 
   const enrollmentFields = {
-    curriculum_id: CURRICULUM_IDS[data.curriculum],
+    curriculum_id:
+      data.curriculumId !== undefined
+        ? data.curriculumId
+        : (CURRICULUM_IDS[data.curriculum] ?? null),
     specialization_id:
       data.specializationId ?? SPECIALIZATIONS.indexOf(data.specialization) + 1,
     comments: upper(data.comments) || null,

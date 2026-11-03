@@ -288,7 +288,6 @@ export default function HandoutScreen() {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState("");
-  // Admin tools: "select" = tick cards to delete, "reorder" = drag to sort
   const [mode, setMode] = useState<"normal" | "select" | "reorder">("normal");
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [deleting, setDeleting] = useState(false);
@@ -400,7 +399,6 @@ export default function HandoutScreen() {
     }
   };
 
-  // Pick one or more files and upload them all
   const handleUpload = async () => {
     if (!currentAdminId || !uploadModuleId) return;
     setUploading(true);

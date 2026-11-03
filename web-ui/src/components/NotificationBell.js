@@ -20,7 +20,6 @@ const dayStart = (d) => {
   return x.getTime();
 };
 
-// Where clicking an item goes
 const routeFor = (n) => {
   if (n.kind === "enrollment") return "/admin/approvals";
   if (n.kind === "balance_receipt") return "/admin/students";

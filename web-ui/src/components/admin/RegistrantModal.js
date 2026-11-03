@@ -889,13 +889,20 @@ export default function RegistrantModal({ enrollmentId, onClose, onChanged }) {
                 setOpenSection(openSection === "program" ? null : "program")
               }
               fields={[
-                ["Curriculum", first(enrollment.curriculum)?.curriculumName],
-                [
-                  "Specialization",
-                  first(enrollment.specialization)?.specializationName,
-                ],
                 ["Type of Taker", first(enrollment.type_of_taker)?.typeOfTaker],
-                ["Comments", enrollment.comments || "None"],
+                [
+                  "Examination Program",
+                  first(enrollment.specialization)?.exam_label ??
+                    [
+                      first(enrollment.curriculum)?.curriculumName,
+                      first(enrollment.specialization)?.specializationName,
+                    ]
+                      .filter(Boolean)
+                      .join(" – "),
+                ],
+                ...(enrollment.comments
+                  ? [["Specified Program", enrollment.comments]]
+                  : []),
               ]}
             />
             <InfoSection
@@ -909,10 +916,28 @@ export default function RegistrantModal({ enrollmentId, onClose, onChanged }) {
                 ["Middle Name", student?.middleName],
                 ["Last Name", student?.lastName],
                 ["Email", student?.email],
-                ["Degree", student?.bachelorsDegree],
+                ["Bachelor's Degree", student?.bachelorsDegree],
                 ["Majorship", student?.majorshipTaken],
-                ["Last School", student?.lastSchoolAttended],
-                ["Province", student?.province],
+                ["Name of School", student?.lastSchoolAttended],
+                ["Program/Course (TCP)", student?.tcpProgram || "Not provided"],
+                ["Last School (TCP)", student?.tcpSchool || "Not provided"],
+                ["Facebook Name", student?.facebookName || "Not provided"],
+                [
+                  "Facebook Link",
+                  student?.facebookLink ? (
+                    <a
+                      href={student.facebookLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ color: "#2F459B", wordBreak: "break-all" }}
+                    >
+                      {student.facebookLink}
+                    </a>
+                  ) : (
+                    "Not provided"
+                  ),
+                ],
+                ...(student?.province ? [["Province", student.province]] : []),
                 ["Contact Number", student?.phoneNumber?.trim() || "Not set"],
               ]}
             />

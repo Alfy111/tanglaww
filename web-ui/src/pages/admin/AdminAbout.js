@@ -1,98 +1,99 @@
-import { Check, Info } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import AdminSidebar from "../../components/admin/AdminSidebar";
-import AdminTopbar from "../../components/admin/AdminTopbar";
-import { supabase } from "../../lib/supabase";
+import {
+  AdminContentFrame,
+  Note,
+  Status,
+  TabBar,
+  TextEditor,
+} from "../../components/admin/SiteContentEditor";
+import { AboutView, PageCard } from "../../components/SiteContentViews";
+import { getSiteContent, saveSiteContent } from "../../lib/siteContent";
+
+const KEYS = ["about_tanglaw", "about_tarc"];
+const TABS = [
+  ["about_tanglaw", "Tanglaw"],
+  ["about_tarc", "TARC"],
+];
 
 export default function AdminAbout() {
-  const [activeTab, setActiveTab] = useState("Tanglaw");
-  const [content, setContent] = useState({ Tanglaw: "", TARC: "" });
-  const [loading, setLoading] = useState(true);
+  const [content, setContent] = useState(null);
+  const [draft, setDraft] = useState({});
+  const [tab, setTab] = useState(KEYS[0]);
+  const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
 
-  const fetchContent = useCallback(async () => {
-    setLoading(true);
-    const { data } = await supabase.from("about_content").select("*");
-    if (data) {
-      const map = {};
-      data.forEach((row) => { map[row.section] = row.content; });
-      setContent((prev) => ({ ...prev, ...map }));
+  const load = useCallback(async () => {
+    try {
+      setContent(await getSiteContent(KEYS));
+    } catch (e) {
+      setError(e.message ?? "Could not load this page.");
     }
-    setLoading(false);
   }, []);
 
-  useEffect(() => { fetchContent(); }, [fetchContent]);
+  useEffect(() => {
+    load();
+  }, [load]);
 
-  const handleSave = async () => {
+  const startEdit = () => {
+    setDraft({
+      about_tanglaw: content?.about_tanglaw ?? "",
+      about_tarc: content?.about_tarc ?? "",
+    });
+    setNotice("");
+    setError("");
+    setEditing(true);
+  };
+
+  const save = async () => {
     setSaving(true);
-    const { error } = await supabase
-      .from("about_content")
-      .upsert({ section: activeTab, content: content[activeTab], updated_at: new Date().toISOString() }, { onConflict: "section" });
-    if (error) { alert("Save error: " + error.message); setSaving(false); return; }
-    setSaving(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    setError("");
+    try {
+      await saveSiteContent(draft);
+      await load();
+      setEditing(false);
+      setNotice("The About page has been updated.");
+    } catch (e) {
+      setError(e.message ?? "Could not save.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
-    <div className="dashboard-layout admin-layout" style={{ fontFamily: "Poppins, sans-serif", backgroundColor: "#f5f6fa" }}>
-      <AdminSidebar />
-      <div className="dashboard-main">
-        <AdminTopbar title="Edit About Content" />
-        <div style={{ padding: "32px 40px" }}>
-
-          {/* Tabs */}
-          <div style={{ display: "flex", marginBottom: "24px", backgroundColor: "#f0f0f0", borderRadius: "10px", padding: "4px", width: "fit-content" }}>
-            {["Tanglaw", "TARC"].map((tab) => (
-              <button key={tab} onClick={() => setActiveTab(tab)} style={{
-                padding: "10px 32px", border: "none", cursor: "pointer",
-                fontFamily: "Poppins, sans-serif", fontWeight: "700", fontSize: "14px",
-                backgroundColor: activeTab === tab ? "#1a1a6e" : "transparent",
-                color: activeTab === tab ? "#fff" : "#aaa",
-                borderRadius: "8px", transition: "all 0.15s",
-              }}>{tab}</button>
-            ))}
-          </div>
-
-          {/* Editor */}
-          <div style={{ backgroundColor: "#fff", borderRadius: "12px", padding: "24px", border: "1px solid #eee", marginBottom: "16px" }}>
-            <h3 style={{ fontSize: "15px", fontWeight: "700", color: "#1a1a2e", marginBottom: "12px" }}>
-              Description for {activeTab}
-            </h3>
-            {loading ? <p style={{ color: "#aaa" }}>Loading...</p> : (
-              <textarea
-                value={content[activeTab]}
-                onChange={(e) => setContent({ ...content, [activeTab]: e.target.value })}
-                style={{
-                  width: "100%", minHeight: "300px", padding: "14px",
-                  borderRadius: "8px", border: "1px solid #eee",
-                  fontSize: "14px", fontFamily: "Poppins, sans-serif",
-                  color: "#444", lineHeight: "1.7", resize: "vertical",
-                  outline: "none", boxSizing: "border-box",
-                }}
-              />
-            )}
-          </div>
-
-          {/* Info box */}
-          <div style={{ display: "flex", gap: "10px", alignItems: "flex-start", backgroundColor: "#eef0fb", borderRadius: "10px", padding: "14px 16px", marginBottom: "24px" }}>
-            <Info size={16} color="#1a1a6e" style={{ flexShrink: 0, marginTop: "2px" }} />
-            <p style={{ fontSize: "13px", color: "#1a1a6e", margin: 0 }}>
-              Changes made here will be reflected immediately in the student's "About" section.
-            </p>
-          </div>
-
-          <button onClick={handleSave} disabled={saving} style={{
-            display: "flex", alignItems: "center", gap: "6px",
-            padding: "12px 40px", backgroundColor: "#1a1a6e", color: "#fff",
-            border: "none", borderRadius: "8px", fontSize: "14px", fontWeight: "700",
-            cursor: "pointer", fontFamily: "Poppins, sans-serif", opacity: saving ? 0.7 : 1,
-          }}>
-            {saved ? <><Check size={16} /> Saved</> : saving ? "Saving..." : "Save"}
-          </button>
-        </div>
-      </div>
-    </div>
+    <AdminContentFrame
+      title="About"
+      editing={editing}
+      saving={saving}
+      onEdit={startEdit}
+      onCancel={() => setEditing(false)}
+      onSave={save}
+    >
+      <PageCard>
+        <Status error={error} notice={notice} />
+        {!content ? (
+          !error && <p style={{ color: "#999", margin: 0 }}>Loading...</p>
+        ) : editing ? (
+          <>
+            <TabBar tabs={TABS} active={tab} onChange={setTab} />
+            <TextEditor
+              label={`About ${TABS.find(([k]) => k === tab)[1]}`}
+              value={draft[tab] ?? ""}
+              onChange={(v) => setDraft((d) => ({ ...d, [tab]: v }))}
+              minHeight={320}
+              placeholder="Enter description here..."
+            />
+            <Note>
+              Changes show right away on the students' About page (web and app).
+              Leave a blank line between paragraphs, and start a line with "- "
+              for a bullet.
+            </Note>
+          </>
+        ) : (
+          <AboutView content={content} />
+        )}
+      </PageCard>
+    </AdminContentFrame>
   );
 }
