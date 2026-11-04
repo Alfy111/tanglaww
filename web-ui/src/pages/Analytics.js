@@ -3,12 +3,21 @@ import {
   BarChart3,
   BookOpen,
   CalendarCheck,
+  Lightbulb,
   Target,
   TrendingDown,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import Sidebar from "../components/Sidebar";
 import UserTopbar from "../components/UserTopbar";
+import {
+  courseTopicsInsight,
+  coursesInsight,
+  focusInsight,
+  progressInsight,
+  recentInsight,
+  trendInsight,
+} from "../lib/insights";
 import { supabase } from "../lib/supabase";
 import "./Dashboard.css";
 
@@ -23,14 +32,15 @@ const shortDate = (iso) =>
         day: "numeric",
       })
     : "";
+// Same colors and cutoffs as the mobile app
 const barColor = (value) =>
   value == null
-    ? "#C4C9D2"
+    ? "#BDC3C7"
     : value >= 75
-      ? GREEN
-      : value >= 50
-        ? "#F39C12"
-        : "#E74C3C";
+      ? "#4CD964"
+      : value >= 60
+        ? "#FFB800"
+        : "#FF4D4D";
 
 function CardTitle({ icon: Icon, title, subtitle }) {
   return (
@@ -50,51 +60,104 @@ function CardTitle({ icon: Icon, title, subtitle }) {
   );
 }
 
+// Same layout as the mobile app: label, bar, percentage on one line
 function BarRow({ label, value, note }) {
   const width = Math.max(0, Math.min(100, Number(value) || 0));
   return (
-    <div style={{ marginBottom: "12px" }}>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          gap: "12px",
-          marginBottom: "5px",
-        }}
-      >
-        <span style={{ fontSize: "13px", fontWeight: "600", color: "#333" }}>
+    <div style={{ margin: "8px 0" }}>
+      <div style={{ display: "flex", alignItems: "center" }}>
+        <span
+          style={{
+            flex: 3,
+            minWidth: 0,
+            fontSize: "13px",
+            fontWeight: 500,
+            color: "#34495E",
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+        >
           {label}
-          {note && (
-            <span
-              style={{ fontSize: "11px", color: "#888", fontWeight: "400" }}
-            >
-              {" "}
-              · {note}
-            </span>
-          )}
         </span>
-        <span style={{ fontSize: "12px", fontWeight: "700", color: NAVY }}>
+        <div style={{ flex: 4, padding: "0 8px" }}>
+          <div
+            style={{
+              height: "8px",
+              backgroundColor: "#ECF0F1",
+              borderRadius: "4px",
+              overflow: "hidden",
+            }}
+          >
+            <div
+              style={{
+                height: "100%",
+                width: `${width}%`,
+                backgroundColor: barColor(value),
+                borderRadius: "4px",
+                transition: "width 0.4s ease",
+              }}
+            />
+          </div>
+        </div>
+        <span
+          style={{
+            flex: 1.2,
+            textAlign: "right",
+            fontSize: "13px",
+            fontWeight: 600,
+            color: "#2C3E50",
+          }}
+        >
           {pct(value)}
         </span>
       </div>
+      {note && (
+        <div style={{ fontSize: "11px", color: "#7F8C8D", marginTop: "2px" }}>
+          {note}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Insight({ text }) {
+  if (!text) return null;
+  return (
+    <div
+      style={{
+        marginTop: "14px",
+        padding: "10px 14px",
+        borderRadius: "8px",
+        backgroundColor: "#FFFFFF",
+        border: "1px solid #E3E8F4",
+        borderLeft: "4px solid #0D2A94",
+        color: "#1a2a5e",
+        fontSize: "12px",
+        lineHeight: 1.55,
+      }}
+    >
       <div
         style={{
-          height: "8px",
-          backgroundColor: "#eef2ff",
-          borderRadius: "4px",
-          overflow: "hidden",
+          display: "flex",
+          alignItems: "center",
+          gap: "6px",
+          marginBottom: "4px",
         }}
       >
-        <div
+        <Lightbulb size={14} color="#D4A017" />
+        <span
           style={{
-            height: "100%",
-            width: `${width}%`,
-            backgroundColor: barColor(value),
-            borderRadius: "4px",
-            transition: "width 0.4s ease",
+            fontSize: "10px",
+            fontWeight: 700,
+            letterSpacing: "0.08em",
+            color: "#0D2A94",
           }}
-        />
+        >
+          INSIGHT
+        </span>
       </div>
+      <span>{text}</span>
     </div>
   );
 }
@@ -336,6 +399,7 @@ export default function Analytics() {
                     {pct(summary.completion ?? 0)}
                   </span>
                 </div>
+                <Insight text={progressInsight(summary)} />
               </div>
 
               <div
@@ -394,6 +458,7 @@ export default function Analytics() {
                       />
                     ))
                   )}
+                  <Insight text={coursesInsight(data.courses)} />
                 </div>
 
                 <div className="card">
@@ -420,6 +485,7 @@ export default function Analytics() {
                       />
                     ))
                   )}
+                  <Insight text={focusInsight(data.focus, data.topics)} />
                 </div>
               </div>
 
@@ -524,6 +590,7 @@ export default function Analytics() {
                     </table>
                   </div>
                 )}
+                <Insight text={recentInsight(data.recent)} />
               </div>
             </>
           ) : (
@@ -610,6 +677,7 @@ export default function Analytics() {
                             {q.attempts > 1 ? ` (${q.attempts} attempts)` : ""}
                           </div>
                         ))}
+                        <Insight text={trendInsight(course.quizzes)} />
                       </>
                     )}
                   </div>
@@ -631,6 +699,7 @@ export default function Analytics() {
                         />
                       ))
                     )}
+                    <Insight text={courseTopicsInsight(course.topics)} />
                   </div>
                 </div>
               )}

@@ -31,6 +31,7 @@ import {
   StatTile,
   Tabs,
 } from "../../components/analytics-ui";
+import InsightNote from "../../components/InsightNote";
 import { useAdmin } from "../../context/AdminContext";
 import {
   AdminCourse,
@@ -45,6 +46,18 @@ import {
   StudentListItem,
   StudentReport,
 } from "../../services/analyticsService";
+import {
+  atRiskInsight,
+  diagnosticInsight,
+  distributionInsight,
+  historyInsight,
+  missedInsight,
+  quizBreakdownInsight,
+  rankingInsight,
+  recommendedFocusInsight,
+  strengthsInsight,
+  weakTopicsInsight,
+} from "../../services/insights";
 
 type TabKey = "overview" | "course" | "student";
 
@@ -261,6 +274,7 @@ export default function AdminAnalytics() {
                   />
                 </Card>
               </View>
+              <View style={{ height: 12 }} />
 
               <Card
                 title="Score Distribution"
@@ -285,6 +299,9 @@ export default function AdminAnalytics() {
                       />
                     </View>
                     <Histogram bins={overview.distribution.bins} />
+                    <InsightNote
+                      text={distributionInsight(overview.distribution)}
+                    />
                   </>
                 )}
               </Card>
@@ -374,6 +391,9 @@ export default function AdminAnalytics() {
                         </Text>
                       </TouchableOpacity>
                     )}
+                    <InsightNote
+                      text={rankingInsight(rankings, rankKey === "overall")}
+                    />
                   </>
                 )}
               </Card>
@@ -441,13 +461,16 @@ export default function AdminAnalytics() {
                         mostly did not reach 75% in Prof Ed final coaching.
                       </Text>
                     </View>
+                    <InsightNote
+                      text={diagnosticInsight(overview.diagnostic)}
+                    />
                   </>
                 )}
               </Card>
 
               <Card
                 title="At-Risk Students"
-                subtitle="Students with an average below 60%. Tap for details."
+                subtitle="Students with an average below 60% or an early warning. Tap for details."
               >
                 {atRisk.length === 0 ? (
                   <EmptyNote text="No students at risk right now." />
@@ -505,6 +528,7 @@ export default function AdminAnalytics() {
                     ))}
                   </>
                 )}
+                <InsightNote text={atRiskInsight(atRisk)} />
               </Card>
 
               <Card
@@ -607,6 +631,9 @@ export default function AdminAnalytics() {
                             </Text>
                           </View>
                         ))}
+                        <InsightNote
+                          text={quizBreakdownInsight(course.quizzes)}
+                        />
                       </>
                     )}
                   </Card>
@@ -629,6 +656,7 @@ export default function AdminAnalytics() {
                           />
                         ))
                     )}
+                    <InsightNote text={weakTopicsInsight(course.weakTopics)} />
                   </Card>
 
                   <Card
@@ -728,6 +756,9 @@ export default function AdminAnalytics() {
                             )}
                           </>
                         )}
+                        <InsightNote
+                          text={missedInsight(quizQuestions, quizAll.length)}
+                        />
                       </>
                     )}
                   </Card>
@@ -826,6 +857,7 @@ export default function AdminAnalytics() {
                       </Text>
                     </Card>
                   </View>
+                  <View style={{ height: 12 }} />
 
                   <Card
                     title="Recommended Focus"
@@ -849,6 +881,12 @@ export default function AdminAnalytics() {
                         />
                       ))
                     )}
+                    <InsightNote
+                      text={recommendedFocusInsight(
+                        report.focus,
+                        report.topics,
+                      )}
+                    />
                   </Card>
 
                   <Card title="Topic Strengths">
@@ -868,6 +906,7 @@ export default function AdminAnalytics() {
                         </View>
                       ))
                     )}
+                    <InsightNote text={strengthsInsight(report.topics)} />
                   </Card>
 
                   <Card title="Course Progress">
@@ -918,6 +957,7 @@ export default function AdminAnalytics() {
                         )),
                       )
                     )}
+                    <InsightNote text={historyInsight(report.courses)} />
                   </Card>
                 </>
               )}
@@ -945,7 +985,9 @@ export default function AdminAnalytics() {
               keyExtractor={(s) => String(s.id)}
               style={{ maxHeight: 460 }}
               renderItem={({ item }) => {
-                const atRisk = item.avgScore != null && item.avgScore < 60;
+                const atRisk =
+                  item.earlyWarning ||
+                  (item.avgScore != null && item.avgScore < 60);
                 return (
                   <TouchableOpacity
                     style={[
@@ -957,17 +999,16 @@ export default function AdminAnalytics() {
                       setPickerOpen(false);
                     }}
                   >
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.studentName}>{item.name}</Text>
-                      <Text style={styles.smallNote}>
-                        Avg {pct(item.avgScore)} · Completion{" "}
-                        {pct(item.completion)}
-                      </Text>
-                    </View>
+                    <Text style={[styles.studentName, { flex: 1 }]}>
+                      {item.name}
+                    </Text>
                     {atRisk && (
-                      <View style={styles.riskBadge}>
-                        <Text style={styles.riskText}>At risk</Text>
-                      </View>
+                      <Ionicons
+                        name="flag"
+                        size={16}
+                        color={C.red}
+                        accessibilityLabel="At risk"
+                      />
                     )}
                   </TouchableOpacity>
                 );

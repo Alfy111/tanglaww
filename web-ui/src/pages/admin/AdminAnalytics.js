@@ -6,12 +6,25 @@ import {
   ChevronUp,
   CircleAlert,
   GraduationCap,
+  Lightbulb,
   Users,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AdminSidebar from "../../components/admin/AdminSidebar";
 import AdminTopbar from "../../components/admin/AdminTopbar";
+import {
+  atRiskInsight,
+  diagnosticInsight,
+  distributionInsight,
+  historyInsight,
+  missedInsight,
+  quizBreakdownInsight,
+  rankingInsight,
+  recommendedFocusInsight,
+  strengthsInsight,
+  weakTopicsInsight,
+} from "../../lib/insights";
 import { supabase } from "../../lib/supabase";
 import "./AdminAnalytics.css";
 
@@ -88,6 +101,66 @@ function Bar({ label, value, note, color = "blue" }) {
         />
       </div>
       {note && <small>{note}</small>}
+    </div>
+  );
+}
+
+// "What this means" note under a chart (rule-based, see lib/insights.js)
+function Insight({ text }) {
+  if (!text) return null;
+  return (
+    <div className="admin-analytics-insight">
+      <div className="admin-analytics-insight-label">
+        <Lightbulb size={14} />
+        <span>INSIGHT</span>
+      </div>
+      <p>{text}</p>
+    </div>
+  );
+}
+
+// Score distribution in 10% bins, same style as the mobile app (Google Forms-like):
+// counts on the left, light gridlines, score labels under the bar edges
+function Histogram({ bins }) {
+  const step = Math.max(1, Math.ceil(Math.max(...bins, 1) / 2));
+  const top = step * 2;
+  const ticks = [0, step, top];
+  return (
+    <div className="histo">
+      <div className="histo-plot">
+        <div className="histo-ticks">
+          {ticks.map((t) => (
+            <span key={t} style={{ bottom: `calc(${(t / top) * 100}% - 6px)` }}>
+              {t}
+            </span>
+          ))}
+        </div>
+        <div className="histo-area">
+          {ticks.map((t) => (
+            <div
+              key={t}
+              className={t === 0 ? "histo-grid base" : "histo-grid"}
+              style={{ bottom: `${(t / top) * 100}%` }}
+            />
+          ))}
+          <div className="histo-bars">
+            {bins.map((c, i) => (
+              <div key={i} className="histo-col">
+                {c > 0 && <small>{c}</small>}
+                <span style={{ height: `${(c / top) * 88}%` }} />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+      <div className="histo-labels">
+        {[0, 20, 40, 60, 80, 100].map((n) => (
+          <span key={n} style={{ left: `${n}%` }}>
+            {n}
+          </span>
+        ))}
+      </div>
+      <p className="histo-caption">Score (%) · number of students</p>
     </div>
   );
 }
@@ -340,26 +413,10 @@ export default function AdminAnalytics() {
                               value={`${percent(overview.distribution.min)} – ${percent(overview.distribution.max)}`}
                             />
                           </div>
-                          <div
-                            className="admin-analytics-histogram"
-                            aria-label="Score distribution"
-                          >
-                            {overview.distribution.bins.map((count, index) => (
-                              <div
-                                key={index}
-                                className="admin-analytics-histogram-column"
-                              >
-                                <span
-                                  style={{
-                                    height: `${Math.max(3, (count / Math.max(...overview.distribution.bins, 1)) * 100)}%`,
-                                  }}
-                                />
-                                <small>
-                                  {index * 10}-{index * 10 + 9}
-                                </small>
-                              </div>
-                            ))}
-                          </div>
+                          <Histogram bins={overview.distribution.bins} />
+                          <Insight
+                            text={distributionInsight(overview.distribution)}
+                          />
                         </>
                       )}
                     </Panel>
@@ -442,6 +499,11 @@ export default function AdminAnalytics() {
                             : `Show all ${rankings.length} students`}
                         </button>
                       )}
+                      {rankings?.length > 0 && (
+                        <Insight
+                          text={rankingInsight(rankings, rankKey === "overall")}
+                        />
+                      )}
                     </Panel>
                   </div>
 
@@ -510,6 +572,7 @@ export default function AdminAnalytics() {
                             Ed final coaching.
                           </span>
                         </div>
+                        <Insight text={diagnosticInsight(diagnostic)} />
                       </>
                     )}
                   </Panel>
@@ -556,6 +619,7 @@ export default function AdminAnalytics() {
                         </table>
                       </div>
                     )}
+                    <Insight text={atRiskInsight(atRisk)} />
                   </Panel>
 
                   <div className="admin-analytics-columns">
@@ -653,6 +717,7 @@ export default function AdminAnalytics() {
                             </table>
                           </div>
                         )}
+                        <Insight text={quizBreakdownInsight(course.quizzes)} />
                       </Panel>
                       <Panel
                         title="Weak Topics"
@@ -676,6 +741,7 @@ export default function AdminAnalytics() {
                               />
                             ))
                         )}
+                        <Insight text={weakTopicsInsight(course.weakTopics)} />
                       </Panel>
                       <Panel
                         title="Frequently Missed Questions"
@@ -776,6 +842,14 @@ export default function AdminAnalytics() {
                               )}
                             </div>
                           ))}
+                        {course.quizzes.length > 0 && (
+                          <Insight
+                            text={missedInsight(
+                              weakQuestions,
+                              allQuizQuestions.length,
+                            )}
+                          />
+                        )}
                       </Panel>
                     </>
                   )}
@@ -794,11 +868,10 @@ export default function AdminAnalytics() {
                     >
                       {students.map((student) => (
                         <option key={student.id} value={student.id}>
-                          {student.name} · Avg {percent(student.avgScore)} ·
-                          Completion {percent(student.completion)}
+                          {student.name}
                           {student.earlyWarning ||
                           (student.avgScore != null && student.avgScore < 60)
-                            ? " · At risk"
+                            ? "  🚩"
                             : ""}
                         </option>
                       ))}
@@ -879,6 +952,12 @@ export default function AdminAnalytics() {
                             />
                           ))
                         )}
+                        <Insight
+                          text={recommendedFocusInsight(
+                            report.focus,
+                            report.topics,
+                          )}
+                        />
                       </Panel>
                       <Panel title="Topic Strengths">
                         {report.topics.length === 0 ? (
@@ -907,6 +986,7 @@ export default function AdminAnalytics() {
                             </div>
                           ))
                         )}
+                        <Insight text={strengthsInsight(report.topics)} />
                       </Panel>
                       <Panel title="Course Progress">
                         {report.courses.map((item) => (
@@ -960,6 +1040,7 @@ export default function AdminAnalytics() {
                             </table>
                           </div>
                         )}
+                        <Insight text={historyInsight(report.courses)} />
                       </Panel>
                     </>
                   )}

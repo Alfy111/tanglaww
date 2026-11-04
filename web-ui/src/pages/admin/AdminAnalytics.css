@@ -559,3 +559,110 @@
     font-size: 18px;
   }
 }
+
+/* "What this means" notes under each chart */
+.admin-analytics-insight {
+  margin: 14px 0 0;
+  padding: 10px 14px;
+  border: 1px solid #e3e8f4;
+  border-left: 4px solid #0d2a94;
+  border-radius: 8px;
+  background: #fff;
+  color: #1a2a5e;
+  font-size: 12px;
+  line-height: 1.55;
+}
+.admin-analytics-insight-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+  color: #0d2a94;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+.admin-analytics-insight-label svg {
+  color: #d4a017;
+}
+.admin-analytics-insight p {
+  margin: 0;
+}
+.admin-analytics-stack > .admin-analytics-insight {
+  margin-top: -4px;
+}
+
+/* Score distribution (same style as mobile) */
+.histo-plot {
+  display: flex;
+  height: 140px;
+}
+.histo-ticks {
+  position: relative;
+  width: 26px;
+}
+.histo-ticks span {
+  position: absolute;
+  right: 6px;
+  color: #7f8c8d;
+  font-size: 10px;
+}
+.histo-area {
+  position: relative;
+  flex: 1;
+}
+.histo-grid {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: #e5e8ee;
+}
+.histo-grid.base {
+  background: #9aa1ae;
+}
+.histo-bars {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  padding: 0 22px;
+}
+.histo-col {
+  display: flex;
+  height: 100%;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  margin: 0 1px;
+}
+.histo-col small {
+  margin-bottom: 2px;
+  color: #2c3e50;
+  font-size: 10px;
+}
+.histo-col span {
+  width: 100%;
+  background: #0d2a94;
+}
+.histo-labels {
+  position: relative;
+  height: 16px;
+  margin: 4px 22px 0 48px;
+}
+.histo-labels span {
+  position: absolute;
+  width: 30px;
+  margin-left: -15px;
+  color: #7f8c8d;
+  font-size: 10px;
+  text-align: center;
+}
+.histo-caption {
+  margin: 6px 0 0;
+  color: #7f8c8d;
+  font-size: 11px;
+  font-style: italic;
+  text-align: center;
+}

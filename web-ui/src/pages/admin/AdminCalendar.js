@@ -570,7 +570,8 @@ export default function AdminCalendar() {
         <div
           style={{
             padding: "32px 40px",
-            maxWidth: "1100px",
+            maxWidth: "1400px",
+            margin: "0 auto",
             boxSizing: "border-box",
           }}
         >
@@ -591,7 +592,7 @@ export default function AdminCalendar() {
               alignItems: "flex-start",
             }}
           >
-            <section style={{ ...card, flex: "1 1 380px", minWidth: 0 }}>
+            <section style={{ ...card, flex: "3 1 460px", minWidth: 0 }}>
               <div
                 style={{
                   display: "flex",
@@ -687,7 +688,7 @@ export default function AdminCalendar() {
                         dayEvents.length && setOpenEvents(dayEvents)
                       }
                       style={{
-                        height: "50px",
+                        height: "clamp(50px, 7vh, 80px)",
                         display: "flex",
                         flexDirection: "column",
                         alignItems: "center",
@@ -701,15 +702,15 @@ export default function AdminCalendar() {
                     >
                       <span
                         style={{
-                          width: "34px",
-                          height: "34px",
+                          width: "38px",
+                          height: "38px",
                           borderRadius: "50%",
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
                           backgroundColor: isToday ? YELLOW : "transparent",
                           color: NAVY,
-                          fontSize: "14px",
+                          fontSize: "15px",
                           fontWeight: isToday ? "700" : "400",
                         }}
                       >
@@ -785,7 +786,7 @@ export default function AdminCalendar() {
               </div>
             </section>
 
-            <section style={{ ...card, flex: "1 1 380px", minWidth: 0 }}>
+            <section style={{ ...card, flex: "2 1 340px", minWidth: 0 }}>
               <div
                 role="tablist"
                 style={{

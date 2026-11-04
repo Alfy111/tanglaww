@@ -8,17 +8,38 @@ import {
   EyeOff,
   Info,
   KeyRound,
+  Lock,
   Search,
   User,
   XCircle,
 } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import { supabase } from "../lib/supabase";
 import "./SignIn.css";
 
 const CODE_LENGTH = 6;
+
+// Wrong-code limit: a warning on the 3rd wrong code, then the 4th locks entry
+// for 10 minutes. Saved in the browser so refreshing doesn't reset it.
+const WARN_AT = 3;
+const LOCK_AT = 4;
+const LOCK_MS = 10 * 60 * 1000;
+const ATTEMPTS_KEY = "activationCodeAttempts";
+
+const readAttempts = () => {
+  try {
+    return JSON.parse(localStorage.getItem(ATTEMPTS_KEY)) ?? {};
+  } catch {
+    return {};
+  }
+};
+
+const formatTime = (ms) => {
+  const total = Math.max(0, Math.ceil(ms / 1000));
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
+};
 
 export default function SignInWithCode() {
   const navigate = useNavigate();
@@ -46,6 +67,56 @@ export default function SignInWithCode() {
   const [studentData, setStudentData] = useState(null);
   const [rejectionNotes, setRejectionNotes] = useState("");
   const [allowReenroll, setAllowReenroll] = useState(false);
+  const [wrongCount, setWrongCount] = useState(() => readAttempts().count ?? 0);
+  const [lockedUntil, setLockedUntil] = useState(
+    () => readAttempts().lockedUntil ?? null,
+  );
+  const [now, setNow] = useState(Date.now());
+  const isLocked = lockedUntil !== null && now < lockedUntil;
+
+  const saveAttempts = (count, until) => {
+    setWrongCount(count);
+    setLockedUntil(until);
+    try {
+      localStorage.setItem(
+        ATTEMPTS_KEY,
+        JSON.stringify({ count, lockedUntil: until }),
+      );
+    } catch {
+      // storage blocked; the limit still works until the page is closed
+    }
+  };
+
+  // Countdown while locked; unlock and reset when the time is up
+  useEffect(() => {
+    if (!lockedUntil) return undefined;
+    const timer = setInterval(() => {
+      const t = Date.now();
+      setNow(t);
+      if (t >= lockedUntil) {
+        saveAttempts(0, null);
+        setCodeError("");
+      }
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [lockedUntil]);
+
+  const recordWrongCode = (message) => {
+    const next = wrongCount + 1;
+    if (next >= LOCK_AT) {
+      setNow(Date.now());
+      saveAttempts(0, Date.now() + LOCK_MS);
+      setCodeDigits(Array(CODE_LENGTH).fill(""));
+      setCodeError("");
+      return;
+    }
+    saveAttempts(next, null);
+    setCodeError(
+      next === WARN_AT
+        ? `${message} Warning: 1 attempt left. Another wrong code will lock code entry for 10 minutes.`
+        : message,
+    );
+  };
 
   const fullCode = codeDigits.join("");
   const isCodeComplete = codeDigits.every(Boolean);
@@ -82,7 +153,7 @@ export default function SignInWithCode() {
 
   const handleVerifyCode = async (event) => {
     event.preventDefault();
-    if (!isCodeComplete) return;
+    if (!isCodeComplete || isLocked) return;
 
     setCodeError("");
     setLoading(true);
@@ -95,7 +166,7 @@ export default function SignInWithCode() {
 
       if (codeQueryError) throw new Error(codeQueryError.message);
       if (!codeData) {
-        setCodeError("Invalid code. Please check and try again.");
+        recordWrongCode("Invalid code. Please check and try again.");
         return;
       }
       if (codeData.is_used) {
@@ -129,6 +200,7 @@ export default function SignInWithCode() {
         return;
       }
 
+      saveAttempts(0, null);
       setActivation({ ...codeData, student });
     } catch (error) {
       setCodeError(error.message ?? "Something went wrong. Please try again.");
@@ -550,6 +622,32 @@ export default function SignInWithCode() {
                 </p>
               </div>
 
+              {isLocked && !activation && !accountCreated && (
+                <div
+                  role="alert"
+                  style={{
+                    display: "flex",
+                    gap: "8px",
+                    alignItems: "flex-start",
+                    marginBottom: "14px",
+                    padding: "10px 12px",
+                    border: "1px solid #E74C3C",
+                    borderRadius: "8px",
+                    backgroundColor: "#fff5f5",
+                    color: "#c13121",
+                    fontSize: "12px",
+                    lineHeight: 1.5,
+                  }}
+                >
+                  <Lock size={17} style={{ flexShrink: 0 }} />
+                  <span>
+                    Too many incorrect attempts. Code entry is locked for{" "}
+                    <strong>{formatTime(lockedUntil - now)}</strong>. If you
+                    need help, please contact the admin.
+                  </span>
+                </div>
+              )}
+
               {codeError && (
                 <div
                   role="alert"
@@ -896,6 +994,7 @@ export default function SignInWithCode() {
                         autoComplete={index === 0 ? "one-time-code" : "off"}
                         maxLength={CODE_LENGTH}
                         value={digit}
+                        disabled={isLocked}
                         onChange={(event) =>
                           handleCodeChange(event.target.value, index)
                         }
@@ -955,7 +1054,7 @@ export default function SignInWithCode() {
                   </div>
                   <button
                     type="submit"
-                    disabled={!isCodeComplete || loading}
+                    disabled={!isCodeComplete || loading || isLocked}
                     style={{
                       ...buttonStyle,
                       display: "flex",
@@ -963,7 +1062,8 @@ export default function SignInWithCode() {
                       alignItems: "center",
                       gap: "6px",
                       marginTop: "32px",
-                      opacity: isCodeComplete && !loading ? 1 : 0.6,
+                      opacity:
+                        isCodeComplete && !loading && !isLocked ? 1 : 0.6,
                     }}
                   >
                     {loading ? (
