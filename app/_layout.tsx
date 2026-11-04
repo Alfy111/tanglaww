@@ -15,8 +15,6 @@ import { Stack, usePathname, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, AppState, View } from "react-native";
 import Toast, { BaseToast, ToastConfig } from "react-native-toast-message";
-import * as Notifications from "expo-notifications";
-import { registerPushNotifications } from "@/lib/pushNotifications";
 
 const toastConfig: ToastConfig = {
   warning: (props) => (
@@ -60,28 +58,9 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const fetchingRole = useRef(false);
   const kickingRef = useRef(false);
 
-  useEffect(() => {
-    const responseSubscription =
-      Notifications.addNotificationResponseReceivedListener((response) => {
-        const route = response.notification.request.content.data?.route;
-        if (typeof route === "string" && route.startsWith("/")) {
-          router.push(route as any);
-        } else {
-          router.push("/notification" as any);
-        }
-      });
-
-    return () => responseSubscription.remove();
-  }, [router]);
-
   const applyRole = (r: Role) => {
     roleRef.current = r;
     setRole(r);
-    if (r === "student") {
-      void registerPushNotifications().catch((error) =>
-        console.warn("[push] Registration failed", error),
-      );
-    }
   };
 
   const setValidatingBoth = (v: boolean) => {

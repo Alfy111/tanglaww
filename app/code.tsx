@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Dimensions,
@@ -29,6 +30,18 @@ type StatusType =
   | null;
 type ActiveTab = "code" | "status";
 
+// Wrong-code limit: a warning on the 3rd wrong code, then the 4th locks entry
+// for 10 minutes. Saved on the phone so closing the screen doesn't reset it.
+const WARN_AT = 3;
+const LOCK_AT = 4;
+const LOCK_MS = 10 * 60 * 1000;
+const ATTEMPTS_KEY = "activationCodeAttempts";
+
+const formatTime = (ms: number) => {
+  const total = Math.max(0, Math.ceil(ms / 1000));
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
+};
+
 export default function EnrollmentCodeScreen() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<ActiveTab>("code");
@@ -37,6 +50,63 @@ export default function EnrollmentCodeScreen() {
   const [codeLoading, setCodeLoading] = useState(false);
   const [codeError, setCodeError] = useState("");
   const inputs = useRef<TextInput[]>([]);
+  const [wrongCount, setWrongCount] = useState(0);
+  const [lockedUntil, setLockedUntil] = useState<number | null>(null);
+  const [now, setNow] = useState(Date.now());
+  const isLocked = lockedUntil !== null && now < lockedUntil;
+
+  const saveAttempts = (count: number, until: number | null) => {
+    setWrongCount(count);
+    setLockedUntil(until);
+    AsyncStorage.setItem(
+      ATTEMPTS_KEY,
+      JSON.stringify({ count, lockedUntil: until }),
+    ).catch(() => {});
+  };
+
+  // Load saved attempts when the screen opens
+  useEffect(() => {
+    AsyncStorage.getItem(ATTEMPTS_KEY)
+      .then((raw) => {
+        if (!raw) return;
+        const saved = JSON.parse(raw);
+        setWrongCount(saved.count ?? 0);
+        setLockedUntil(saved.lockedUntil ?? null);
+      })
+      .catch(() => {});
+  }, []);
+
+  // Countdown while locked; unlock and reset when the time is up
+  useEffect(() => {
+    if (!lockedUntil) return;
+    const timer = setInterval(() => {
+      const t = Date.now();
+      setNow(t);
+      if (t >= lockedUntil) {
+        saveAttempts(0, null);
+        setCodeError("");
+      }
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [lockedUntil]);
+
+  const recordWrongCode = (message: string) => {
+    const next = wrongCount + 1;
+    if (next >= LOCK_AT) {
+      const until = Date.now() + LOCK_MS;
+      setNow(Date.now());
+      saveAttempts(0, until);
+      setCode(["", "", "", "", "", ""]);
+      setCodeError("");
+      return;
+    }
+    saveAttempts(next, null);
+    setCodeError(
+      next === WARN_AT
+        ? `${message} Warning: 1 attempt left. Another wrong code will lock code entry for 10 minutes.`
+        : message,
+    );
+  };
 
   const [email, setEmail] = useState("");
   const [lastName, setLastName] = useState("");
@@ -68,7 +138,7 @@ export default function EnrollmentCodeScreen() {
   };
 
   const handleVerify = async () => {
-    if (!isCodeComplete) return;
+    if (!isCodeComplete || isLocked) return;
     setCodeLoading(true);
     setCodeError("");
 
@@ -82,7 +152,7 @@ export default function EnrollmentCodeScreen() {
       if (codeErr) throw new Error(codeErr.message);
 
       if (!codeData) {
-        setCodeError("Invalid code. Please check and try again.");
+        recordWrongCode("Invalid code. Please check and try again.");
         setCodeLoading(false);
         return;
       }
@@ -139,6 +209,7 @@ export default function EnrollmentCodeScreen() {
         return;
       }
 
+      saveAttempts(0, null);
       router.push({
         pathname: "/profilesetup",
         params: {
@@ -468,6 +539,7 @@ export default function EnrollmentCodeScreen() {
                       onChangeText={(text) => handleTextChange(text, index)}
                       onKeyPress={(e) => handleKeyPress(e, index)}
                       value={digit}
+                      editable={!isLocked}
                       placeholder="•"
                       placeholderTextColor="#BDC3C7"
                       selectionColor="#0D2A94"
@@ -476,7 +548,18 @@ export default function EnrollmentCodeScreen() {
                 ))}
               </View>
 
-              {codeError ? (
+              {isLocked ? (
+                <View style={styles.errorBanner}>
+                  <Ionicons name="lock-closed" size={16} color="#E74C3C" />
+                  <Text style={styles.errorText}>
+                    Too many incorrect attempts. Code entry is locked for{" "}
+                    <Text style={{ fontWeight: "bold" }}>
+                      {formatTime((lockedUntil ?? 0) - now)}
+                    </Text>
+                    . If you need help, please contact the admin.
+                  </Text>
+                </View>
+              ) : codeError ? (
                 <View style={styles.errorBanner}>
                   <Ionicons name="alert-circle" size={16} color="#E74C3C" />
                   <Text style={styles.errorText}>{codeError}</Text>
@@ -502,10 +585,13 @@ export default function EnrollmentCodeScreen() {
             <TouchableOpacity
               style={[
                 styles.continueBtn,
-                { opacity: isCodeComplete && !codeLoading ? 1 : 0.6 },
+                {
+                  opacity:
+                    isCodeComplete && !codeLoading && !isLocked ? 1 : 0.6,
+                },
               ]}
               onPress={handleVerify}
-              disabled={!isCodeComplete || codeLoading}
+              disabled={!isCodeComplete || codeLoading || isLocked}
               activeOpacity={0.8}
             >
               {codeLoading ? (

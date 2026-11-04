@@ -218,7 +218,7 @@ export default function AdminCourses() {
 
         {/* Opens the admin analytics dashboard */}
         <TouchableOpacity
-          onPress={() => router.push("/admin-analytics" as any)}
+          onPress={() => router.push("/admin/analytics" as any)}
           activeOpacity={0.7}
           style={styles.analyticsButton}
         >

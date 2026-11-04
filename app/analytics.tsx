@@ -24,8 +24,17 @@ import {
   shortDate,
   Tabs,
 } from "../components/analytics-ui";
+import InsightNote from "../components/InsightNote";
 import { useAdmin } from "../context/AdminContext";
 import { getMyAnalytics, StudentReport } from "../services/analyticsService";
+import {
+  coursesInsight,
+  courseTopicsInsight,
+  focusInsight,
+  progressInsight,
+  recentInsight,
+  trendInsight,
+} from "../services/insights";
 
 const isTablet = Dimensions.get("window").width >= 600;
 
@@ -39,7 +48,7 @@ export default function StudentAnalytics() {
   const [courseId, setCourseId] = useState<number | null>(null);
 
   useEffect(() => {
-    if (!authLoading && isAdmin) router.replace("/admin-analytics" as any);
+    if (!authLoading && isAdmin) router.replace("/admin/analytics" as any);
   }, [authLoading, isAdmin, router]);
 
   const load = useCallback(async () => {
@@ -125,6 +134,7 @@ export default function StudentAnalytics() {
                     {pct(data.summary.completion ?? 0)}
                   </Text>
                 </View>
+                <InsightNote text={progressInsight(data.summary)} />
               </Card>
 
               <View style={styles.grid}>
@@ -156,7 +166,6 @@ export default function StudentAnalytics() {
                   </Card>
                 </View>
               </View>
-
               <Card title="Overall Performance by Course">
                 {data.courses.map((c) => (
                   <BarRow
@@ -165,6 +174,7 @@ export default function StudentAnalytics() {
                     value={c.percent}
                   />
                 ))}
+                <InsightNote text={coursesInsight(data.courses)} />
               </Card>
 
               <Card title="Recent Quiz Results">
@@ -223,6 +233,7 @@ export default function StudentAnalytics() {
                         </Text>
                       </View>
                     ))}
+                    <InsightNote text={recentInsight(data.recent)} />
                   </>
                 )}
               </Card>
@@ -246,6 +257,7 @@ export default function StudentAnalytics() {
                     />
                   ))
                 )}
+                <InsightNote text={focusInsight(data.focus, data.topics)} />
               </Card>
             </View>
           )}
@@ -288,6 +300,7 @@ export default function StudentAnalytics() {
                                 : ""}
                             </Text>
                           ))}
+                          <InsightNote text={trendInsight(course.quizzes)} />
                         </>
                       )}
                     </Card>
@@ -309,6 +322,7 @@ export default function StudentAnalytics() {
                           />
                         ))
                       )}
+                      <InsightNote text={courseTopicsInsight(course.topics)} />
                     </Card>
                   </View>
                 </View>

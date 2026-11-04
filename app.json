@@ -35,10 +35,7 @@
               "scheme": "tanglaw"
             }
           ],
-          "category": [
-            "BROWSABLE",
-            "DEFAULT"
-          ]
+          "category": ["BROWSABLE", "DEFAULT"]
         },
         {
           "action": "VIEW",
@@ -47,10 +44,7 @@
               "scheme": "tanglaw"
             }
           ],
-          "category": [
-            "BROWSABLE",
-            "DEFAULT"
-          ]
+          "category": ["BROWSABLE", "DEFAULT"]
         }
       ],
       "permissions": [
@@ -75,14 +69,6 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
-      [
-        "expo-notifications",
-        {
-          "icon": "./assets/icons/android-icon-foreground.png",
-          "color": "#00167a",
-          "defaultChannel": "default"
-        }
-      ],
       [
         "expo-media-library",
         {

@@ -1,9 +1,5 @@
 import { supabase } from "@/lib/supabase";
-import {
-  FontAwesome5,
-  Ionicons,
-  MaterialCommunityIcons,
-} from "@expo/vector-icons";
+import { FontAwesome5, Ionicons } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
@@ -18,12 +14,15 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
   View,
 } from "react-native";
 import { readFileBytes } from "../lib/readFileBytes";
 import HamburgerMenu from "./hamburger";
+
+const PHONE_PATTERN = /^09\d{9}$/;
 
 type MyEnrollment = {
   status: string | null;
@@ -42,6 +41,10 @@ export default function ProfileScreen() {
     null,
   );
   const [uploading, setUploading] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [phone, setPhone] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [photoUploading, setPhotoUploading] = useState(false);
 
   useEffect(() => {
     fetchProfile();
@@ -74,7 +77,10 @@ export default function ProfileScreen() {
       .single();
 
     if (error) console.error("Profile fetch error:", error.message);
-    if (data) setStudent(data);
+    if (data) {
+      setStudent(data);
+      setPhone(data.phoneNumber ?? "");
+    }
 
     const { data: info } = await supabase.rpc("get_my_enrollment");
     setEnrollmentInfo((info as MyEnrollment) ?? null);
@@ -90,6 +96,97 @@ export default function ProfileScreen() {
   const specialization =
     (student?.enrollment as any)?.[0]?.specialization?.specializationName ??
     "—";
+
+  // Tap the photo to change it (same as web)
+  const uploadPhoto = async (uri: string, name: string, mimeType: string) => {
+    if (!student) return;
+    setPhotoUploading(true);
+    try {
+      const safeName = name.replace(/[^a-zA-Z0-9._-]/g, "_");
+      const path = `avatars/${student.id}_${Date.now()}_${safeName}`;
+      const bytes = await readFileBytes(uri);
+      const { error: uploadError } = await supabase.storage
+        .from("receipts")
+        .upload(path, bytes, { contentType: mimeType, upsert: false });
+      if (uploadError) throw new Error(uploadError.message);
+
+      const url = supabase.storage.from("receipts").getPublicUrl(path)
+        .data.publicUrl;
+      const { error } = await supabase
+        .from("student")
+        .update({ profilephotourl: url })
+        .eq("id", student.id);
+      if (error) throw new Error(error.message);
+      setStudent((s: any) => ({ ...s, profilephotourl: url }));
+    } catch (err: any) {
+      Alert.alert("Upload failed", err.message ?? "Please try again.");
+    } finally {
+      setPhotoUploading(false);
+    }
+  };
+
+  const changePhoto = () => {
+    const handle = (result: ImagePicker.ImagePickerResult) => {
+      if (result.canceled) return;
+      const a = result.assets[0];
+      uploadPhoto(a.uri, a.fileName ?? "photo.jpg", a.mimeType ?? "image/jpeg");
+    };
+    Alert.alert("Profile Photo", "Choose an option", [
+      {
+        text: "Camera",
+        onPress: async () =>
+          handle(
+            await ImagePicker.launchCameraAsync({
+              mediaTypes: ["images"],
+              allowsEditing: true,
+              aspect: [1, 1],
+              quality: 0.8,
+            }),
+          ),
+      },
+      {
+        text: "Gallery",
+        onPress: async () =>
+          handle(
+            await ImagePicker.launchImageLibraryAsync({
+              mediaTypes: ["images"],
+              allowsEditing: true,
+              aspect: [1, 1],
+              quality: 0.8,
+            }),
+          ),
+      },
+      { text: "Cancel", style: "cancel" },
+    ]);
+  };
+
+  const savePhone = async () => {
+    const cleaned = phone.trim();
+    if (cleaned && !PHONE_PATTERN.test(cleaned)) {
+      Alert.alert(
+        "Invalid number",
+        "Enter an 11-digit mobile number that starts with 09, e.g. 09171234567.",
+      );
+      return;
+    }
+    setSaving(true);
+    const { error } = await supabase
+      .from("student")
+      .update({ phoneNumber: cleaned || null })
+      .eq("id", student.id);
+    setSaving(false);
+    if (error) {
+      Alert.alert("Could not save", error.message);
+      return;
+    }
+    setStudent((s: any) => ({ ...s, phoneNumber: cleaned || null }));
+    setEditing(false);
+  };
+
+  const cancelEdit = () => {
+    setEditing(false);
+    setPhone(student?.phoneNumber ?? "");
+  };
 
   const uploadBalanceReceipt = async (
     uri: string,
@@ -238,16 +335,6 @@ export default function ProfileScreen() {
       >
         <View style={styles.profileCard}>
           <View style={styles.banner}>
-            <TouchableOpacity
-              style={styles.editIcon}
-              onPress={() => router.push("/edit-profile")}
-            >
-              <MaterialCommunityIcons
-                name="pencil-box-outline"
-                size={28}
-                color="white"
-              />
-            </TouchableOpacity>
             <View style={styles.bannerGraphic}>
               <FontAwesome5
                 name="graduation-cap"
@@ -258,16 +345,30 @@ export default function ProfileScreen() {
           </View>
 
           <View style={styles.avatarContainer}>
-            <View style={styles.avatarCircle}>
-              {student?.profilephotourl ? (
-                <Image
-                  source={{ uri: student.profilephotourl }}
-                  style={styles.avatarImage}
-                />
-              ) : (
-                <Ionicons name="person-outline" size={60} color="#BDC3C7" />
-              )}
-            </View>
+            <TouchableOpacity
+              onPress={changePhoto}
+              disabled={photoUploading}
+              accessibilityLabel="Change profile photo"
+              activeOpacity={0.8}
+            >
+              <View style={styles.avatarCircle}>
+                {student?.profilephotourl ? (
+                  <Image
+                    source={{ uri: student.profilephotourl }}
+                    style={styles.avatarImage}
+                  />
+                ) : (
+                  <Ionicons name="person-outline" size={60} color="#BDC3C7" />
+                )}
+              </View>
+              <View style={styles.cameraBadge}>
+                {photoUploading ? (
+                  <ActivityIndicator size="small" color="white" />
+                ) : (
+                  <Ionicons name="camera" size={14} color="white" />
+                )}
+              </View>
+            </TouchableOpacity>
           </View>
 
           <View style={styles.userInfoHeader}>
@@ -277,33 +378,86 @@ export default function ProfileScreen() {
           </View>
 
           <View style={styles.detailsContainer}>
+            {!editing && (
+              <TouchableOpacity
+                style={styles.editBtn}
+                onPress={() => setEditing(true)}
+              >
+                <Ionicons name="pencil" size={14} color="#0D2A94" />
+                <Text style={styles.editBtnText}>Edit</Text>
+              </TouchableOpacity>
+            )}
+
             {[
               { label: "Curriculum", value: curriculum },
               { label: "Specialization", value: specialization },
               { label: "Email", value: student?.email ?? "—" },
-              {
-                label: "Contact Number",
-                value: student?.phoneNumber?.trim()
-                  ? student.phoneNumber
-                  : "Not set",
-              },
-            ].map((item, index) => (
-              <View key={index} style={styles.inputGroup}>
+            ].map((item) => (
+              <View key={item.label} style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>{item.label}</Text>
+                <View style={styles.inputBox}>
+                  <Text style={styles.inputText}>{item.value}</Text>
+                </View>
+              </View>
+            ))}
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Contact Number</Text>
+              {editing ? (
+                <TextInput
+                  style={[styles.inputBox, styles.inputEditing]}
+                  value={phone}
+                  onChangeText={(t) => setPhone(t.replace(/\D/g, ""))}
+                  keyboardType="number-pad"
+                  maxLength={11}
+                  placeholder="09XXXXXXXXX"
+                  placeholderTextColor="#BDC3C7"
+                  autoFocus
+                />
+              ) : (
                 <View style={styles.inputBox}>
                   <Text
                     style={[
                       styles.inputText,
-                      !student?.phoneNumber?.trim() &&
-                        item.label === "Contact Number" &&
-                        styles.inputTextMuted,
+                      !student?.phoneNumber?.trim() && styles.inputTextMuted,
                     ]}
                   >
-                    {item.value}
+                    {student?.phoneNumber?.trim()
+                      ? student.phoneNumber
+                      : "Not set"}
                   </Text>
                 </View>
-              </View>
-            ))}
+              )}
+            </View>
+
+            {editing && (
+              <>
+                <Text style={styles.editNote}>
+                  Your name, program and email come from your enrollment.
+                  Contact the admin if any of them need to change.
+                </Text>
+                <View style={styles.editActions}>
+                  <TouchableOpacity
+                    style={styles.cancelBtn}
+                    onPress={cancelEdit}
+                    disabled={saving}
+                  >
+                    <Text style={styles.cancelBtnText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.saveBtn, saving && { opacity: 0.7 }]}
+                    onPress={savePhone}
+                    disabled={saving}
+                  >
+                    {saving ? (
+                      <ActivityIndicator color="white" />
+                    ) : (
+                      <Text style={styles.saveBtnText}>Save</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
           </View>
         </View>
 
@@ -418,7 +572,6 @@ const styles = StyleSheet.create({
   },
   banner: { backgroundColor: "#0D2A94", height: 120, position: "relative" },
   bannerGraphic: { position: "absolute", right: -10, bottom: -10 },
-  editIcon: { position: "absolute", top: 15, right: 15, zIndex: 1 },
   avatarContainer: { alignItems: "center", marginTop: -50 },
   avatarCircle: {
     width: 100,
@@ -430,12 +583,68 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  avatarImage: { width: 100, height: 100, borderRadius: 50 },
+  avatarImage: { width: 96, height: 96, borderRadius: 48 },
+  cameraBadge: {
+    position: "absolute",
+    right: 0,
+    bottom: 2,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: "#0D2A94",
+    borderWidth: 2,
+    borderColor: "white",
+    justifyContent: "center",
+    alignItems: "center",
+  },
   userInfoHeader: { alignItems: "center", paddingVertical: 15 },
   userName: { fontSize: 20, fontWeight: "bold", color: "#0D2A94" },
   userRole: { fontSize: 13, color: "#333", fontWeight: "600" },
   userEmailSmall: { fontSize: 11, color: "#7F8C8D" },
   detailsContainer: { paddingHorizontal: 20, paddingBottom: 30 },
+  editBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-end",
+    gap: 6,
+    backgroundColor: "#F0F3FF",
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    marginBottom: 10,
+  },
+  editBtnText: { color: "#0D2A94", fontWeight: "600", fontSize: 13 },
+  inputEditing: {
+    borderColor: "#0D2A94",
+    backgroundColor: "white",
+    fontSize: 14,
+    color: "#333",
+  },
+  editNote: {
+    fontSize: 12,
+    color: "#7F8C8D",
+    lineHeight: 17,
+    marginBottom: 14,
+  },
+  editActions: { flexDirection: "row", gap: 10 },
+  cancelBtn: {
+    flex: 1,
+    padding: 13,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#DDD",
+    alignItems: "center",
+    backgroundColor: "white",
+  },
+  cancelBtnText: { fontSize: 14, color: "#333" },
+  saveBtn: {
+    flex: 2,
+    padding: 13,
+    borderRadius: 8,
+    alignItems: "center",
+    backgroundColor: "#0D2A94",
+  },
+  saveBtnText: { color: "white", fontWeight: "bold", fontSize: 14 },
   inputGroup: { marginBottom: 15 },
   inputLabel: {
     fontSize: 14,

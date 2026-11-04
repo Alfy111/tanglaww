@@ -18,9 +18,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import {
-  setPushNotificationsEnabled,
-} from "@/lib/pushNotifications";
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -33,19 +30,12 @@ export default function SettingsScreen() {
       .then((v) => setPushEnabled(v !== "off"))
       .catch(() => {});
   }, []);
-  const togglePush = async (value: boolean) => {
+
+  const togglePush = (value: boolean) => {
     setPushEnabled(value);
-    await Promise.all([
-      AsyncStorage.setItem(POPUPS_KEY, value ? "on" : "off"),
-      setPushNotificationsEnabled(value),
-    ]).catch((error) => {
-      setPushEnabled(!value);
-      Alert.alert(
-        "Notification setting failed",
-        error instanceof Error ? error.message : "Please try again.",
-      );
-    });
+    AsyncStorage.setItem(POPUPS_KEY, value ? "on" : "off").catch(() => {});
   };
+
   const [updateStatus, setUpdateStatus] = useState<
     "idle" | "checking" | "downloading"
   >("idle");
@@ -236,7 +226,7 @@ export default function SettingsScreen() {
             </View>
             <Switch
               value={pushEnabled}
-              onValueChange={(enabled) => void togglePush(enabled)}
+              onValueChange={togglePush}
               trackColor={{ false: colors.border, true: colors.primary }}
               thumbColor="white"
             />

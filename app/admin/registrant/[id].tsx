@@ -2,7 +2,7 @@ import { useAdmin } from "@/context/AdminContext";
 import { supabase } from "@/lib/supabase";
 import { Ionicons } from "@expo/vector-icons";
 import * as FileSystem from "expo-file-system/legacy";
-import * as MediaLibrary from "expo-media-library";
+
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import { useEffect, useState } from "react";
@@ -368,8 +368,10 @@ export default function RegistrantDetails() {
 
     setSavingPhoto(true);
     try {
+      let MediaLibrary: typeof import("expo-media-library");
       let granted = false;
       try {
+        MediaLibrary = await import("expo-media-library");
         ({ granted } = await MediaLibrary.requestPermissionsAsync(true, [
           "photo",
         ]));
