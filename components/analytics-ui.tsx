@@ -1,5 +1,6 @@
+import { useAppTheme } from "@/context/ThemeContext";
 import { Ionicons } from "@expo/vector-icons";
-import React from "react";
+import React, { createContext, useContext, useMemo } from "react";
 import {
   FlatList,
   Modal,
@@ -10,7 +11,6 @@ import {
   View,
   ViewStyle,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export const C = {
   primary: "#0D2A94",
@@ -45,6 +45,7 @@ export function Header({
   title: string;
   onBack: () => void;
 }) {
+  const s = useS();
   return (
     <View style={s.header}>
       <TouchableOpacity style={{ padding: 4 }} onPress={onBack}>
@@ -65,6 +66,7 @@ export function Tabs<T extends string>({
   active: T;
   onChange: (key: T) => void;
 }) {
+  const s = useS();
   return (
     <View style={s.tabContainer}>
       {tabs.map((t) => (
@@ -91,6 +93,7 @@ export function Chips({
   selected: number | null;
   onSelect: (id: number) => void;
 }) {
+  const s = useS();
   return (
     <ScrollView
       horizontal
@@ -125,6 +128,7 @@ export function Card({
   style?: ViewStyle | ViewStyle[];
   right?: React.ReactNode;
 }) {
+  const s = useS();
   return (
     <View style={[s.card, style as ViewStyle]}>
       {title && (
@@ -140,6 +144,7 @@ export function Card({
 }
 
 export function EmptyNote({ text }: { text: string }) {
+  const s = useS();
   return <Text style={s.empty}>{text}</Text>;
 }
 
@@ -153,6 +158,7 @@ export function ScoreStat({
   color?: string;
   note?: string;
 }) {
+  const s = useS();
   return (
     <View style={{ alignItems: "center" }}>
       <Text style={s.metricLabel}>{label}</Text>
@@ -174,8 +180,8 @@ export function Dropdown<T extends string | number>({
   onChange: (key: T) => void;
   title: string;
 }) {
+  const s = useS();
   const [open, setOpen] = React.useState(false);
-  const insets = useSafeAreaInsets();
   const selected = options.find((o) => o.key === value);
   return (
     <>
@@ -192,7 +198,7 @@ export function Dropdown<T extends string | number>({
         onRequestClose={() => setOpen(false)}
       >
         <View style={s.overlay}>
-          <View style={[s.sheet, { paddingBottom: 16 + insets.bottom }]}>
+          <View style={s.sheet}>
             <View style={s.sheetHeader}>
               <Text style={s.sheetTitle}>{title}</Text>
               <TouchableOpacity onPress={() => setOpen(false)}>
@@ -224,6 +230,7 @@ export function Dropdown<T extends string | number>({
 }
 
 export function StatTile({ label, value }: { label: string; value: string }) {
+  const s = useS();
   return (
     <View style={s.statTile}>
       <Text style={s.statLabel}>{label}</Text>
@@ -243,6 +250,7 @@ export function BarRow({
   color?: string;
   note?: string;
 }) {
+  const s = useS();
   const v = Math.max(0, Math.min(100, Number(value ?? 0)));
   return (
     <View style={{ marginVertical: 8 }}>
@@ -274,6 +282,7 @@ export function ColumnChart({
   values: (number | null)[];
   labels: string[];
 }) {
+  const s = useS();
   return (
     <View style={s.columns}>
       {values.map((v, i) => (
@@ -298,6 +307,7 @@ export function ColumnChart({
 }
 
 export function Histogram({ bins }: { bins: number[] }) {
+  const s = useS();
   const step = Math.max(1, Math.ceil(Math.max(...bins, 1) / 2));
   const top = step * 2;
   const ticks = [0, step, top];
@@ -361,225 +371,287 @@ export function Histogram({ bins }: { bins: number[] }) {
   );
 }
 
-export const s = StyleSheet.create({
-  header: {
-    backgroundColor: C.primary,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 18,
-  },
-  headerTitle: {
-    color: "white",
-    fontSize: 18,
-    fontWeight: "700",
-    letterSpacing: 0.5,
-  },
-  tabContainer: {
-    flexDirection: "row",
-    backgroundColor: C.primary,
-    paddingBottom: 2,
-  },
-  tab: {
-    flex: 1,
-    alignItems: "center",
-    paddingVertical: 14,
-    borderBottomWidth: 3,
-    borderBottomColor: "transparent",
-  },
-  activeTab: { borderBottomColor: C.yellow },
-  tabText: { color: "rgba(255,255,255,0.6)", fontSize: 14, fontWeight: "600" },
-  activeTabText: { color: "white", fontWeight: "700" },
+type ThemeColors = Pick<
+  ReturnType<typeof useAppTheme>["colors"],
+  | "background"
+  | "surface"
+  | "mutedSurface"
+  | "text"
+  | "secondaryText"
+  | "primary"
+  | "border"
+>;
 
-  chip: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: C.chip,
-    marginRight: 8,
-    borderWidth: 1,
-    borderColor: "#CBD5E1",
-  },
-  chipActive: { backgroundColor: C.primary },
-  chipText: { fontSize: 13, color: C.primary, fontWeight: "600" },
-  chipTextActive: { color: "white" },
+export const LIGHT_COLORS: ThemeColors = {
+  background: C.bg,
+  surface: "#FFFFFF",
+  mutedSurface: "#F4F6FB",
+  text: C.text,
+  secondaryText: C.sub,
+  primary: C.primary,
+  border: "#E5E8EE",
+};
 
-  card: {
-    backgroundColor: "white",
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    elevation: 2,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-  },
-  cardTitleRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  cardTitle: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: C.text,
-    marginBottom: 12,
-  },
-  subtitle: { fontSize: 12, color: C.sub, marginTop: -8, marginBottom: 12 },
-  empty: {
-    fontSize: 12,
-    color: C.sub,
-    fontStyle: "italic",
-    paddingVertical: 6,
-  },
+const ForceLight = createContext(false);
+export function AlwaysLight({ children }: { children: React.ReactNode }) {
+  return <ForceLight.Provider value>{children}</ForceLight.Provider>;
+}
 
-  metricLabel: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: C.sub,
-    marginBottom: 4,
-  },
-  scoreValue: { fontSize: 22, fontWeight: "700", color: C.text, marginTop: 2 },
-  scoreLine: {
-    width: 44,
-    height: 5,
-    borderRadius: 3,
-    backgroundColor: C.primary,
-    marginTop: 6,
-  },
-  scoreNote: { fontSize: 11, color: C.sub, marginTop: 6 },
+export function useAnalyticsColors(): ThemeColors {
+  const forced = useContext(ForceLight);
+  const { colors } = useAppTheme();
+  return forced ? LIGHT_COLORS : colors;
+}
 
-  dropdown: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: "white",
-    borderWidth: 1,
-    borderColor: "#CBD5E1",
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 12,
-  },
-  dropdownText: { flex: 1, fontSize: 13, color: C.text },
-  overlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "flex-end",
-  },
-  sheet: {
-    backgroundColor: "white",
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    padding: 16,
-  },
-  sheetHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 10,
-  },
-  sheetTitle: { fontSize: 16, fontWeight: "700", color: C.primary },
-  option: {
-    paddingVertical: 12,
-    paddingHorizontal: 6,
-    borderBottomWidth: 1,
-    borderBottomColor: "#EEE",
-  },
-  optionActive: { backgroundColor: "#EEF1FB" },
-  optionText: { fontSize: 14, color: C.text, fontWeight: "600" },
-  optionSub: { fontSize: 11, color: C.sub, marginTop: 2 },
+const makeS = (colors: ThemeColors) =>
+  StyleSheet.create({
+    header: {
+      backgroundColor: C.primary,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: 16,
+      paddingVertical: 18,
+    },
+    headerTitle: {
+      color: "white",
+      fontSize: 18,
+      fontWeight: "700",
+      letterSpacing: 0.5,
+    },
+    tabContainer: {
+      flexDirection: "row",
+      backgroundColor: C.primary,
+      paddingBottom: 2,
+    },
+    tab: {
+      flex: 1,
+      alignItems: "center",
+      paddingVertical: 14,
+      borderBottomWidth: 3,
+      borderBottomColor: "transparent",
+    },
+    activeTab: { borderBottomColor: C.yellow },
+    tabText: {
+      color: "rgba(255,255,255,0.6)",
+      fontSize: 14,
+      fontWeight: "600",
+    },
+    activeTabText: { color: "white", fontWeight: "700" },
 
-  statTile: {
-    flex: 1,
-    backgroundColor: "#F4F6FB",
-    borderRadius: 8,
-    paddingVertical: 10,
-    alignItems: "center",
-  },
-  statLabel: { fontSize: 11, fontWeight: "700", color: C.text },
-  statValue: { fontSize: 13, color: C.text, marginTop: 4 },
+    chip: {
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      borderRadius: 20,
+      backgroundColor: colors.mutedSurface,
+      marginRight: 8,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    chipActive: { backgroundColor: C.primary },
+    chipText: { fontSize: 13, color: colors.primary, fontWeight: "600" },
+    chipTextActive: { color: "white" },
 
-  barRow: { flexDirection: "row", alignItems: "center" },
-  barLabel: { flex: 3, fontSize: 13, color: "#34495E", fontWeight: "500" },
-  barTrackWrap: { flex: 4, paddingHorizontal: 8 },
-  barTrack: {
-    height: 8,
-    backgroundColor: C.track,
-    borderRadius: 4,
-    overflow: "hidden",
-  },
-  barFill: { height: "100%", borderRadius: 4 },
-  barValue: {
-    flex: 1.2,
-    textAlign: "right",
-    fontSize: 13,
-    fontWeight: "600",
-    color: C.text,
-  },
-  barNote: { fontSize: 11, color: C.sub, marginTop: 2 },
+    card: {
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      padding: 16,
+      marginBottom: 16,
+      elevation: 2,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.1,
+      shadowRadius: 3,
+    },
+    cardTitleRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+    },
+    cardTitle: {
+      fontSize: 15,
+      fontWeight: "700",
+      color: colors.text,
+      marginBottom: 12,
+    },
+    subtitle: {
+      fontSize: 12,
+      color: colors.secondaryText,
+      marginTop: -8,
+      marginBottom: 12,
+    },
+    empty: {
+      fontSize: 12,
+      color: colors.secondaryText,
+      fontStyle: "italic",
+      paddingVertical: 6,
+    },
 
-  columns: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    height: 170,
-    alignItems: "flex-end",
-    paddingTop: 10,
-  },
-  columnWrap: { alignItems: "center", width: 44 },
-  columnTop: { fontSize: 10, color: C.sub, marginBottom: 4 },
-  columnTrack: {
-    height: 120,
-    width: 24,
-    backgroundColor: "#F1F3F9",
-    borderRadius: 6,
-    justifyContent: "flex-end",
-    overflow: "hidden",
-  },
-  columnFill: { width: "100%", borderRadius: 6 },
-  columnLabel: { marginTop: 8, fontSize: 12, fontWeight: "600", color: C.sub },
+    metricLabel: {
+      fontSize: 12,
+      fontWeight: "600",
+      color: colors.secondaryText,
+      marginBottom: 4,
+    },
+    scoreValue: {
+      fontSize: 22,
+      fontWeight: "700",
+      color: colors.text,
+      marginTop: 2,
+    },
+    scoreLine: {
+      width: 44,
+      height: 5,
+      borderRadius: 3,
+      backgroundColor: C.primary,
+      marginTop: 6,
+    },
+    scoreNote: { fontSize: 11, color: colors.secondaryText, marginTop: 6 },
 
-  histoBars: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    top: 0,
-    flexDirection: "row",
-    alignItems: "flex-end",
-  },
-  histoCol: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "flex-end",
-    marginHorizontal: 1,
-  },
-  histoBar: { width: "100%", backgroundColor: C.primary },
-  histoCount: { fontSize: 10, color: C.text, marginBottom: 2 },
-  histoTick: { position: "absolute", right: 6, fontSize: 10, color: C.sub },
-  gridLine: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    height: 1,
-    backgroundColor: "#E5E8EE",
-  },
-  baseLine: { backgroundColor: "#9AA1AE" },
-  histoLabel: {
-    position: "absolute",
-    width: 30,
-    marginLeft: -15,
-    textAlign: "center",
-    fontSize: 10,
-    color: C.sub,
-  },
-  histoCaption: {
-    fontSize: 11,
-    color: C.sub,
-    textAlign: "center",
-    marginTop: 6,
-    fontStyle: "italic",
-  },
-});
+    dropdown: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 8,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      marginBottom: 12,
+    },
+    dropdownText: { flex: 1, fontSize: 13, color: colors.text },
+    overlay: {
+      flex: 1,
+      backgroundColor: "rgba(0,0,0,0.5)",
+      justifyContent: "flex-end",
+    },
+    sheet: {
+      backgroundColor: colors.surface,
+      borderTopLeftRadius: 16,
+      borderTopRightRadius: 16,
+      padding: 16,
+    },
+    sheetHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 10,
+    },
+    sheetTitle: { fontSize: 16, fontWeight: "700", color: colors.primary },
+    option: {
+      paddingVertical: 12,
+      paddingHorizontal: 6,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    optionActive: { backgroundColor: colors.mutedSurface },
+    optionText: { fontSize: 14, color: colors.text, fontWeight: "600" },
+    optionSub: { fontSize: 11, color: colors.secondaryText, marginTop: 2 },
+
+    statTile: {
+      flex: 1,
+      backgroundColor: colors.mutedSurface,
+      borderRadius: 8,
+      paddingVertical: 10,
+      alignItems: "center",
+    },
+    statLabel: { fontSize: 11, fontWeight: "700", color: colors.text },
+    statValue: { fontSize: 13, color: colors.text, marginTop: 4 },
+
+    barRow: { flexDirection: "row", alignItems: "center" },
+    barLabel: { flex: 3, fontSize: 13, color: colors.text, fontWeight: "500" },
+    barTrackWrap: { flex: 4, paddingHorizontal: 8 },
+    barTrack: {
+      height: 8,
+      backgroundColor: colors.border,
+      borderRadius: 4,
+      overflow: "hidden",
+    },
+    barFill: { height: "100%", borderRadius: 4 },
+    barValue: {
+      flex: 1.2,
+      textAlign: "right",
+      fontSize: 13,
+      fontWeight: "600",
+      color: colors.text,
+    },
+    barNote: { fontSize: 11, color: colors.secondaryText, marginTop: 2 },
+
+    columns: {
+      flexDirection: "row",
+      justifyContent: "space-around",
+      height: 170,
+      alignItems: "flex-end",
+      paddingTop: 10,
+    },
+    columnWrap: { alignItems: "center", width: 44 },
+    columnTop: { fontSize: 10, color: colors.secondaryText, marginBottom: 4 },
+    columnTrack: {
+      height: 120,
+      width: 24,
+      backgroundColor: colors.mutedSurface,
+      borderRadius: 6,
+      justifyContent: "flex-end",
+      overflow: "hidden",
+    },
+    columnFill: { width: "100%", borderRadius: 6 },
+    columnLabel: {
+      marginTop: 8,
+      fontSize: 12,
+      fontWeight: "600",
+      color: colors.secondaryText,
+    },
+
+    histoBars: {
+      position: "absolute",
+      left: 0,
+      right: 0,
+      bottom: 0,
+      top: 0,
+      flexDirection: "row",
+      alignItems: "flex-end",
+    },
+    histoCol: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "flex-end",
+      marginHorizontal: 1,
+    },
+    histoBar: { width: "100%", backgroundColor: C.primary },
+    histoCount: { fontSize: 10, color: colors.text, marginBottom: 2 },
+    histoTick: {
+      position: "absolute",
+      right: 6,
+      fontSize: 10,
+      color: colors.secondaryText,
+    },
+    gridLine: {
+      position: "absolute",
+      left: 0,
+      right: 0,
+      height: 1,
+      backgroundColor: colors.border,
+    },
+    baseLine: { backgroundColor: "#9AA1AE" },
+    histoLabel: {
+      position: "absolute",
+      width: 30,
+      marginLeft: -15,
+      textAlign: "center",
+      fontSize: 10,
+      color: colors.secondaryText,
+    },
+    histoCaption: {
+      fontSize: 11,
+      color: colors.secondaryText,
+      textAlign: "center",
+      marginTop: 6,
+      fontStyle: "italic",
+    },
+  });
+
+function useS() {
+  const colors = useAnalyticsColors();
+  return useMemo(() => makeS(colors), [colors]);
+}

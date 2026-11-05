@@ -35,7 +35,6 @@ export const KIND_LABELS: Record<FeedItem["kind"], string> = {
 const FEED_LIMIT = 100;
 const HOUR = 60 * 60 * 1000;
 
-/** Events/sessions that start within the next hour. */
 export const startingSoon = (items: FeedItem[], now = Date.now()) =>
   items.filter((n) => {
     if (!n.event_at) return false;

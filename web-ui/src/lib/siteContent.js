@@ -26,7 +26,6 @@ const CONTACT_COLUMNS = {
 };
 const newer = (a, b) => (!a || (b && b > a) ? b : a);
 
-/** Loads the given keys. updatedAt = newest change among them. */
 export async function getSiteContent(keys) {
   const out = { updatedAt: null };
   for (const table of ["about_content", "policy_content"]) {
@@ -95,7 +94,6 @@ export async function saveSiteContent(values) {
   }
 }
 
-// FAQs: the screens use { faq_id, question, answer, sort_order }
 export async function getFaqs() {
   const { data, error } = await supabase
     .from("faq")
@@ -111,7 +109,6 @@ export async function getFaqs() {
   }));
 }
 
-/** Saves the list as shown: updates kept rows, adds new ones, deletes removed ones. */
 export async function saveFaqs(list, originalIds) {
   const clean = list
     .map((f, i) => ({

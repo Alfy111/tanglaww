@@ -25,7 +25,6 @@ const isHeading = (block) =>
   block.length <= 40 &&
   !/[.!?:"”]$/.test(block.trim());
 
-/** Admin-written text: blank line = paragraph, "- " = bullet, short line alone = small heading. */
 export function ContentText({ text }) {
   const blocks = (text ?? "")
     .split(/\n\s*\n/)

@@ -1,3 +1,4 @@
+import { useAppTheme } from "@/context/ThemeContext";
 import { useNotificationFeed } from "@/lib/notifications";
 import { supabase } from "@/lib/supabase";
 import {
@@ -7,7 +8,7 @@ import {
 } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect, useRouter } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Modal,
   Platform,
@@ -24,6 +25,8 @@ import DashboardCarousel from "../components/dashboard-carousel";
 import HamburgerMenu from "./hamburger";
 
 export default function Homepage() {
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const router = useRouter();
   const [isMenuVisible, setIsMenuVisible] = useState(false);
   const [studentName, setStudentName] = useState({
@@ -241,7 +244,7 @@ export default function Homepage() {
               {lastMaterial?.title ?? "Go to your courses"}
             </Text>
           </View>
-          <Ionicons name="arrow-forward" size={24} color="#2F459B" />
+          <Ionicons name="arrow-forward" size={24} color={colors.primary} />
         </TouchableOpacity>
 
         <View style={styles.infoCard}>
@@ -249,7 +252,7 @@ export default function Homepage() {
             <MaterialCommunityIcons
               name="bullhorn-outline"
               size={22}
-              color="#2F459B"
+              color={colors.primary}
             />
             <Text style={styles.cardTitle}>Announcements</Text>
           </View>
@@ -264,7 +267,7 @@ export default function Homepage() {
                     ? {
                         marginTop: 10,
                         borderTopWidth: 1,
-                        borderTopColor: "#eee",
+                        borderTopColor: colors.border,
                         paddingTop: 10,
                       }
                     : {}
@@ -273,7 +276,7 @@ export default function Homepage() {
                 <Text
                   style={[
                     styles.cardBody,
-                    { fontWeight: "bold", color: "#0D2A94" },
+                    { fontWeight: "bold", color: colors.primary },
                   ]}
                 >
                   {a.title}
@@ -311,7 +314,11 @@ export default function Homepage() {
           style={styles.navItem}
           onPress={() => router.push("/courses")}
         >
-          <FontAwesome5 name="graduation-cap" size={20} color="#2F459B" />
+          <FontAwesome5
+            name="graduation-cap"
+            size={20}
+            color={colors.primary}
+          />
           <Text style={styles.navText}>Courses</Text>
         </TouchableOpacity>
 
@@ -319,7 +326,7 @@ export default function Homepage() {
           style={styles.navItem}
           onPress={() => router.push("/calendar")}
         >
-          <Ionicons name="calendar-outline" size={24} color="#2F459B" />
+          <Ionicons name="calendar-outline" size={24} color={colors.primary} />
           <Text style={styles.navText}>Calendar</Text>
         </TouchableOpacity>
 
@@ -327,7 +334,7 @@ export default function Homepage() {
           style={styles.navItem}
           onPress={() => router.push("/profile")}
         >
-          <Ionicons name="person-outline" size={24} color="#2F459B" />
+          <Ionicons name="person-outline" size={24} color={colors.primary} />
           <Text style={styles.navText}>Profile</Text>
         </TouchableOpacity>
       </View>
@@ -335,150 +342,170 @@ export default function Homepage() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F8F9FA" },
-  modalOverlay: {
-    flex: 1,
-    flexDirection: "row",
-    backgroundColor: "rgba(0,0,0,0.4)",
-  },
-  clickableOverlay: {
-    flex: 1,
-  },
-  header: {
-    backgroundColor: "#0D2A94",
-    height: Platform.OS === "ios" ? 60 : 70,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingTop: Platform.OS === "android" ? 10 : 0,
-  },
-  headerTitle: { color: "white", fontSize: 20, fontWeight: "bold" },
-  headerIcons: { flexDirection: "row", alignItems: "center" },
-  scrollContent: { padding: 20, paddingBottom: 100 },
-  welcomeText: {
-    fontSize: 22,
-    fontWeight: "bold",
-    color: "#0D2A94",
-    marginBottom: 20,
-  },
-  carouselContainer: {
-    backgroundColor: "white",
-    borderRadius: 15,
-    padding: 15,
-    elevation: 4,
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    marginBottom: 25,
-  },
-  imagePlaceholder: {
-    width: "100%",
-    height: 180,
-    backgroundColor: "#F2F4F7",
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "#DCDFE3",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  pagination: { flexDirection: "row", justifyContent: "center", marginTop: 15 },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "#DCDFE3",
-    marginHorizontal: 4,
-  },
-  activeDot: { backgroundColor: "#000", width: 10 },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#0D2A94",
-    marginBottom: 15,
-  },
-  continueCard: {
-    backgroundColor: "white",
-    borderRadius: 12,
-    padding: 15,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    borderWidth: 1,
-    borderColor: "#EEE",
-    marginBottom: 20,
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
-    elevation: 2,
-  },
-  cardInfo: { flex: 1 },
-  sessionLabel: { fontSize: 14, color: "#7F8C8D", marginBottom: 2 },
-  courseTitle: { fontSize: 16, fontWeight: "bold", color: "#2F459B" },
-  infoCard: {
-    backgroundColor: "white",
-    borderRadius: 15,
-    padding: 20,
-    marginBottom: 15,
-    elevation: 3,
-    shadowColor: "#000",
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-  },
-  cardHeader: { flexDirection: "row", alignItems: "center", marginBottom: 10 },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "#0D2A94",
-    marginLeft: 10,
-  },
-  cardBody: { fontSize: 14, color: "#555", lineHeight: 20 },
-  affirmationCard: { backgroundColor: "#0D2A94" },
-  affirmationTitle: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "white",
-    marginLeft: 8,
-  },
-  affirmationRow: { flexDirection: "row", gap: 10, marginTop: 4 },
-  affirmationText: {
-    flex: 1,
-    fontSize: 14,
-    lineHeight: 21,
-    fontStyle: "italic",
-    color: "#E0E7FF",
-  },
-  bottomNav: {
-    position: "absolute",
-    bottom: 0,
-    width: "100%",
-    height: 80,
-    backgroundColor: "white",
-    flexDirection: "row",
-    justifyContent: "space-around",
-    alignItems: "center",
-    borderTopWidth: 1,
-    borderTopColor: "#EEE",
-    paddingBottom: Platform.OS === "ios" ? 20 : 0,
-  },
-  navItem: { alignItems: "center", justifyContent: "center" },
-  navText: { fontSize: 12, marginTop: 4, color: "#2F459B", fontWeight: "500" },
-  badge: {
-    position: "absolute",
-    top: -4,
-    right: -4,
-    backgroundColor: "#e74c3c",
-    borderRadius: 10,
-    minWidth: 18,
-    height: 18,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 3,
-    borderWidth: 1.5,
-    borderColor: "#FFD75E",
-  },
-  badgeText: { color: "white", fontSize: 10, fontWeight: "bold" },
-});
+type ThemeColors = ReturnType<typeof useAppTheme>["colors"];
+
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
+    modalOverlay: {
+      flex: 1,
+      flexDirection: "row",
+      backgroundColor: "rgba(0,0,0,0.4)",
+    },
+    clickableOverlay: {
+      flex: 1,
+    },
+    header: {
+      backgroundColor: "#0D2A94",
+      height: Platform.OS === "ios" ? 60 : 70,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: 20,
+      paddingTop: Platform.OS === "android" ? 10 : 0,
+    },
+    headerTitle: { color: "white", fontSize: 20, fontWeight: "bold" },
+    headerIcons: { flexDirection: "row", alignItems: "center" },
+    scrollContent: { padding: 20, paddingBottom: 100 },
+    welcomeText: {
+      fontSize: 22,
+      fontWeight: "bold",
+      color: colors.primary,
+      marginBottom: 20,
+    },
+    carouselContainer: {
+      backgroundColor: colors.surface,
+      borderRadius: 15,
+      padding: 15,
+      elevation: 4,
+      shadowColor: "#000",
+      shadowOpacity: 0.1,
+      shadowRadius: 10,
+      shadowOffset: { width: 0, height: 4 },
+      marginBottom: 25,
+    },
+    imagePlaceholder: {
+      width: "100%",
+      height: 180,
+      backgroundColor: colors.mutedSurface,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: colors.border,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    pagination: {
+      flexDirection: "row",
+      justifyContent: "center",
+      marginTop: 15,
+    },
+    dot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: colors.border,
+      marginHorizontal: 4,
+    },
+    activeDot: { backgroundColor: "#000", width: 10 },
+    sectionTitle: {
+      fontSize: 18,
+      fontWeight: "bold",
+      color: colors.primary,
+      marginBottom: 15,
+    },
+    continueCard: {
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      padding: 15,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      borderWidth: 1,
+      borderColor: colors.border,
+      marginBottom: 20,
+      shadowColor: "#000",
+      shadowOpacity: 0.05,
+      shadowRadius: 5,
+      elevation: 2,
+    },
+    cardInfo: { flex: 1 },
+    sessionLabel: {
+      fontSize: 14,
+      color: colors.secondaryText,
+      marginBottom: 2,
+    },
+    courseTitle: { fontSize: 16, fontWeight: "bold", color: colors.primary },
+    infoCard: {
+      backgroundColor: colors.surface,
+      borderRadius: 15,
+      padding: 20,
+      marginBottom: 15,
+      elevation: 3,
+      shadowColor: "#000",
+      shadowOpacity: 0.08,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 2 },
+    },
+    cardHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginBottom: 10,
+    },
+    cardTitle: {
+      fontSize: 16,
+      fontWeight: "bold",
+      color: colors.primary,
+      marginLeft: 10,
+    },
+    cardBody: { fontSize: 14, color: colors.text, lineHeight: 20 },
+    affirmationCard: { backgroundColor: "#0D2A94" },
+    affirmationTitle: {
+      fontSize: 16,
+      fontWeight: "bold",
+      color: "white",
+      marginLeft: 8,
+    },
+    affirmationRow: { flexDirection: "row", gap: 10, marginTop: 4 },
+    affirmationText: {
+      flex: 1,
+      fontSize: 14,
+      lineHeight: 21,
+      fontStyle: "italic",
+      color: "#E0E7FF",
+    },
+    bottomNav: {
+      position: "absolute",
+      bottom: 0,
+      width: "100%",
+      height: 80,
+      backgroundColor: colors.surface,
+      flexDirection: "row",
+      justifyContent: "space-around",
+      alignItems: "center",
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+      paddingBottom: Platform.OS === "ios" ? 20 : 0,
+    },
+    navItem: { alignItems: "center", justifyContent: "center" },
+    navText: {
+      fontSize: 12,
+      marginTop: 4,
+      color: colors.primary,
+      fontWeight: "500",
+    },
+    badge: {
+      position: "absolute",
+      top: -4,
+      right: -4,
+      backgroundColor: "#e74c3c",
+      borderRadius: 10,
+      minWidth: 18,
+      height: 18,
+      justifyContent: "center",
+      alignItems: "center",
+      paddingHorizontal: 3,
+      borderWidth: 1.5,
+      borderColor: "#FFD75E",
+    },
+    badgeText: { color: "white", fontSize: 10, fontWeight: "bold" },
+  });

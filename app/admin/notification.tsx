@@ -51,7 +51,6 @@ const isYesterday = (iso: string) => {
   );
 };
 
-// Where tapping an item goes
 const ROUTES: Partial<Record<FeedItem["kind"], string>> = {
   enrollment: "/admin/approval",
   balance_receipt: "/admin/registry",
@@ -63,7 +62,6 @@ export default function AdminNotification() {
     useNotificationFeed("admin");
   const [refreshing, setRefreshing] = useState(false);
 
-  // Keep the dots for what was new when the screen opened, then mark as read.
   const newIds = useRef<Set<number> | null>(null);
   useEffect(() => {
     if (loading) return;

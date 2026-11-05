@@ -1,9 +1,10 @@
+import { useAppTheme } from "@/context/ThemeContext";
 import { supabase } from "@/lib/supabase";
 import { FontAwesome5, Ionicons } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -24,6 +25,33 @@ import HamburgerMenu from "./hamburger";
 
 const PHONE_PATTERN = /^09\d{9}$/;
 
+const pickImage = async (
+  source: "camera" | "gallery",
+  options: ImagePicker.ImagePickerOptions,
+) => {
+  try {
+    const { granted } =
+      source === "camera"
+        ? await ImagePicker.requestCameraPermissionsAsync()
+        : await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!granted) {
+      Alert.alert(
+        "Permission needed",
+        `Allow ${source === "camera" ? "camera" : "photo"} access in your phone settings to continue.`,
+      );
+      return null;
+    }
+    const result =
+      source === "camera"
+        ? await ImagePicker.launchCameraAsync(options)
+        : await ImagePicker.launchImageLibraryAsync(options);
+    return result.canceled ? null : result.assets[0];
+  } catch (err: any) {
+    Alert.alert("Couldn't open", err.message ?? "Please try again.");
+    return null;
+  }
+};
+
 type MyEnrollment = {
   status: string | null;
   paymentType: string | null;
@@ -32,6 +60,8 @@ type MyEnrollment = {
 };
 
 export default function ProfileScreen() {
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const router = useRouter();
   const [isMenuVisible, setIsMenuVisible] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -97,7 +127,6 @@ export default function ProfileScreen() {
     (student?.enrollment as any)?.[0]?.specialization?.specializationName ??
     "—";
 
-  // Tap the photo to change it (same as web)
   const uploadPhoto = async (uri: string, name: string, mimeType: string) => {
     if (!student) return;
     setPhotoUploading(true);
@@ -126,36 +155,24 @@ export default function ProfileScreen() {
   };
 
   const changePhoto = () => {
-    const handle = (result: ImagePicker.ImagePickerResult) => {
-      if (result.canceled) return;
-      const a = result.assets[0];
-      uploadPhoto(a.uri, a.fileName ?? "photo.jpg", a.mimeType ?? "image/jpeg");
+    const options: ImagePicker.ImagePickerOptions = {
+      mediaTypes: ["images"],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    };
+    const handle = async (source: "camera" | "gallery") => {
+      const a = await pickImage(source, options);
+      if (a)
+        uploadPhoto(
+          a.uri,
+          a.fileName ?? "photo.jpg",
+          a.mimeType ?? "image/jpeg",
+        );
     };
     Alert.alert("Profile Photo", "Choose an option", [
-      {
-        text: "Camera",
-        onPress: async () =>
-          handle(
-            await ImagePicker.launchCameraAsync({
-              mediaTypes: ["images"],
-              allowsEditing: true,
-              aspect: [1, 1],
-              quality: 0.8,
-            }),
-          ),
-      },
-      {
-        text: "Gallery",
-        onPress: async () =>
-          handle(
-            await ImagePicker.launchImageLibraryAsync({
-              mediaTypes: ["images"],
-              allowsEditing: true,
-              aspect: [1, 1],
-              quality: 0.8,
-            }),
-          ),
-      },
+      { text: "Camera", onPress: () => handle("camera") },
+      { text: "Gallery", onPress: () => handle("gallery") },
       { text: "Cancel", style: "cancel" },
     ]);
   };
@@ -230,12 +247,11 @@ export default function ProfileScreen() {
       {
         text: "Camera",
         onPress: async () => {
-          const result = await ImagePicker.launchCameraAsync({
+          const a = await pickImage("camera", {
             mediaTypes: ["images"],
             quality: 0.8,
           });
-          if (!result.canceled) {
-            const a = result.assets[0];
+          if (a) {
             uploadBalanceReceipt(
               a.uri,
               a.fileName ?? "receipt.jpg",
@@ -247,12 +263,11 @@ export default function ProfileScreen() {
       {
         text: "Gallery",
         onPress: async () => {
-          const result = await ImagePicker.launchImageLibraryAsync({
+          const a = await pickImage("gallery", {
             mediaTypes: ["images"],
             quality: 0.8,
           });
-          if (!result.canceled) {
-            const a = result.assets[0];
+          if (a) {
             uploadBalanceReceipt(
               a.uri,
               a.fileName ?? "receipt.jpg",
@@ -293,7 +308,11 @@ export default function ProfileScreen() {
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
-        <ActivityIndicator size="large" color="#0D2A94" style={{ flex: 1 }} />
+        <ActivityIndicator
+          size="large"
+          color={colors.primary}
+          style={{ flex: 1 }}
+        />
       </SafeAreaView>
     );
   }
@@ -358,7 +377,11 @@ export default function ProfileScreen() {
                     style={styles.avatarImage}
                   />
                 ) : (
-                  <Ionicons name="person-outline" size={60} color="#BDC3C7" />
+                  <Ionicons
+                    name="person-outline"
+                    size={60}
+                    color={colors.secondaryText}
+                  />
                 )}
               </View>
               <View style={styles.cameraBadge}>
@@ -383,7 +406,7 @@ export default function ProfileScreen() {
                 style={styles.editBtn}
                 onPress={() => setEditing(true)}
               >
-                <Ionicons name="pencil" size={14} color="#0D2A94" />
+                <Ionicons name="pencil" size={14} color={colors.primary} />
                 <Text style={styles.editBtnText}>Edit</Text>
               </TouchableOpacity>
             )}
@@ -464,7 +487,11 @@ export default function ProfileScreen() {
         {isPartial && (
           <View style={styles.balanceCard}>
             <View style={styles.balanceHeader}>
-              <Ionicons name="wallet-outline" size={22} color="#0D2A94" />
+              <Ionicons
+                name="wallet-outline"
+                size={22}
+                color={colors.primary}
+              />
               <Text style={styles.balanceTitle}>Remaining Balance</Text>
             </View>
             <Text style={styles.balanceText}>
@@ -520,21 +547,25 @@ export default function ProfileScreen() {
           style={styles.navItem}
           onPress={() => router.replace("/homepage")}
         >
-          <Ionicons name="home-outline" size={24} color="#2F459B" />
+          <Ionicons name="home-outline" size={24} color={colors.primary} />
           <Text style={styles.navText}>Home</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.navItem}
           onPress={() => router.replace("/courses")}
         >
-          <FontAwesome5 name="graduation-cap" size={20} color="#2F459B" />
+          <FontAwesome5
+            name="graduation-cap"
+            size={20}
+            color={colors.primary}
+          />
           <Text style={styles.navText}>Courses</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.navItem}
           onPress={() => router.replace("/calendar")}
         >
-          <Ionicons name="calendar-outline" size={24} color="#2F459B" />
+          <Ionicons name="calendar-outline" size={24} color={colors.primary} />
           <Text style={styles.navText}>Calendar</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.navItem}>
@@ -546,168 +577,176 @@ export default function ProfileScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F8F9FA" },
-  modalOverlay: {
-    flex: 1,
-    flexDirection: "row",
-    backgroundColor: "rgba(0,0,0,0.5)",
-  },
-  clickableOverlay: { flex: 1 },
-  header: {
-    backgroundColor: "#0D2A94",
-    height: 60,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-  },
-  headerTitle: { color: "white", fontSize: 20, fontWeight: "bold" },
-  scrollContent: { padding: 20, paddingBottom: 100 },
-  profileCard: {
-    backgroundColor: "white",
-    borderRadius: 20,
-    overflow: "hidden",
-    elevation: 5,
-  },
-  banner: { backgroundColor: "#0D2A94", height: 120, position: "relative" },
-  bannerGraphic: { position: "absolute", right: -10, bottom: -10 },
-  avatarContainer: { alignItems: "center", marginTop: -50 },
-  avatarCircle: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: "white",
-    borderWidth: 2,
-    borderColor: "#0D2A94",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  avatarImage: { width: 96, height: 96, borderRadius: 48 },
-  cameraBadge: {
-    position: "absolute",
-    right: 0,
-    bottom: 2,
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: "#0D2A94",
-    borderWidth: 2,
-    borderColor: "white",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  userInfoHeader: { alignItems: "center", paddingVertical: 15 },
-  userName: { fontSize: 20, fontWeight: "bold", color: "#0D2A94" },
-  userRole: { fontSize: 13, color: "#333", fontWeight: "600" },
-  userEmailSmall: { fontSize: 11, color: "#7F8C8D" },
-  detailsContainer: { paddingHorizontal: 20, paddingBottom: 30 },
-  editBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    alignSelf: "flex-end",
-    gap: 6,
-    backgroundColor: "#F0F3FF",
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    marginBottom: 10,
-  },
-  editBtnText: { color: "#0D2A94", fontWeight: "600", fontSize: 13 },
-  inputEditing: {
-    borderColor: "#0D2A94",
-    backgroundColor: "white",
-    fontSize: 14,
-    color: "#333",
-  },
-  editNote: {
-    fontSize: 12,
-    color: "#7F8C8D",
-    lineHeight: 17,
-    marginBottom: 14,
-  },
-  editActions: { flexDirection: "row", gap: 10 },
-  cancelBtn: {
-    flex: 1,
-    padding: 13,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#DDD",
-    alignItems: "center",
-    backgroundColor: "white",
-  },
-  cancelBtnText: { fontSize: 14, color: "#333" },
-  saveBtn: {
-    flex: 2,
-    padding: 13,
-    borderRadius: 8,
-    alignItems: "center",
-    backgroundColor: "#0D2A94",
-  },
-  saveBtnText: { color: "white", fontWeight: "bold", fontSize: 14 },
-  inputGroup: { marginBottom: 15 },
-  inputLabel: {
-    fontSize: 14,
-    fontWeight: "bold",
-    color: "#0D2A94",
-    marginBottom: 8,
-  },
-  inputBox: {
-    borderWidth: 1,
-    borderColor: "#BDC3C7",
-    borderRadius: 8,
-    padding: 12,
-    backgroundColor: "#FDFDFD",
-  },
-  inputText: { fontSize: 14, color: "#555" },
-  inputTextMuted: { color: "#BDC3C7", fontStyle: "italic" },
-  balanceCard: {
-    backgroundColor: "white",
-    borderRadius: 20,
-    padding: 20,
-    marginTop: 20,
-    elevation: 5,
-  },
-  balanceHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginBottom: 8,
-  },
-  balanceTitle: { fontSize: 16, fontWeight: "bold", color: "#0D2A94" },
-  balanceText: { fontSize: 13, color: "#555", lineHeight: 19 },
-  balanceDone: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 6,
-    borderRadius: 8,
-    padding: 3,
-    marginTop: 9,
-  },
-  balanceDoneText: { flex: 1, fontSize: 12, color: "#B26A00", lineHeight: 17 },
-  balanceBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    backgroundColor: "#0D2A94",
-    padding: 14,
-    borderRadius: 10,
-    marginTop: 14,
-  },
-  balanceBtnText: { color: "white", fontWeight: "bold", fontSize: 15 },
-  bottomNav: {
-    position: "absolute",
-    bottom: 0,
-    width: "100%",
-    height: 70,
-    backgroundColor: "white",
-    flexDirection: "row",
-    justifyContent: "space-around",
-    alignItems: "center",
-    borderTopWidth: 1,
-    borderTopColor: "#EEE",
-  },
-  navItem: { alignItems: "center" },
-  navText: { fontSize: 12, marginTop: 4, color: "#2F459B" },
-});
+type ThemeColors = ReturnType<typeof useAppTheme>["colors"];
+
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
+    modalOverlay: {
+      flex: 1,
+      flexDirection: "row",
+      backgroundColor: "rgba(0,0,0,0.5)",
+    },
+    clickableOverlay: { flex: 1 },
+    header: {
+      backgroundColor: "#0D2A94",
+      height: 60,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: 20,
+    },
+    headerTitle: { color: "white", fontSize: 20, fontWeight: "bold" },
+    scrollContent: { padding: 20, paddingBottom: 100 },
+    profileCard: {
+      backgroundColor: colors.surface,
+      borderRadius: 20,
+      overflow: "hidden",
+      elevation: 5,
+    },
+    banner: { backgroundColor: "#0D2A94", height: 120, position: "relative" },
+    bannerGraphic: { position: "absolute", right: -10, bottom: -10 },
+    avatarContainer: { alignItems: "center", marginTop: -50 },
+    avatarCircle: {
+      width: 100,
+      height: 100,
+      borderRadius: 50,
+      backgroundColor: "white",
+      borderWidth: 2,
+      borderColor: "#0D2A94",
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    avatarImage: { width: 96, height: 96, borderRadius: 48 },
+    cameraBadge: {
+      position: "absolute",
+      right: 0,
+      bottom: 2,
+      width: 30,
+      height: 30,
+      borderRadius: 15,
+      backgroundColor: "#0D2A94",
+      borderWidth: 2,
+      borderColor: "white",
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    userInfoHeader: { alignItems: "center", paddingVertical: 15 },
+    userName: { fontSize: 20, fontWeight: "bold", color: colors.primary },
+    userRole: { fontSize: 13, color: colors.text, fontWeight: "600" },
+    userEmailSmall: { fontSize: 11, color: colors.secondaryText },
+    detailsContainer: { paddingHorizontal: 20, paddingBottom: 30 },
+    editBtn: {
+      flexDirection: "row",
+      alignItems: "center",
+      alignSelf: "flex-end",
+      gap: 6,
+      backgroundColor: colors.mutedSurface,
+      borderRadius: 8,
+      paddingVertical: 8,
+      paddingHorizontal: 14,
+      marginBottom: 10,
+    },
+    editBtnText: { color: colors.primary, fontWeight: "600", fontSize: 13 },
+    inputEditing: {
+      borderColor: colors.primary,
+      backgroundColor: colors.surface,
+      fontSize: 14,
+      color: colors.text,
+    },
+    editNote: {
+      fontSize: 12,
+      color: colors.secondaryText,
+      lineHeight: 17,
+      marginBottom: 14,
+    },
+    editActions: { flexDirection: "row", gap: 10 },
+    cancelBtn: {
+      flex: 1,
+      padding: 13,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: colors.border,
+      alignItems: "center",
+      backgroundColor: colors.surface,
+    },
+    cancelBtnText: { fontSize: 14, color: colors.text },
+    saveBtn: {
+      flex: 2,
+      padding: 13,
+      borderRadius: 8,
+      alignItems: "center",
+      backgroundColor: "#0D2A94",
+    },
+    saveBtnText: { color: "white", fontWeight: "bold", fontSize: 14 },
+    inputGroup: { marginBottom: 15 },
+    inputLabel: {
+      fontSize: 14,
+      fontWeight: "bold",
+      color: colors.primary,
+      marginBottom: 8,
+    },
+    inputBox: {
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 8,
+      padding: 12,
+      backgroundColor: colors.surface,
+    },
+    inputText: { fontSize: 14, color: colors.text },
+    inputTextMuted: { color: colors.secondaryText, fontStyle: "italic" },
+    balanceCard: {
+      backgroundColor: colors.surface,
+      borderRadius: 20,
+      padding: 20,
+      marginTop: 20,
+      elevation: 5,
+    },
+    balanceHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      marginBottom: 8,
+    },
+    balanceTitle: { fontSize: 16, fontWeight: "bold", color: colors.primary },
+    balanceText: { fontSize: 13, color: colors.text, lineHeight: 19 },
+    balanceDone: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: 6,
+      borderRadius: 8,
+      padding: 3,
+      marginTop: 9,
+    },
+    balanceDoneText: {
+      flex: 1,
+      fontSize: 12,
+      color: "#B26A00",
+      lineHeight: 17,
+    },
+    balanceBtn: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+      backgroundColor: "#0D2A94",
+      padding: 14,
+      borderRadius: 10,
+      marginTop: 14,
+    },
+    balanceBtnText: { color: "white", fontWeight: "bold", fontSize: 15 },
+    bottomNav: {
+      position: "absolute",
+      bottom: 0,
+      width: "100%",
+      height: 70,
+      backgroundColor: colors.surface,
+      flexDirection: "row",
+      justifyContent: "space-around",
+      alignItems: "center",
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+    },
+    navItem: { alignItems: "center" },
+    navText: { fontSize: 12, marginTop: 4, color: colors.primary },
+  });

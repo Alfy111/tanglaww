@@ -40,7 +40,6 @@ const button = (primary) => ({
   fontFamily: FONT,
 });
 
-/** Page frame: sidebar, yellow top bar with Edit (or Cancel/Save) buttons. */
 export function AdminContentFrame({
   title,
   editing,

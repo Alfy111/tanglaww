@@ -270,7 +270,7 @@ export default function QuizEditorScreen() {
     courseTitle: string;
     assessmentId?: string;
     moduleId?: string;
-    diagnostic?: string; // "1" = creating/editing the diagnostic exam
+    diagnostic?: string;
   }>();
   const isDiagnostic = params.diagnostic === "1";
   const courseId = Number(params.courseId);
@@ -404,7 +404,7 @@ export default function QuizEditorScreen() {
           .eq("assessment_id", assessmentId);
         setHasAttempts((count ?? 0) > 0);
       } else if (params.moduleId) {
-        setModuleId(Number(params.moduleId)); // module selected on the quiz list
+        setModuleId(Number(params.moduleId));
       } else if (moduleList.length === 1) {
         setModuleId(moduleList[0].module_id);
       }
@@ -609,7 +609,6 @@ export default function QuizEditorScreen() {
           contentContainerStyle={styles.scroll}
           keyboardShouldPersistTaps="handled"
         >
-          {/* ---------- Details ---------- */}
           <Text style={styles.label}>Title:</Text>
           <TextInput
             style={styles.input}
@@ -732,7 +731,6 @@ export default function QuizEditorScreen() {
             running if they leave.
           </Text>
 
-          {/* ---------- Settings ---------- */}
           <View style={styles.settingsCard}>
             <SettingRow
               title="Show correct answers"
@@ -755,7 +753,6 @@ export default function QuizEditorScreen() {
             />
           </View>
 
-          {/* ---------- Questions ---------- */}
           <View style={styles.divider} />
 
           {hasAttempts && (
@@ -854,7 +851,6 @@ export default function QuizEditorScreen() {
             </TouchableOpacity>
           ))}
 
-          {/* ---------- Buttons ---------- */}
           <TouchableOpacity
             style={[styles.primaryBtn, saving && { opacity: 0.7 }]}
             disabled={saving}
@@ -1026,7 +1022,6 @@ function QuestionEditorModal(props: {
             contentContainerStyle={styles.scroll}
             keyboardShouldPersistTaps="handled"
           >
-            {/* Type */}
             <Text style={styles.label}>Question type:</Text>
             <View style={styles.segment}>
               {(Object.keys(TYPE_LABELS) as QuestionType[]).map((t) => (
@@ -1050,7 +1045,6 @@ function QuestionEditorModal(props: {
               ))}
             </View>
 
-            {/* Tags */}
             <Text style={styles.label}>Major tag:</Text>
             {majors.length === 0 ? (
               <Text style={styles.hint}>
@@ -1119,7 +1113,6 @@ function QuestionEditorModal(props: {
               </>
             )}
 
-            {/* Question text and points */}
             <Text style={styles.label}>Question:</Text>
             <TextInput
               style={[styles.input, styles.multiline]}
@@ -1141,7 +1134,6 @@ function QuestionEditorModal(props: {
               keyboardType="number-pad"
             />
 
-            {/* MCQ */}
             {draft.questionType === "mcq" && (
               <>
                 <Text style={styles.label}>Choices:</Text>
@@ -1210,7 +1202,6 @@ function QuestionEditorModal(props: {
               </>
             )}
 
-            {/* Identification */}
             {draft.questionType === "identification" && (
               <>
                 <Text style={styles.label}>Accepted answers:</Text>
@@ -1246,7 +1237,6 @@ function QuestionEditorModal(props: {
               </>
             )}
 
-            {/* Matching */}
             {draft.questionType === "matching" && (
               <>
                 <Text style={styles.label}>Pairs:</Text>

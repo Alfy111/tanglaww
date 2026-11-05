@@ -1,8 +1,7 @@
 import NetworkStatusBanner from "@/components/NetworkStatusBanner";
-import NotificationToaster from "@/components/NotificationToaster";
 import UpdatePrompt from "@/components/UpdatePrompt";
 import { AdminProvider } from "@/context/AdminContext";
-import { ThemeProvider } from "@/context/ThemeContext";
+import { ThemeProvider, useAppTheme } from "@/context/ThemeContext";
 import {
   clearLocalSession,
   generateSessionToken,
@@ -12,6 +11,12 @@ import {
 import { supabase } from "@/lib/supabase";
 import type { Session } from "@supabase/supabase-js";
 import { Stack, usePathname, useRouter } from "expo-router";
+import {
+  DarkTheme,
+  DefaultTheme,
+  ThemeProvider as NavThemeProvider,
+} from "expo-router/react-navigation";
+import * as SystemUI from "expo-system-ui";
 import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, AppState, View } from "react-native";
 import Toast, { BaseToast, ToastConfig } from "react-native-toast-message";
@@ -283,14 +288,41 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 export default function RootLayout() {
   return (
     <ThemeProvider>
+      <ThemedApp />
+    </ThemeProvider>
+  );
+}
+
+function ThemedApp() {
+  const { colors } = useAppTheme();
+  const pathname = usePathname();
+  const bg = pathname.startsWith("/admin") ? "#F8F9FA" : colors.background;
+  const isDark = bg !== "#F8F9FA" && bg !== "#FFFFFF" && bg !== "white";
+
+  useEffect(() => {
+    SystemUI.setBackgroundColorAsync(bg).catch(() => {});
+  }, [bg]);
+
+  const navTheme = {
+    ...(isDark ? DarkTheme : DefaultTheme),
+    colors: { ...(isDark ? DarkTheme : DefaultTheme).colors, background: bg },
+  };
+
+  return (
+    <NavThemeProvider value={navTheme}>
       <AdminProvider>
-        <View style={{ flex: 1 }}>
+        <View style={{ flex: 1, backgroundColor: bg }}>
           <NetworkStatusBanner />
           <UpdatePrompt />
-          <View style={{ flex: 1 }}>
+          <View style={{ flex: 1, backgroundColor: bg }}>
             <AuthGate>
-              <NotificationToaster />
-              <Stack screenOptions={{ headerShown: false, animation: "fade" }}>
+              <Stack
+                screenOptions={{
+                  headerShown: false,
+                  animation: "fade",
+                  contentStyle: { backgroundColor: bg },
+                }}
+              >
                 <Stack.Screen name="index" />
                 <Stack.Screen name="welcome" />
                 <Stack.Screen name="login" />
@@ -310,6 +342,6 @@ export default function RootLayout() {
         </View>
         <Toast config={toastConfig} />
       </AdminProvider>
-    </ThemeProvider>
+    </NavThemeProvider>
   );
 }

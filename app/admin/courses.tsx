@@ -216,7 +216,6 @@ export default function AdminCourses() {
           <Text style={styles.headerTitle}>Courses</Text>
         </View>
 
-        {/* Opens the admin analytics dashboard */}
         <TouchableOpacity
           onPress={() => router.push("/admin/analytics" as any)}
           activeOpacity={0.7}

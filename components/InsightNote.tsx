@@ -1,25 +1,29 @@
-// Small "Insight" box shown under an analytics chart.
 import { Ionicons } from "@expo/vector-icons";
 import { StyleSheet, Text, View } from "react-native";
+import { useAnalyticsColors } from "./analytics-ui";
 
 export default function InsightNote({ text }: { text?: string | null }) {
+  const colors = useAnalyticsColors();
   if (!text) return null;
   return (
-    <View style={styles.box}>
+    <View
+      style={[
+        styles.box,
+        { backgroundColor: colors.surface, borderColor: colors.border },
+      ]}
+    >
       <View style={styles.labelRow}>
         <Ionicons name="bulb-outline" size={14} color="#D4A017" />
-        <Text style={styles.label}>INSIGHT</Text>
+        <Text style={[styles.label, { color: colors.primary }]}>INSIGHT</Text>
       </View>
-      <Text style={styles.text}>{text}</Text>
+      <Text style={[styles.text, { color: colors.text }]}>{text}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   box: {
-    backgroundColor: "#FFFFFF",
     borderWidth: 1,
-    borderColor: "#E3E8F4",
     borderLeftWidth: 4,
     borderLeftColor: "#0D2A94",
     borderRadius: 8,
@@ -33,11 +37,6 @@ const styles = StyleSheet.create({
     gap: 6,
     marginBottom: 4,
   },
-  label: {
-    fontSize: 10,
-    fontWeight: "700",
-    letterSpacing: 0.8,
-    color: "#0D2A94",
-  },
-  text: { fontSize: 12, color: "#1A2A5E", lineHeight: 17 },
+  label: { fontSize: 10, fontWeight: "700", letterSpacing: 0.8 },
+  text: { fontSize: 12, lineHeight: 17 },
 });

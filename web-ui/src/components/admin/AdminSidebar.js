@@ -217,7 +217,6 @@ export default function AdminSidebar() {
           overflowY: "auto",
         }}
       >
-        {/* Admin Profile Header */}
         <div
           style={{
             position: "relative",
@@ -273,7 +272,6 @@ export default function AdminSidebar() {
           </div>
         </div>
 
-        {/* Overview */}
         <div style={{ padding: "16px 0 0" }}>
           <div
             style={{
@@ -311,7 +309,6 @@ export default function AdminSidebar() {
           ))}
         </div>
 
-        {/* Management */}
         <div style={{ padding: "16px 0 0" }}>
           <div
             style={{
@@ -378,7 +375,6 @@ export default function AdminSidebar() {
           ))}
         </div>
 
-        {/* App Configuration */}
         <div style={{ padding: "16px 0 0" }}>
           <div
             style={{
@@ -416,7 +412,6 @@ export default function AdminSidebar() {
           ))}
         </div>
 
-        {/* Bottom */}
         <div
           style={{
             marginTop: "auto",

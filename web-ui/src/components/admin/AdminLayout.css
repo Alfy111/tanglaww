@@ -1,5 +1,3 @@
-/* Shared admin layout rules. Imported by AdminSidebar, so every admin page gets them. */
-
 .admin-sidebar {
   transition: transform 0.2s ease;
 }
@@ -10,7 +8,6 @@
   display: none;
 }
 
-/* Sign-out dialog (also used by pages that don't load Dashboard.css) */
 .signout-modal-backdrop {
   position: fixed;
   inset: 0;
@@ -74,7 +71,6 @@
   background: #c93636;
 }
 
-/* Tablets and phones: the sidebar slides in from the left */
 @media (max-width: 900px) {
   .admin-sidebar {
     transform: translateX(-100%);
@@ -130,7 +126,6 @@
     background: rgba(13, 22, 48, 0.45);
   }
 
-  /* Admin pages offset their content by the 240px sidebar; remove that on small screens */
   [style*="margin-left: 240px"],
   .admin-layout .dashboard-main {
     margin-left: 0 !important;
@@ -151,7 +146,6 @@
     min-width: 0;
   }
 
-  /* Wide tables scroll inside their card instead of stretching the page */
   [style*="margin-left: 240px"] table,
   .admin-layout table {
     display: block;
@@ -160,7 +154,6 @@
   }
 }
 
-/* Phones */
 @media (max-width: 600px) {
   [style*="padding: 32px 40px"],
   [style*="padding: 28px 32px"] {

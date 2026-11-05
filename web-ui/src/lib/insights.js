@@ -1,19 +1,9 @@
-// Rule-based interpretations for the analytics cards (student + admin).
-// Each function reads the numbers a card already shows and returns one or
-// two plain sentences explaining what they mean and what to do next.
-// The same rules are used by the mobile app (services/insights.ts).
-//
-// Benchmarks: 75% = LEPT passing rate, 60% = clearly below passing,
-// 50% correct = frequently missed question.
-
 const PASS = 75;
 const WEAK = 60;
 
 const r = (v) => Math.round(Number(v));
 const has = (v) => v !== null && v !== undefined && !Number.isNaN(Number(v));
 const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
-
-/* ------------------------------ Student ------------------------------ */
 
 export function progressInsight(summary) {
   const c = r(summary?.completion ?? 0);
@@ -115,8 +105,6 @@ export function courseTopicsInsight(topics) {
   const low = below[0];
   return `${plural(below.length, "topic needs", "topics need")} review in this course. The lowest is ${low.topicName} at ${r(low.mastery)}%.`;
 }
-
-/* ------------------------------ Admin: Overview ------------------------------ */
 
 export function adminSummaryInsight(summary) {
   if (!summary) return null;
@@ -226,8 +214,6 @@ export function engagementInsight(items) {
   return parts.length ? parts.join(" ") : null;
 }
 
-/* ------------------------------ Admin: By Course ------------------------------ */
-
 export function quizBreakdownInsight(quizzes) {
   const list = (quizzes ?? []).filter((q) => has(q.avgScore));
   if (!list.length) return null;
@@ -260,8 +246,6 @@ export function missedInsight(questions, total) {
   }
   return text;
 }
-
-/* ------------------------------ Admin: By Student ------------------------------ */
 
 export function studentSummaryInsight(summary, name) {
   if (!summary) return null;
