@@ -1,10 +1,10 @@
 import { useState } from "react";
 import {
-  FiBell,
   FiChevronDown,
   FiChevronRight,
   FiLock,
   FiSun,
+  FiUser,
 } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
 import Sidebar from "../components/Sidebar";
@@ -13,7 +13,6 @@ import "./Dashboard.css";
 
 export default function Settings() {
   const navigate = useNavigate();
-  const [pushNotif, setPushNotif] = useState(true);
   const [themeOpen, setThemeOpen] = useState(false);
   const [selectedTheme, setSelectedTheme] = useState(getUserThemePreference);
 
@@ -90,46 +89,18 @@ export default function Settings() {
               <div style={divider} />
 
               {/* Manage Account */}
-              <div style={rowStyle} className="settings-row">
+              <div
+                style={rowStyle}
+                onClick={() => navigate("/dashboard/profile")}
+                className="settings-row"
+              >
                 <div style={rowLeft}>
                   <div style={iconBox}>
-                    <FiLock size={16} color="#1a1a6e" />
+                    <FiUser size={16} color="#1a1a6e" />
                   </div>
                   <span style={rowLabel}>Manage Account</span>
                 </div>
                 <FiChevronRight size={18} color="#aaa" />
-              </div>
-            </div>
-          </div>
-
-          {/* Notification Settings */}
-          <div style={{ marginBottom: "32px" }}>
-            <p
-              style={{
-                fontSize: "16px",
-                fontWeight: "700",
-                color: "#555",
-                marginBottom: "12px",
-              }}
-            >
-              Notification Settings
-            </p>
-            <div style={cardStyle}>
-              {/* Push Notifications */}
-              <div style={rowStyle}>
-                <div style={rowLeft}>
-                  <div style={iconBox}>
-                    <FiBell size={16} color="#1a1a6e" />
-                  </div>
-                  <div>
-                    <div style={rowLabel}>Push Notifications</div>
-                    <div style={rowSub}>
-                      Get instant alerts within the app for new schedules,
-                      quizzes, and announcements.
-                    </div>
-                  </div>
-                </div>
-                <Toggle value={pushNotif} onChange={setPushNotif} />
               </div>
             </div>
           </div>
@@ -210,38 +181,6 @@ export default function Settings() {
   );
 }
 
-function Toggle({ value, onChange }) {
-  return (
-    <div
-      className="settings-toggle"
-      onClick={() => onChange(!value)}
-      style={{
-        width: "44px",
-        height: "24px",
-        borderRadius: "12px",
-        backgroundColor: value ? "#1a1a6e" : "#ccc",
-        cursor: "pointer",
-        position: "relative",
-        transition: "background-color 0.2s",
-        flexShrink: 0,
-      }}
-    >
-      <div
-        style={{
-          position: "absolute",
-          top: "3px",
-          left: value ? "23px" : "3px",
-          width: "18px",
-          height: "18px",
-          borderRadius: "50%",
-          backgroundColor: "#fff",
-          transition: "left 0.2s",
-        }}
-      />
-    </div>
-  );
-}
-
 // Styles
 const cardStyle = {
   backgroundColor: "#fff",
@@ -269,13 +208,6 @@ const rowLabel = {
   fontSize: "14px",
   fontWeight: "600",
   color: "#1a1a2e",
-};
-
-const rowSub = {
-  fontSize: "12px",
-  color: "#999",
-  marginTop: "2px",
-  maxWidth: "380px",
 };
 
 const iconBox = {

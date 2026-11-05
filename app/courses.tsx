@@ -1,10 +1,11 @@
+import { useAppTheme } from "@/context/ThemeContext";
 import {
   FontAwesome5,
   Ionicons,
   MaterialCommunityIcons,
 } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -52,6 +53,8 @@ const courseImages: Record<number, any> = {
 };
 
 export default function CoursesScreen() {
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const router = useRouter();
   const { currentStudentId } = useAdmin();
   const [expandedId, setExpandedId] = useState<number | null>(null);
@@ -175,7 +178,7 @@ export default function CoursesScreen() {
 
       {loading ? (
         <View style={styles.centered}>
-          <ActivityIndicator size="large" color="#2F459B" />
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : (
         <ScrollView
@@ -229,7 +232,12 @@ export default function CoursesScreen() {
                           resizeMode="cover"
                         />
                       ) : (
-                        <View style={{ flex: 1, backgroundColor: "#F2F4F7" }} />
+                        <View
+                          style={{
+                            flex: 1,
+                            backgroundColor: colors.mutedSurface,
+                          }}
+                        />
                       )}
 
                       <View style={styles.progressBadge}>
@@ -271,7 +279,7 @@ export default function CoursesScreen() {
                         <Ionicons
                           name={isExpanded ? "chevron-up" : "chevron-down"}
                           size={24}
-                          color="#BDC3C7"
+                          color={colors.secondaryText}
                         />
                       )}
                     </View>
@@ -286,7 +294,7 @@ export default function CoursesScreen() {
                         <Ionicons
                           name="document-text-outline"
                           size={20}
-                          color="#2F459B"
+                          color={colors.primary}
                         />
                         <Text style={styles.dropText}>Learning Modules</Text>
                         <SectionCheck
@@ -301,7 +309,7 @@ export default function CoursesScreen() {
                         <Ionicons
                           name="videocam-outline"
                           size={20}
-                          color="#2F459B"
+                          color={colors.primary}
                         />
                         <Text style={styles.dropText}>Recorded Sessions</Text>
                         <SectionCheck
@@ -316,7 +324,7 @@ export default function CoursesScreen() {
                         <Ionicons
                           name="bulb-outline"
                           size={20}
-                          color="#2F459B"
+                          color={colors.primary}
                         />
                         <Text style={styles.dropText}>Quiz</Text>
                         <SectionCheck
@@ -330,7 +338,7 @@ export default function CoursesScreen() {
                         <Ionicons
                           name="share-outline"
                           size={20}
-                          color="#2F459B"
+                          color={colors.primary}
                         />
                         <Text style={styles.dropText}>Online Session Link</Text>
                       </TouchableOpacity>
@@ -347,7 +355,7 @@ export default function CoursesScreen() {
           style={styles.navItem}
           onPress={() => router.replace("/homepage")}
         >
-          <Ionicons name="home-outline" size={24} color="#2F459B" />
+          <Ionicons name="home-outline" size={24} color={colors.primary} />
           <Text style={styles.navText}>Home</Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -361,14 +369,14 @@ export default function CoursesScreen() {
           style={styles.navItem}
           onPress={() => router.replace("/calendar")}
         >
-          <Ionicons name="calendar-outline" size={24} color="#2F459B" />
+          <Ionicons name="calendar-outline" size={24} color={colors.primary} />
           <Text style={styles.navText}>Calendar</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.navItem}
           onPress={() => router.replace("/profile")}
         >
-          <Ionicons name="person-outline" size={24} color="#2F459B" />
+          <Ionicons name="person-outline" size={24} color={colors.primary} />
           <Text style={styles.navText}>Profile</Text>
         </TouchableOpacity>
       </View>
@@ -376,145 +384,148 @@ export default function CoursesScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F8F9FA" },
-  modalOverlay: {
-    flex: 1,
-    flexDirection: "row",
-    backgroundColor: "rgba(0,0,0,0.5)",
-  },
-  clickableOverlay: { flex: 1 },
-  header: {
-    backgroundColor: "#0D2A94",
-    height: 60,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-  },
-  headerLeft: { flexDirection: "row", alignItems: "center" },
-  headerTitle: {
-    color: "white",
-    fontSize: 22,
-    fontWeight: "bold",
-    marginLeft: 15,
-  },
-  analyticsButton: {
-    padding: 6,
-    borderRadius: 8,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  centered: { flex: 1, justifyContent: "center", alignItems: "center" },
-  scrollContent: { padding: 15, paddingBottom: 100 },
-  cardContainer: { marginBottom: 15 },
-  diagnosticCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "white",
-    borderRadius: 12,
-    padding: 15,
-    marginBottom: 15,
-    elevation: 3,
-    gap: 12,
-    borderLeftWidth: 4,
-    borderLeftColor: "#FFB800",
-  },
-  diagnosticIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "#EEF1FF",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  diagnosticTitle: { fontSize: 15, fontWeight: "bold", color: "#333" },
-  diagnosticSub: { fontSize: 12, color: "#7F8C8D", marginTop: 2 },
-  courseCard: {
-    backgroundColor: "white",
-    borderRadius: 12,
-    overflow: "hidden",
-    elevation: 3,
-  },
-  imageSection: {
-    height: 120,
-    backgroundColor: "#F2F4F7",
-    overflow: "hidden",
-  },
-  progressBadge: {
-    position: "absolute",
-    top: 10,
-    left: 10,
-    backgroundColor: "white",
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    flexDirection: "row",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#EEE",
-  },
-  progressCircle: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    borderWidth: 2,
-    marginRight: 5,
-  },
-  progressText: { fontSize: 10, fontWeight: "bold", color: "#555" },
-  infoSection: { flexDirection: "row", alignItems: "center", padding: 15 },
-  textContainer: { flex: 1 },
-  courseTitleText: { fontSize: 15, fontWeight: "bold", color: "#333" },
-  instructorText: { fontSize: 12, color: "#7F8C8D" },
-  lockedNote: {
-    fontSize: 11,
-    color: "#E74C3C",
-    marginTop: 4,
-  },
-  dropdownContent: {
-    backgroundColor: "#F0F2F8",
-    borderBottomLeftRadius: 12,
-    borderBottomRightRadius: 12,
-    padding: 10,
-  },
-  dropItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#E0E0E0",
-  },
-  dropText: {
-    fontSize: 14,
-    color: "#2F459B",
-    fontWeight: "500",
-    marginLeft: 15,
-    textDecorationLine: "underline",
-  },
-  sectionCheck: { marginLeft: "auto", marginRight: 4 },
-  bottomNav: {
-    position: "absolute",
-    bottom: 0,
-    width: "100%",
-    height: 70,
-    backgroundColor: "white",
-    flexDirection: "row",
-    justifyContent: "space-around",
-    alignItems: "center",
-    borderTopWidth: 1,
-    borderTopColor: "#EEE",
-  },
-  navItem: { alignItems: "center" },
-  navText: { fontSize: 12, marginTop: 4, color: "#2F459B" },
-  lockOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "rgba(0,0,0,0.25)",
-    justifyContent: "center",
-    alignItems: "center",
-    zIndex: 1,
-  },
-});
+type ThemeColors = ReturnType<typeof useAppTheme>["colors"];
+
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
+    modalOverlay: {
+      flex: 1,
+      flexDirection: "row",
+      backgroundColor: "rgba(0,0,0,0.5)",
+    },
+    clickableOverlay: { flex: 1 },
+    header: {
+      backgroundColor: "#0D2A94",
+      height: 60,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: 20,
+    },
+    headerLeft: { flexDirection: "row", alignItems: "center" },
+    headerTitle: {
+      color: "white",
+      fontSize: 22,
+      fontWeight: "bold",
+      marginLeft: 15,
+    },
+    analyticsButton: {
+      padding: 6,
+      borderRadius: 8,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    centered: { flex: 1, justifyContent: "center", alignItems: "center" },
+    scrollContent: { padding: 15, paddingBottom: 100 },
+    cardContainer: { marginBottom: 15 },
+    diagnosticCard: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      padding: 15,
+      marginBottom: 15,
+      elevation: 3,
+      gap: 12,
+      borderLeftWidth: 4,
+      borderLeftColor: "#FFB800",
+    },
+    diagnosticIcon: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: colors.mutedSurface,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    diagnosticTitle: { fontSize: 15, fontWeight: "bold", color: colors.text },
+    diagnosticSub: { fontSize: 12, color: colors.secondaryText, marginTop: 2 },
+    courseCard: {
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      overflow: "hidden",
+      elevation: 3,
+    },
+    imageSection: {
+      height: 120,
+      backgroundColor: colors.mutedSurface,
+      overflow: "hidden",
+    },
+    progressBadge: {
+      position: "absolute",
+      top: 10,
+      left: 10,
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      flexDirection: "row",
+      alignItems: "center",
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    progressCircle: {
+      width: 12,
+      height: 12,
+      borderRadius: 6,
+      borderWidth: 2,
+      marginRight: 5,
+    },
+    progressText: { fontSize: 10, fontWeight: "bold", color: colors.text },
+    infoSection: { flexDirection: "row", alignItems: "center", padding: 15 },
+    textContainer: { flex: 1 },
+    courseTitleText: { fontSize: 15, fontWeight: "bold", color: colors.text },
+    instructorText: { fontSize: 12, color: colors.secondaryText },
+    lockedNote: {
+      fontSize: 11,
+      color: "#E74C3C",
+      marginTop: 4,
+    },
+    dropdownContent: {
+      backgroundColor: colors.mutedSurface,
+      borderBottomLeftRadius: 12,
+      borderBottomRightRadius: 12,
+      padding: 10,
+    },
+    dropItem: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingVertical: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    dropText: {
+      fontSize: 14,
+      color: colors.primary,
+      fontWeight: "500",
+      marginLeft: 15,
+      textDecorationLine: "underline",
+    },
+    sectionCheck: { marginLeft: "auto", marginRight: 4 },
+    bottomNav: {
+      position: "absolute",
+      bottom: 0,
+      width: "100%",
+      height: 70,
+      backgroundColor: colors.surface,
+      flexDirection: "row",
+      justifyContent: "space-around",
+      alignItems: "center",
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+    },
+    navItem: { alignItems: "center" },
+    navText: { fontSize: 12, marginTop: 4, color: colors.primary },
+    lockOverlay: {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: "rgba(0,0,0,0.25)",
+      justifyContent: "center",
+      alignItems: "center",
+      zIndex: 1,
+    },
+  });

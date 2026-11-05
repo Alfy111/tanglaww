@@ -38,7 +38,6 @@ const CONTACT_COLUMNS: Partial<Record<ContentKey, string>> = {
 const newer = (a?: string | null, b?: string | null) =>
   !a || (b && b > a) ? (b ?? null) : a;
 
-/** Loads the given keys. updatedAt = newest change among them. */
 export async function getSiteContent(keys: ContentKey[]): Promise<SiteContent> {
   const out: SiteContent = { updatedAt: null };
   for (const table of ["about_content", "policy_content"]) {

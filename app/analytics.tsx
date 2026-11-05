@@ -1,6 +1,7 @@
+import { useAppTheme } from "@/context/ThemeContext";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Dimensions,
@@ -39,6 +40,8 @@ import {
 const isTablet = Dimensions.get("window").width >= 600;
 
 export default function StudentAnalytics() {
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const router = useRouter();
   const { isAdmin, authLoading } = useAdmin();
   const [tab, setTab] = useState<"overview" | "course">("overview");
@@ -157,7 +160,9 @@ export default function StudentAnalytics() {
                     <Text style={styles.metricLabel}>Review Frequency</Text>
                     <Text style={styles.freqText}>
                       Active{" "}
-                      <Text style={{ color: C.primary, fontWeight: "bold" }}>
+                      <Text
+                        style={{ color: colors.primary, fontWeight: "bold" }}
+                      >
                         {data.summary.activeDays}{" "}
                         {data.summary.activeDays === 1 ? "day" : "days"}
                       </Text>{" "}
@@ -199,7 +204,10 @@ export default function StudentAnalytics() {
                     {data.recent.map((q, i) => (
                       <View key={i} style={styles.tdRow}>
                         <Text
-                          style={[styles.td, { flex: 2, color: C.primary }]}
+                          style={[
+                            styles.td,
+                            { flex: 2, color: colors.primary },
+                          ]}
                           numberOfLines={1}
                         >
                           {q.courseName}
@@ -217,7 +225,7 @@ export default function StudentAnalytics() {
                               flex: 1,
                               textAlign: "center",
                               fontWeight: "bold",
-                              color: C.primary,
+                              color: colors.primary,
                             },
                           ]}
                         >
@@ -226,7 +234,11 @@ export default function StudentAnalytics() {
                         <Text
                           style={[
                             styles.td,
-                            { flex: 1.4, textAlign: "right", color: C.sub },
+                            {
+                              flex: 1.4,
+                              textAlign: "right",
+                              color: colors.secondaryText,
+                            },
                           ]}
                         >
                           {shortDate(q.date)}
@@ -335,65 +347,81 @@ export default function StudentAnalytics() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: C.bg },
-  centered: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 30,
-  },
-  errorText: { color: C.red, textAlign: "center" },
-  scroll: { padding: isTablet ? 24 : 16, paddingBottom: 40 },
-  tabletWrap: { flexDirection: "row", justifyContent: "space-between" },
-  tabletCol: { width: "49%" },
+type ThemeColors = ReturnType<typeof useAppTheme>["colors"];
 
-  progressRow: { flexDirection: "row", alignItems: "center", marginTop: 8 },
-  progressTrack: {
-    flex: 1,
-    height: 10,
-    backgroundColor: "#E0E0E0",
-    borderRadius: 5,
-    overflow: "hidden",
-  },
-  progressFill: { height: "100%", backgroundColor: C.primary, borderRadius: 5 },
-  progressText: {
-    marginLeft: 12,
-    fontSize: 14,
-    fontWeight: "700",
-    color: C.primary,
-  },
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
+    centered: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+      padding: 30,
+    },
+    errorText: { color: C.red, textAlign: "center" },
+    scroll: { padding: isTablet ? 24 : 16, paddingBottom: 40 },
+    tabletWrap: { flexDirection: "row", justifyContent: "space-between" },
+    tabletCol: { width: "49%" },
 
-  grid: { flexDirection: "row", justifyContent: "space-between" },
-  gridHalf: { width: "48%" },
-  centerCard: { alignItems: "center", justifyContent: "center" },
-  miniCard: { justifyContent: "center", paddingVertical: 10, marginBottom: 12 },
-  metricLabel: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: C.sub,
-    marginBottom: 4,
-  },
-  bigValue: { fontSize: 20, fontWeight: "700", color: C.primary, marginTop: 2 },
-  freqText: { fontSize: 12, color: C.sub },
-  smallNote: { fontSize: 11, color: C.sub, marginTop: 6 },
+    progressRow: { flexDirection: "row", alignItems: "center", marginTop: 8 },
+    progressTrack: {
+      flex: 1,
+      height: 10,
+      backgroundColor: colors.border,
+      borderRadius: 5,
+      overflow: "hidden",
+    },
+    progressFill: {
+      height: "100%",
+      backgroundColor: C.primary,
+      borderRadius: 5,
+    },
+    progressText: {
+      marginLeft: 12,
+      fontSize: 14,
+      fontWeight: "700",
+      color: colors.primary,
+    },
 
-  thRow: {
-    flexDirection: "row",
-    borderBottomWidth: 1,
-    borderBottomColor: C.track,
-    paddingBottom: 8,
-    marginBottom: 8,
-  },
-  th: { fontSize: 11, fontWeight: "700", color: "#95A5A6" },
-  tdRow: {
-    flexDirection: "row",
-    paddingVertical: 11,
-    borderBottomWidth: 1,
-    borderBottomColor: C.bg,
-    alignItems: "center",
-  },
-  td: { fontSize: 12, color: "#34495E" },
+    grid: { flexDirection: "row", justifyContent: "space-between" },
+    gridHalf: { width: "48%" },
+    centerCard: { alignItems: "center", justifyContent: "center" },
+    miniCard: {
+      justifyContent: "center",
+      paddingVertical: 10,
+      marginBottom: 12,
+    },
+    metricLabel: {
+      fontSize: 12,
+      fontWeight: "600",
+      color: colors.secondaryText,
+      marginBottom: 4,
+    },
+    bigValue: {
+      fontSize: 20,
+      fontWeight: "700",
+      color: colors.primary,
+      marginTop: 2,
+    },
+    freqText: { fontSize: 12, color: colors.secondaryText },
+    smallNote: { fontSize: 11, color: colors.secondaryText, marginTop: 6 },
 
-  legend: { fontSize: 11, color: C.sub, marginTop: 4 },
-});
+    thRow: {
+      flexDirection: "row",
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+      paddingBottom: 8,
+      marginBottom: 8,
+    },
+    th: { fontSize: 11, fontWeight: "700", color: colors.secondaryText },
+    tdRow: {
+      flexDirection: "row",
+      paddingVertical: 11,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+      alignItems: "center",
+    },
+    td: { fontSize: 12, color: colors.text },
+
+    legend: { fontSize: 11, color: colors.secondaryText, marginTop: 4 },
+  });

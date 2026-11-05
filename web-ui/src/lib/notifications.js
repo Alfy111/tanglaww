@@ -17,7 +17,6 @@ const FEED_LIMIT = 100;
 const HOUR = 60 * 60 * 1000;
 const ms = (iso) => (iso ? new Date(iso).getTime() : 0);
 
-/** Events/sessions that start within the next hour. */
 export const startingSoon = (items, now = Date.now()) =>
   items.filter(
     (n) => n.event_at && ms(n.event_at) > now && ms(n.event_at) - now <= HOUR,
@@ -28,7 +27,6 @@ async function currentUserId() {
   return data.session?.user?.id ?? null;
 }
 
-// Lets every open copy of the feed (e.g. sidebar badge + page) stay in sync
 const STATE_EVENT = "tanglaw:notif-state";
 const announceState = (changes) =>
   window.dispatchEvent(new CustomEvent(STATE_EVENT, { detail: changes }));

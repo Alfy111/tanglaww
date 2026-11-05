@@ -1,7 +1,8 @@
+import { useAppTheme } from "@/context/ThemeContext";
 import { supabase } from "@/lib/supabase";
 import { FontAwesome5, Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -37,6 +38,8 @@ const MONTHS = [
 ];
 
 export default function CalendarScreen() {
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const router = useRouter();
   const { width } = useWindowDimensions();
   const [activeTab, setActiveTab] = useState("Upcoming");
@@ -238,13 +241,13 @@ export default function CalendarScreen() {
       >
         <View style={styles.monthHeader}>
           <TouchableOpacity onPress={prevMonth}>
-            <Ionicons name="chevron-back" size={20} color="#0D2A94" />
+            <Ionicons name="chevron-back" size={20} color={colors.primary} />
           </TouchableOpacity>
           <Text style={styles.monthTitle}>
             {MONTHS[currentMonth]} {currentYear}
           </Text>
           <TouchableOpacity onPress={nextMonth}>
-            <Ionicons name="chevron-forward" size={20} color="#0D2A94" />
+            <Ionicons name="chevron-forward" size={20} color={colors.primary} />
           </TouchableOpacity>
         </View>
 
@@ -291,7 +294,10 @@ export default function CalendarScreen() {
                 <View style={styles.dotRow}>
                   {hasEvent(day) && (
                     <View
-                      style={[styles.calDot, { backgroundColor: "#0D2A94" }]}
+                      style={[
+                        styles.calDot,
+                        { backgroundColor: colors.primary },
+                      ]}
                     />
                   )}
                   {hasTodo(day) && (
@@ -307,7 +313,9 @@ export default function CalendarScreen() {
 
         <View style={styles.legend}>
           <View style={styles.legendItem}>
-            <View style={[styles.calDot, { backgroundColor: "#0D2A94" }]} />
+            <View
+              style={[styles.calDot, { backgroundColor: colors.primary }]}
+            />
             <Text style={styles.legendText}>Event</Text>
           </View>
           <View style={styles.legendItem}>
@@ -352,7 +360,7 @@ export default function CalendarScreen() {
 
         <View style={styles.eventSection}>
           {loading ? (
-            <ActivityIndicator color="#0D2A94" />
+            <ActivityIndicator color={colors.primary} />
           ) : activeTab === "Upcoming" ? (
             events.length === 0 ? (
               <Text style={styles.emptyText}>No upcoming events</Text>
@@ -402,7 +410,7 @@ export default function CalendarScreen() {
                   <Ionicons
                     name={todo.isCompleted ? "checkbox" : "square-outline"}
                     size={24}
-                    color="#0D2A94"
+                    color={colors.primary}
                   />
                 </TouchableOpacity>
                 <View style={styles.todoTextContainer}>
@@ -447,14 +455,18 @@ export default function CalendarScreen() {
           style={styles.navItem}
           onPress={() => router.replace("/homepage")}
         >
-          <Ionicons name="home-outline" size={24} color="#2F459B" />
+          <Ionicons name="home-outline" size={24} color={colors.primary} />
           <Text style={styles.navText}>Home</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.navItem}
           onPress={() => router.replace("/courses")}
         >
-          <FontAwesome5 name="graduation-cap" size={20} color="#2F459B" />
+          <FontAwesome5
+            name="graduation-cap"
+            size={20}
+            color={colors.primary}
+          />
           <Text style={styles.navText}>Courses</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.navItem}>
@@ -465,7 +477,7 @@ export default function CalendarScreen() {
           style={styles.navItem}
           onPress={() => router.replace("/profile")}
         >
-          <Ionicons name="person-outline" size={24} color="#2F459B" />
+          <Ionicons name="person-outline" size={24} color={colors.primary} />
           <Text style={styles.navText}>Profile</Text>
         </TouchableOpacity>
       </View>
@@ -493,11 +505,11 @@ export default function CalendarScreen() {
                 onPress={() => setEventModalVisible(false)}
                 style={{ marginLeft: "auto" }}
               >
-                <Ionicons name="close" size={24} color="#555" />
+                <Ionicons name="close" size={24} color={colors.secondaryText} />
               </TouchableOpacity>
             </View>
             <View style={styles.eventModalRow}>
-              <Ionicons name="time-outline" size={16} color="#0D2A94" />
+              <Ionicons name="time-outline" size={16} color={colors.primary} />
               <Text style={styles.eventModalMeta}>
                 {selectedEvent ? formatEventDate(selectedEvent.event_date) : ""}{" "}
                 ·{" "}
@@ -519,11 +531,19 @@ export default function CalendarScreen() {
                 style={styles.eventModalLinkBtn}
                 onPress={() => Linking.openURL(selectedEvent.link)}
               >
-                <Ionicons name="link-outline" size={16} color="#0D2A94" />
+                <Ionicons
+                  name="link-outline"
+                  size={16}
+                  color={colors.primary}
+                />
                 <Text style={styles.eventModalLinkText} numberOfLines={1}>
                   {selectedEvent.link}
                 </Text>
-                <Ionicons name="open-outline" size={14} color="#0D2A94" />
+                <Ionicons
+                  name="open-outline"
+                  size={14}
+                  color={colors.primary}
+                />
               </TouchableOpacity>
             )}
 
@@ -540,225 +560,239 @@ export default function CalendarScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "white" },
-  modalOverlay: {
-    flex: 1,
-    flexDirection: "row",
-    backgroundColor: "rgba(0,0,0,0.5)",
-  },
-  clickableOverlay: { flex: 1 },
-  header: {
-    backgroundColor: "#0D2A94",
-    height: 60,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-  },
-  headerTitle: { color: "white", fontSize: 20, fontWeight: "bold" },
-  scrollContent: { paddingBottom: 100 },
-  monthHeader: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    paddingVertical: 20,
-  },
-  monthTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#0D2A94",
-    marginHorizontal: 40,
-  },
-  calendarGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    paddingHorizontal: 15,
-    marginBottom: 10,
-  },
-  dayLabel: {
-    width: "14.28%",
-    textAlign: "center",
-    color: "#BDC3C7",
-    fontSize: 13,
-    marginBottom: 15,
-    fontWeight: "500",
-  },
-  dateBox: {
-    width: "14.28%",
-    height: 48,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 5,
-  },
-  dateText: { color: "#2F459B", fontSize: 14 },
-  selectedDate: { backgroundColor: "#FFD75E", borderRadius: 25 },
-  selectedDateText: { fontWeight: "bold", color: "#2F459B" },
-  dotRow: { flexDirection: "row", gap: 2, marginTop: 2 },
-  calDot: { width: 5, height: 5, borderRadius: 3 },
-  legend: {
-    flexDirection: "row",
-    justifyContent: "center",
-    gap: 20,
-    marginBottom: 15,
-  },
-  legendItem: { flexDirection: "row", alignItems: "center", gap: 5 },
-  legendText: { fontSize: 11, color: "#666" },
-  tabWrapper: {
-    marginHorizontal: 20,
-    marginTop: 10,
-    backgroundColor: "#0D2A94",
-    borderRadius: 12,
-    height: 50,
-    position: "relative",
-  },
-  tabContainer: { flexDirection: "row", width: "100%", height: "100%" },
-  tab: { flex: 1, paddingVertical: 12, alignItems: "center" },
-  activeTab: { borderBottomWidth: 4, borderBottomColor: "white" },
-  tabText: { color: "rgba(255,255,255,0.6)", fontWeight: "bold" },
-  activeTabText: { color: "white" },
-  eventSection: { padding: 20 },
-  emptyText: {
-    color: "#999",
-    fontStyle: "italic",
-    textAlign: "center",
-    marginTop: 20,
-  },
-  eventCard: {
-    flexDirection: "row",
-    backgroundColor: "white",
-    borderRadius: 10,
-    padding: 15,
-    marginBottom: 15,
-    borderWidth: 1,
-    borderColor: "#DCDFE3",
-  },
-  eventInfo: { flex: 1 },
-  eventTitle: { fontSize: 16, fontWeight: "bold", color: "#555" },
-  eventDesc: { fontSize: 12, color: "#777", marginTop: 3 },
-  eventTimeContainer: { alignItems: "flex-end", justifyContent: "center" },
-  eventDate: { fontSize: 12, color: "#7F8C8D" },
-  eventTime: { fontSize: 12, fontWeight: "bold", color: "#7F8C8D" },
-  todoCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "white",
-    borderRadius: 10,
-    padding: 15,
-    marginBottom: 15,
-    borderWidth: 1,
-    borderColor: "#DCDFE3",
-  },
-  todoCompleted: { opacity: 0.6, backgroundColor: "#f9f9f9" },
-  todoCheckbox: { marginRight: 10 },
-  todoTextContainer: { flex: 1 },
-  todoTitle: { fontSize: 16, fontWeight: "bold", color: "#555" },
-  todoTitleDone: { textDecorationLine: "line-through", color: "#999" },
-  todoDesc: { fontSize: 12, color: "#777", marginTop: 3 },
-  todoDate: { fontSize: 12, color: "#7F8C8D", marginTop: 4 },
-  fab: {
-    position: "absolute",
-    right: 20,
-    bottom: 100,
-    backgroundColor: "#FFB800",
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    justifyContent: "center",
-    alignItems: "center",
-    elevation: 5,
-  },
-  bottomNav: {
-    position: "absolute",
-    bottom: 0,
-    width: "100%",
-    height: 70,
-    backgroundColor: "white",
-    flexDirection: "row",
-    justifyContent: "space-around",
-    alignItems: "center",
-    borderTopWidth: 1,
-    borderTopColor: "#EEE",
-  },
-  navItem: { alignItems: "center" },
-  navText: { fontSize: 12, marginTop: 4, color: "#2F459B" },
-  eventModalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 24,
-  },
-  eventModal: {
-    backgroundColor: "white",
-    borderRadius: 20,
-    padding: 24,
-    width: "100%",
-  },
-  eventModalHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  eventModalIconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#EEF1FF",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  eventModalTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#1A1A2E",
-    marginBottom: 10,
-  },
-  eventModalRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginBottom: 16,
-  },
-  eventModalMeta: { fontSize: 13, color: "#666" },
-  eventModalDescBox: {
-    backgroundColor: "#F8F9FA",
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 16,
-  },
-  eventModalDescLabel: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: "#0D2A94",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-    marginBottom: 4,
-  },
-  eventModalDesc: { fontSize: 14, color: "#444", lineHeight: 20 },
-  eventModalLinkBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#EEF1FF",
-    borderRadius: 8,
-    padding: 10,
-    gap: 8,
-    marginBottom: 20,
-  },
-  eventModalLinkText: { flex: 1, fontSize: 12, color: "#0D2A94" },
-  eventModalCloseBtn: {
-    paddingVertical: 13,
-    borderRadius: 10,
-    backgroundColor: "#0D2A94",
-    alignItems: "center",
-  },
-  eventModalCloseBtnText: { color: "white", fontWeight: "bold", fontSize: 14 },
-  underline: {
-    position: "absolute",
-    bottom: 0,
-    height: 4,
-    backgroundColor: "white",
-    borderRadius: 2,
-  },
-});
+type ThemeColors = ReturnType<typeof useAppTheme>["colors"];
+
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
+    modalOverlay: {
+      flex: 1,
+      flexDirection: "row",
+      backgroundColor: "rgba(0,0,0,0.5)",
+    },
+    clickableOverlay: { flex: 1 },
+    header: {
+      backgroundColor: "#0D2A94",
+      height: 60,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: 20,
+    },
+    headerTitle: { color: "white", fontSize: 20, fontWeight: "bold" },
+    scrollContent: { paddingBottom: 100 },
+    monthHeader: {
+      flexDirection: "row",
+      justifyContent: "center",
+      alignItems: "center",
+      paddingVertical: 20,
+    },
+    monthTitle: {
+      fontSize: 18,
+      fontWeight: "bold",
+      color: colors.primary,
+      marginHorizontal: 40,
+    },
+    calendarGrid: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      paddingHorizontal: 15,
+      marginBottom: 10,
+    },
+    dayLabel: {
+      width: "14.28%",
+      textAlign: "center",
+      color: colors.secondaryText,
+      fontSize: 13,
+      marginBottom: 15,
+      fontWeight: "500",
+    },
+    dateBox: {
+      width: "14.28%",
+      height: 48,
+      justifyContent: "center",
+      alignItems: "center",
+      marginBottom: 5,
+    },
+    dateText: { color: colors.primary, fontSize: 14 },
+    selectedDate: { backgroundColor: "#FFD75E", borderRadius: 25 },
+    selectedDateText: { fontWeight: "bold", color: "#2F459B" },
+    dotRow: { flexDirection: "row", gap: 2, marginTop: 2 },
+    calDot: { width: 5, height: 5, borderRadius: 3 },
+    legend: {
+      flexDirection: "row",
+      justifyContent: "center",
+      gap: 20,
+      marginBottom: 15,
+    },
+    legendItem: { flexDirection: "row", alignItems: "center", gap: 5 },
+    legendText: { fontSize: 11, color: colors.secondaryText },
+    tabWrapper: {
+      marginHorizontal: 20,
+      marginTop: 10,
+      backgroundColor: "#0D2A94",
+      borderRadius: 12,
+      height: 50,
+      position: "relative",
+    },
+    tabContainer: { flexDirection: "row", width: "100%", height: "100%" },
+    tab: { flex: 1, paddingVertical: 12, alignItems: "center" },
+    activeTab: { borderBottomWidth: 4, borderBottomColor: "white" },
+    tabText: { color: "rgba(255,255,255,0.6)", fontWeight: "bold" },
+    activeTabText: { color: "white" },
+    eventSection: { padding: 20 },
+    emptyText: {
+      color: colors.secondaryText,
+      fontStyle: "italic",
+      textAlign: "center",
+      marginTop: 20,
+    },
+    eventCard: {
+      flexDirection: "row",
+      backgroundColor: colors.surface,
+      borderRadius: 10,
+      padding: 15,
+      marginBottom: 15,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    eventInfo: { flex: 1 },
+    eventTitle: { fontSize: 16, fontWeight: "bold", color: colors.text },
+    eventDesc: { fontSize: 12, color: colors.secondaryText, marginTop: 3 },
+    eventTimeContainer: { alignItems: "flex-end", justifyContent: "center" },
+    eventDate: { fontSize: 12, color: colors.secondaryText },
+    eventTime: {
+      fontSize: 12,
+      fontWeight: "bold",
+      color: colors.secondaryText,
+    },
+    todoCard: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: colors.surface,
+      borderRadius: 10,
+      padding: 15,
+      marginBottom: 15,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    todoCompleted: { opacity: 0.6, backgroundColor: colors.mutedSurface },
+    todoCheckbox: { marginRight: 10 },
+    todoTextContainer: { flex: 1 },
+    todoTitle: { fontSize: 16, fontWeight: "bold", color: colors.text },
+    todoTitleDone: {
+      textDecorationLine: "line-through",
+      color: colors.secondaryText,
+    },
+    todoDesc: { fontSize: 12, color: colors.secondaryText, marginTop: 3 },
+    todoDate: { fontSize: 12, color: colors.secondaryText, marginTop: 4 },
+    fab: {
+      position: "absolute",
+      right: 20,
+      bottom: 100,
+      backgroundColor: "#FFB800",
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      justifyContent: "center",
+      alignItems: "center",
+      elevation: 5,
+    },
+    bottomNav: {
+      position: "absolute",
+      bottom: 0,
+      width: "100%",
+      height: 70,
+      backgroundColor: colors.surface,
+      flexDirection: "row",
+      justifyContent: "space-around",
+      alignItems: "center",
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+    },
+    navItem: { alignItems: "center" },
+    navText: { fontSize: 12, marginTop: 4, color: colors.primary },
+    eventModalOverlay: {
+      flex: 1,
+      backgroundColor: "rgba(0,0,0,0.5)",
+      justifyContent: "center",
+      alignItems: "center",
+      padding: 24,
+    },
+    eventModal: {
+      backgroundColor: colors.surface,
+      borderRadius: 20,
+      padding: 24,
+      width: "100%",
+    },
+    eventModalHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 16,
+    },
+    eventModalIconWrap: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: colors.mutedSurface,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    eventModalTitle: {
+      fontSize: 20,
+      fontWeight: "bold",
+      color: colors.text,
+      marginBottom: 10,
+    },
+    eventModalRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      marginBottom: 16,
+    },
+    eventModalMeta: { fontSize: 13, color: colors.secondaryText },
+    eventModalDescBox: {
+      backgroundColor: colors.mutedSurface,
+      borderRadius: 10,
+      padding: 12,
+      marginBottom: 16,
+    },
+    eventModalDescLabel: {
+      fontSize: 11,
+      fontWeight: "700",
+      color: colors.primary,
+      textTransform: "uppercase",
+      letterSpacing: 0.5,
+      marginBottom: 4,
+    },
+    eventModalDesc: { fontSize: 14, color: colors.text, lineHeight: 20 },
+    eventModalLinkBtn: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: colors.mutedSurface,
+      borderRadius: 8,
+      padding: 10,
+      gap: 8,
+      marginBottom: 20,
+    },
+    eventModalLinkText: { flex: 1, fontSize: 12, color: colors.primary },
+    eventModalCloseBtn: {
+      paddingVertical: 13,
+      borderRadius: 10,
+      backgroundColor: "#0D2A94",
+      alignItems: "center",
+    },
+    eventModalCloseBtnText: {
+      color: "white",
+      fontWeight: "bold",
+      fontSize: 14,
+    },
+    underline: {
+      position: "absolute",
+      bottom: 0,
+      height: 4,
+      backgroundColor: "white",
+      borderRadius: 2,
+    },
+  });

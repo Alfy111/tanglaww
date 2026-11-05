@@ -1,11 +1,3 @@
-// Rule-based interpretations for the analytics cards (student + admin).
-// Each function reads the numbers a card already shows and returns one or
-// two plain sentences explaining what they mean and what to do next.
-// The same rules are used by the web app (src/lib/insights.js).
-//
-// Benchmarks: 75% = LEPT passing rate, 60% = clearly below passing,
-// 50% correct = frequently missed question.
-
 const PASS = 75;
 const WEAK = 60;
 
@@ -14,8 +6,6 @@ const has = (v: any) =>
   v !== null && v !== undefined && !Number.isNaN(Number(v));
 const plural = (n: number, one: string, many: string) =>
   `${n} ${n === 1 ? one : many}`;
-
-/* ------------------------------ Student ------------------------------ */
 
 export function progressInsight(summary: any) {
   const c = r(summary?.completion ?? 0);
@@ -117,8 +107,6 @@ export function courseTopicsInsight(topics: any[]) {
   const low = below[0];
   return `${plural(below.length, "topic needs", "topics need")} review in this course. The lowest is ${low.topicName} at ${r(low.mastery)}%.`;
 }
-
-/* ------------------------------ Admin: Overview ------------------------------ */
 
 export function adminSummaryInsight(summary: any) {
   if (!summary) return null;
@@ -228,8 +216,6 @@ export function engagementInsight(items: any[]) {
   return parts.length ? parts.join(" ") : null;
 }
 
-/* ------------------------------ Admin: By Course ------------------------------ */
-
 export function quizBreakdownInsight(quizzes: any[]) {
   const list = (quizzes ?? []).filter((q) => has(q.avgScore));
   if (!list.length) return null;
@@ -253,7 +239,7 @@ export function weakTopicsInsight(topics: any[]) {
 
 export function missedInsight(questions: any[], total: number) {
   if (!total) return null;
-  if (!questions?.length) return null; // the empty note already says so
+  if (!questions?.length) return null;
   const withWrong = questions.filter((q) => q.topWrong);
   let text = `${plural(questions.length, "question was", "questions were")} answered correctly by fewer than half of the examinees.`;
   if (withWrong.length) {
@@ -262,8 +248,6 @@ export function missedInsight(questions: any[], total: number) {
   }
   return text;
 }
-
-/* ------------------------------ Admin: By Student ------------------------------ */
 
 export function studentSummaryInsight(summary: any, name?: string) {
   if (!summary) return null;

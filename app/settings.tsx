@@ -1,11 +1,9 @@
-import { POPUPS_KEY } from "@/components/NotificationToaster";
 import { useAppTheme, type ThemeMode } from "@/context/ThemeContext";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useNetInfo } from "@react-native-community/netinfo";
 import { useRouter } from "expo-router";
 import * as Updates from "expo-updates";
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -13,7 +11,6 @@ import {
   SafeAreaView,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   TouchableOpacity,
   View,
@@ -23,19 +20,6 @@ export default function SettingsScreen() {
   const router = useRouter();
   const { colors, mode, setMode } = useAppTheme();
   const { isConnected, isInternetReachable } = useNetInfo();
-  const [pushEnabled, setPushEnabled] = useState(true);
-
-  useEffect(() => {
-    AsyncStorage.getItem(POPUPS_KEY)
-      .then((v) => setPushEnabled(v !== "off"))
-      .catch(() => {});
-  }, []);
-
-  const togglePush = (value: boolean) => {
-    setPushEnabled(value);
-    AsyncStorage.setItem(POPUPS_KEY, value ? "on" : "off").catch(() => {});
-  };
-
   const [updateStatus, setUpdateStatus] = useState<
     "idle" | "checking" | "downloading"
   >("idle");
@@ -201,36 +185,6 @@ export default function SettingsScreen() {
               color={colors.secondaryText}
             />
           </TouchableOpacity>
-        </View>
-
-        <Text style={[styles.sectionLabel, { color: colors.secondaryText }]}>
-          Notification Settings
-        </Text>
-        <View style={styles.sectionGroup}>
-          <View style={styles.settingItemRow}>
-            <View style={styles.itemLeft}>
-              <Ionicons
-                name="notifications-outline"
-                size={22}
-                color={colors.primary}
-              />
-              <View style={styles.textStack}>
-                <Text style={[styles.itemText, { color: colors.text }]}>
-                  Push Notifications
-                </Text>
-                <Text style={[styles.subText, { color: colors.secondaryText }]}>
-                  Get instant alerts within the app for new schedules, quizzes,
-                  and announcements.
-                </Text>
-              </View>
-            </View>
-            <Switch
-              value={pushEnabled}
-              onValueChange={togglePush}
-              trackColor={{ false: colors.border, true: colors.primary }}
-              thumbColor="white"
-            />
-          </View>
         </View>
 
         <Text style={[styles.sectionLabel, { color: colors.secondaryText }]}>

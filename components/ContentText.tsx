@@ -1,3 +1,5 @@
+import { useAppTheme } from "@/context/ThemeContext";
+import { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 const isHeading = (block: string) =>
@@ -6,6 +8,8 @@ const isHeading = (block: string) =>
   !/[.!?:"”]$/.test(block.trim());
 
 export default function ContentText({ text }: { text?: string | null }) {
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const blocks = (text ?? "")
     .split(/\n\s*\n/)
     .map((b) => b.trim())
@@ -51,17 +55,20 @@ export default function ContentText({ text }: { text?: string | null }) {
   );
 }
 
-const styles = StyleSheet.create({
-  block: { marginBottom: 12 },
-  heading: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "#0D2A94",
-    marginTop: 4,
-    marginBottom: 6,
-  },
-  body: { fontSize: 15, color: "#555", lineHeight: 23 },
-  bulletRow: { flexDirection: "row", gap: 8, marginBottom: 2 },
-  bullet: { fontSize: 15, color: "#0D2A94", lineHeight: 23 },
-  empty: { fontSize: 14, color: "#999", fontStyle: "italic" },
-});
+type ThemeColors = ReturnType<typeof useAppTheme>["colors"];
+
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    block: { marginBottom: 12 },
+    heading: {
+      fontSize: 16,
+      fontWeight: "bold",
+      color: colors.primary,
+      marginTop: 4,
+      marginBottom: 6,
+    },
+    body: { fontSize: 15, color: colors.text, lineHeight: 23 },
+    bulletRow: { flexDirection: "row", gap: 8, marginBottom: 2 },
+    bullet: { fontSize: 15, color: colors.primary, lineHeight: 23 },
+    empty: { fontSize: 14, color: colors.secondaryText, fontStyle: "italic" },
+  });

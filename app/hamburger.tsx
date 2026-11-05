@@ -1,9 +1,10 @@
+import { useAppTheme } from "@/context/ThemeContext";
 import { logoutStudent } from "@/lib/session";
 import { supabase } from "@/lib/supabase";
 import { logAudit } from "@/services/auditService";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Dimensions,
@@ -26,6 +27,8 @@ interface HamburgerProps {
 }
 
 export default function HamburgerMenu({ onClose }: HamburgerProps) {
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const router = useRouter();
 
   const [student, setStudent] = useState<{
@@ -140,7 +143,11 @@ export default function HamburgerMenu({ onClose }: HamburgerProps) {
               style={styles.avatarImage}
             />
           ) : (
-            <Ionicons name="person-outline" size={60} color="#BDC3C7" />
+            <Ionicons
+              name="person-outline"
+              size={60}
+              color={colors.secondaryText}
+            />
           )}
         </View>
         <View style={styles.headerTextContent}>
@@ -159,18 +166,26 @@ export default function HamburgerMenu({ onClose }: HamburgerProps) {
           style={styles.menuItem}
           onPress={() => handleNav("/profile")}
         >
-          <Ionicons name="person-outline" size={22} color="#2F459B" />
+          <Ionicons name="person-outline" size={22} color={colors.primary} />
           <Text style={styles.menuText}>My Profile</Text>
-          <Ionicons name="chevron-forward" size={18} color="#BDC3C7" />
+          <Ionicons
+            name="chevron-forward"
+            size={18}
+            color={colors.secondaryText}
+          />
         </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.menuItem}
           onPress={() => handleNav("/settings")}
         >
-          <Ionicons name="settings-outline" size={22} color="#2F459B" />
+          <Ionicons name="settings-outline" size={22} color={colors.primary} />
           <Text style={styles.menuText}>Settings</Text>
-          <Ionicons name="chevron-forward" size={18} color="#BDC3C7" />
+          <Ionicons
+            name="chevron-forward"
+            size={18}
+            color={colors.secondaryText}
+          />
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -180,10 +195,14 @@ export default function HamburgerMenu({ onClose }: HamburgerProps) {
           <Ionicons
             name="information-circle-outline"
             size={22}
-            color="#2F459B"
+            color={colors.primary}
           />
           <Text style={styles.menuText}>About</Text>
-          <Ionicons name="chevron-forward" size={18} color="#BDC3C7" />
+          <Ionicons
+            name="chevron-forward"
+            size={18}
+            color={colors.secondaryText}
+          />
         </TouchableOpacity>
 
         <View style={{ flex: 1 }} />
@@ -194,7 +213,11 @@ export default function HamburgerMenu({ onClose }: HamburgerProps) {
           style={styles.menuItem}
           onPress={() => handleNav("/help")}
         >
-          <Ionicons name="help-circle-outline" size={22} color="#2F459B" />
+          <Ionicons
+            name="help-circle-outline"
+            size={22}
+            color={colors.primary}
+          />
           <Text style={styles.menuText}>Help</Text>
         </TouchableOpacity>
 
@@ -205,7 +228,7 @@ export default function HamburgerMenu({ onClose }: HamburgerProps) {
           <MaterialCommunityIcons
             name="scale-balance"
             size={22}
-            color="#2F459B"
+            color={colors.primary}
           />
           <Text style={styles.menuText}>Policies</Text>
         </TouchableOpacity>
@@ -219,64 +242,67 @@ export default function HamburgerMenu({ onClose }: HamburgerProps) {
   );
 }
 
-const styles = StyleSheet.create({
-  drawerContainer: {
-    flex: 1,
-    backgroundColor: "white",
-    width: DRAWER_WIDTH,
-  },
-  drawerHeader: {
-    backgroundColor: "#0D2A94",
-    padding: 20,
-    paddingTop: 40,
-    paddingBottom: 25,
-    position: "relative",
-    overflow: "hidden",
-  },
-  avatarCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: "white",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 15,
-    zIndex: 2,
-  },
-  headerTextContent: { zIndex: 2 },
-  userName: { color: "#FFB800", fontSize: 18, fontWeight: "bold" },
-  userRole: { color: "white", fontSize: 13, marginTop: 2 },
-  userEmail: { color: "rgba(255,255,255,0.7)", fontSize: 11, marginTop: 2 },
-  headerGraphic: {
-    position: "absolute",
-    right: -30,
-    bottom: -30,
-    zIndex: 1,
-  },
-  backgroundImage: {
-    width: 150,
-    height: 150,
-    opacity: 0.15,
-  },
-  menuItems: { flex: 1, paddingVertical: 10 },
-  menuItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 15,
-    paddingHorizontal: 25,
-  },
-  menuText: {
-    flex: 1,
-    marginLeft: 20,
-    fontSize: 16,
-    color: "#2F459B",
-    fontWeight: "500",
-  },
-  separator: {
-    height: 1,
-    backgroundColor: "#F0F0F0",
-    marginVertical: 10,
-    marginHorizontal: 25,
-  },
-  avatarImage: { width: 80, height: 80, borderRadius: 40 },
-});
+type ThemeColors = ReturnType<typeof useAppTheme>["colors"];
+
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    drawerContainer: {
+      flex: 1,
+      backgroundColor: colors.background,
+      width: DRAWER_WIDTH,
+    },
+    drawerHeader: {
+      backgroundColor: "#0D2A94",
+      padding: 20,
+      paddingTop: 40,
+      paddingBottom: 25,
+      position: "relative",
+      overflow: "hidden",
+    },
+    avatarCircle: {
+      width: 80,
+      height: 80,
+      borderRadius: 40,
+      backgroundColor: "white",
+      justifyContent: "center",
+      alignItems: "center",
+      marginBottom: 15,
+      zIndex: 2,
+    },
+    headerTextContent: { zIndex: 2 },
+    userName: { color: "#FFB800", fontSize: 18, fontWeight: "bold" },
+    userRole: { color: "white", fontSize: 13, marginTop: 2 },
+    userEmail: { color: "rgba(255,255,255,0.7)", fontSize: 11, marginTop: 2 },
+    headerGraphic: {
+      position: "absolute",
+      right: -30,
+      bottom: -30,
+      zIndex: 1,
+    },
+    backgroundImage: {
+      width: 150,
+      height: 150,
+      opacity: 0.15,
+    },
+    menuItems: { flex: 1, paddingVertical: 10 },
+    menuItem: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingVertical: 15,
+      paddingHorizontal: 25,
+    },
+    menuText: {
+      flex: 1,
+      marginLeft: 20,
+      fontSize: 16,
+      color: colors.primary,
+      fontWeight: "500",
+    },
+    separator: {
+      height: 1,
+      backgroundColor: colors.border,
+      marginVertical: 10,
+      marginHorizontal: 25,
+    },
+    avatarImage: { width: 80, height: 80, borderRadius: 40 },
+  });

@@ -413,7 +413,7 @@ export default function HandoutScreen() {
               : "",
           ),
       );
-      if (!result) return; // cancelled
+      if (!result) return;
       if (result.uploaded > 0) fetchHandouts();
       if (result.failed.length > 0) {
         Alert.alert(
@@ -702,7 +702,6 @@ export default function HandoutScreen() {
         </TouchableOpacity>
       )}
 
-      {/* Admin tools: Select (bulk delete) and Reorder (drag to sort) */}
       {isAdmin && !loading && handouts.length > 0 && mode === "normal" && (
         <View style={styles.toolsRow}>
           <TouchableOpacity

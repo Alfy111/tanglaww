@@ -30,8 +30,6 @@ type StatusType =
   | null;
 type ActiveTab = "code" | "status";
 
-// Wrong-code limit: a warning on the 3rd wrong code, then the 4th locks entry
-// for 10 minutes. Saved on the phone so closing the screen doesn't reset it.
 const WARN_AT = 3;
 const LOCK_AT = 4;
 const LOCK_MS = 10 * 60 * 1000;
@@ -64,7 +62,6 @@ export default function EnrollmentCodeScreen() {
     ).catch(() => {});
   };
 
-  // Load saved attempts when the screen opens
   useEffect(() => {
     AsyncStorage.getItem(ATTEMPTS_KEY)
       .then((raw) => {
@@ -76,7 +73,6 @@ export default function EnrollmentCodeScreen() {
       .catch(() => {});
   }, []);
 
-  // Countdown while locked; unlock and reset when the time is up
   useEffect(() => {
     if (!lockedUntil) return;
     const timer = setInterval(() => {
