@@ -16,7 +16,7 @@ import Navbar from "../components/Navbar";
 import "./Home.css";
 
 const androidApkUrl =
-  "https://github.com/newtical/tanglaww/releases/download/android-apk/tanglaw-latest.apk";
+  "https://github.com/Alfy111/tanglaww/releases/download/android-apk/Tanglaw.apk";
 
 const programs = [
   { title: "General Education", icon: Globe },
@@ -742,7 +742,11 @@ function Home() {
                 Watch sessions, read learning modules, answer quizzes and check
                 your progress — anywhere, anytime.
               </p>
-              <a className="landing-button button-navy" href={androidApkUrl}>
+              <a
+                className="landing-button button-navy"
+                href={androidApkUrl}
+                download="Tanglaw.apk"
+              >
                 <Smartphone size={16} /> Download for Android
               </a>
             </div>
