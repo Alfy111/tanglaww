@@ -5,12 +5,18 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = `${process.env.PUBLIC_URL}/pdf.worker.m
 
 const BOTTOM_MARGIN_PX = 40;
 
-export default function PdfScrollViewer({ url, onReachedBottom }) {
+export default function PdfScrollViewer({
+  url,
+  onReachedBottom,
+  onReadingEstimate,
+}) {
   const scroller = useRef(null);
   const pagesHolder = useRef(null);
   const reported = useRef(false);
   const onBottom = useRef(onReachedBottom);
+  const onEstimate = useRef(onReadingEstimate);
   onBottom.current = onReachedBottom;
+  onEstimate.current = onReadingEstimate;
   const [status, setStatus] = useState("loading");
   const [pageInfo, setPageInfo] = useState({ rendered: 0, total: 0 });
 
@@ -41,10 +47,16 @@ export default function PdfScrollViewer({ url, onReachedBottom }) {
 
         const width = Math.min(holder.clientWidth || 800, 900);
         const ratio = window.devicePixelRatio || 1;
+        let wordCount = 0;
 
         for (let n = 1; n <= doc.numPages; n++) {
           if (cancelled) return;
           const page = await doc.getPage(n);
+          const textContent = await page.getTextContent();
+          wordCount += textContent.items.reduce((count, item) => {
+            const words = (item.str || "").trim().split(/\s+/).filter(Boolean);
+            return count + words.length;
+          }, 0);
           const base = page.getViewport({ scale: 1 });
           const viewport = page.getViewport({ scale: width / base.width });
 
@@ -66,6 +78,12 @@ export default function PdfScrollViewer({ url, onReachedBottom }) {
             transform: ratio !== 1 ? [ratio, 0, 0, ratio, 0, 0] : null,
           }).promise;
           if (!cancelled) setPageInfo({ rendered: n, total: doc.numPages });
+        }
+        if (!cancelled) {
+          onEstimate.current?.({
+            pageCount: doc.numPages,
+            wordCount,
+          });
         }
       } catch (err) {
         console.warn("[pdf] could not load", err);

@@ -7,6 +7,7 @@ import {
   CircleAlert,
   GraduationCap,
   Lightbulb,
+  Plus,
   Users,
 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -53,15 +54,16 @@ const dateLabel = (value) =>
       })
     : "–";
 
-function Panel({ title, subtitle, children, className = "" }) {
+function Panel({ title, subtitle, action, children, className = "" }) {
   return (
     <section className={`admin-analytics-panel ${className}`}>
       {(title || subtitle) && (
-        <header className="admin-analytics-panel-heading">
+        <header className={`admin-analytics-panel-heading${action ? " with-action" : ""}`}>
           <div>
             {title && <h2>{title}</h2>}
             {subtitle && <p>{subtitle}</p>}
           </div>
+          {action}
         </header>
       )}
       {children}
@@ -167,6 +169,42 @@ function Histogram({ bins }) {
 
 function Empty({ children }) {
   return <p className="admin-analytics-empty">{children}</p>;
+}
+
+// Opens a new remedial quiz in the quiz editor. With more than one
+// course, the admin first picks the course the remedial belongs to.
+function CreateRemedialButton({ courses }) {
+  const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
+  const go = (id) => navigate(`/admin/courses/${id}/quiz/new?remedial=1`);
+
+  if (!courses?.length) return null;
+  return (
+    <div className="admin-analytics-remedial">
+      <button
+        type="button"
+        className="admin-analytics-remedial-btn"
+        aria-haspopup={courses.length > 1 ? "menu" : undefined}
+        aria-expanded={courses.length > 1 ? open : undefined}
+        onClick={() => (courses.length === 1 ? go(courses[0].course_id) : setOpen((o) => !o))}
+      >
+        <Plus size={15} /> Create remedial
+      </button>
+      {open && (
+        <>
+          <div className="admin-analytics-remedial-backdrop" onClick={() => setOpen(false)} />
+          <div className="admin-analytics-remedial-menu" role="menu">
+            <span>Which course is it for?</span>
+            {courses.map((c) => (
+              <button key={c.course_id} type="button" role="menuitem" onClick={() => go(c.course_id)}>
+                {c.courseName}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
 }
 
 export default function AdminAnalytics() {
@@ -414,9 +452,7 @@ export default function AdminAnalytics() {
                             />
                           </div>
                           <Histogram bins={overview.distribution.bins} />
-                          <Insight
-                            text={distributionInsight(overview.distribution)}
-                          />
+                          <Insight text={distributionInsight(overview.distribution)} />
                         </>
                       )}
                     </Panel>
@@ -500,9 +536,7 @@ export default function AdminAnalytics() {
                         </button>
                       )}
                       {rankings?.length > 0 && (
-                        <Insight
-                          text={rankingInsight(rankings, rankKey === "overall")}
-                        />
+                        <Insight text={rankingInsight(rankings, rankKey === "overall")} />
                       )}
                     </Panel>
                   </div>
@@ -520,7 +554,9 @@ export default function AdminAnalytics() {
                         }
                       >
                         <option value="">Select a diagnostic exam</option>
-                        {overview.assessments.map((assessment) => (
+                        {(
+                          overview.diagnosticOptions ?? overview.assessments
+                        ).map((assessment) => (
                           <option
                             key={assessment.assessment_id}
                             value={assessment.assessment_id}
@@ -580,6 +616,7 @@ export default function AdminAnalytics() {
                   <Panel
                     title="At-Risk Students"
                     subtitle="Students with an average below 60% or an early warning"
+                    action={<CreateRemedialButton courses={overview.courses} />}
                   >
                     {atRisk.length === 0 ? (
                       <Empty>No students at risk right now.</Empty>
@@ -843,12 +880,7 @@ export default function AdminAnalytics() {
                             </div>
                           ))}
                         {course.quizzes.length > 0 && (
-                          <Insight
-                            text={missedInsight(
-                              weakQuestions,
-                              allQuizQuestions.length,
-                            )}
-                          />
+                          <Insight text={missedInsight(weakQuestions, allQuizQuestions.length)} />
                         )}
                       </Panel>
                     </>
@@ -952,12 +984,7 @@ export default function AdminAnalytics() {
                             />
                           ))
                         )}
-                        <Insight
-                          text={recommendedFocusInsight(
-                            report.focus,
-                            report.topics,
-                          )}
-                        />
+                        <Insight text={recommendedFocusInsight(report.focus, report.topics)} />
                       </Panel>
                       <Panel title="Topic Strengths">
                         {report.topics.length === 0 ? (
