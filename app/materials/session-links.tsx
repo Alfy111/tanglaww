@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  KeyboardAvoidingView,
   Linking,
   Modal,
   Platform,
@@ -330,128 +331,157 @@ export default function SessionLinkScreen() {
         </TouchableOpacity>
       </View>
 
-      <Modal visible={addModalVisible} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalSheet}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Add Session Link</Text>
-              <TouchableOpacity
-                onPress={() => {
-                  resetForm();
-                  setAddModalVisible(false);
-                }}
-              >
-                <Ionicons name="close" size={24} color="#333" />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <Text style={styles.inputLabel}>Session Title *</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="e.g. LEPT Express - Module 3"
-                placeholderTextColor="#9AA0A6"
-                value={newTitle}
-                onChangeText={setNewTitle}
-              />
-
-              <Text style={styles.inputLabel}>Meeting Link *</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="https://zoom.us/j/... or meet.google.com/..."
-                placeholderTextColor="#9AA0A6"
-                value={newLink}
-                onChangeText={setNewLink}
-                autoCapitalize="none"
-                keyboardType="url"
-              />
-
-              <Text style={styles.inputLabel}>Description (optional)</Text>
-              <TextInput
-                style={[styles.input, { height: 70, textAlignVertical: "top" }]}
-                placeholder="Brief description of the session"
-                placeholderTextColor="#9AA0A6"
-                value={newDescription}
-                onChangeText={setNewDescription}
-                multiline
-              />
-
-              <Text style={styles.inputLabel}>Date *</Text>
-              <TouchableOpacity
-                style={styles.inputWithIcon}
-                onPress={() => setShowDatePicker(true)}
-              >
-                <Text
-                  style={{ flex: 1, color: formattedDate ? "#333" : "#BDC3C7" }}
-                >
-                  {formattedDate || "Select date"}
-                </Text>
-                <Ionicons name="calendar-outline" size={20} color="#2F459B" />
-              </TouchableOpacity>
-
-              <Text style={styles.inputLabel}>Time *</Text>
-              <TouchableOpacity
-                style={styles.inputWithIcon}
-                onPress={() => setShowTimePicker(true)}
-              >
-                <Text
-                  style={{ flex: 1, color: formattedTime ? "#333" : "#BDC3C7" }}
-                >
-                  {formattedTime || "Select time"}
-                </Text>
-                <Ionicons name="time-outline" size={20} color="#2F459B" />
-              </TouchableOpacity>
-
-              {showDatePicker && (
-                <DateTimePicker
-                  value={newDate ?? new Date()}
-                  mode="date"
-                  display={Platform.OS === "ios" ? "spinner" : "default"}
-                  onChange={(event, date) => {
-                    setShowDatePicker(false);
-                    if (date) {
-                      const updated = newDate ? new Date(newDate) : new Date();
-                      updated.setFullYear(
-                        date.getFullYear(),
-                        date.getMonth(),
-                        date.getDate(),
-                      );
-                      setNewDate(updated);
-                    }
+      <Modal
+        visible={addModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => {
+          resetForm();
+          setAddModalVisible(false);
+        }}
+      >
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalSheet}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Add Session Link</Text>
+                <TouchableOpacity
+                  onPress={() => {
+                    resetForm();
+                    setAddModalVisible(false);
                   }}
-                />
-              )}
+                >
+                  <Ionicons name="close" size={24} color="#333" />
+                </TouchableOpacity>
+              </View>
 
-              {showTimePicker && (
-                <DateTimePicker
-                  value={newDate ?? new Date()}
-                  mode="time"
-                  display={Platform.OS === "ios" ? "spinner" : "default"}
-                  onChange={(event, date) => {
-                    setShowTimePicker(false);
-                    if (date) {
-                      const updated = newDate ? new Date(newDate) : new Date();
-                      updated.setHours(date.getHours(), date.getMinutes());
-                      setNewDate(updated);
-                    }
-                  }}
-                />
-              )}
-
-              <TouchableOpacity
-                style={[styles.saveBtn, saving && { opacity: 0.7 }]}
-                onPress={handleAdd}
-                disabled={saving}
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
               >
-                {saving ? (
-                  <ActivityIndicator color="white" size="small" />
-                ) : (
-                  <Text style={styles.saveBtnText}>Add Session</Text>
+                <Text style={styles.inputLabel}>Session Title *</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="e.g. LEPT Express - Module 3"
+                  placeholderTextColor="#9AA0A6"
+                  value={newTitle}
+                  onChangeText={setNewTitle}
+                />
+
+                <Text style={styles.inputLabel}>Meeting Link *</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="https://zoom.us/j/... or meet.google.com/..."
+                  placeholderTextColor="#9AA0A6"
+                  value={newLink}
+                  onChangeText={setNewLink}
+                  autoCapitalize="none"
+                  keyboardType="url"
+                />
+
+                <Text style={styles.inputLabel}>Description (optional)</Text>
+                <TextInput
+                  style={[
+                    styles.input,
+                    { height: 70, textAlignVertical: "top" },
+                  ]}
+                  placeholder="Brief description of the session"
+                  placeholderTextColor="#9AA0A6"
+                  value={newDescription}
+                  onChangeText={setNewDescription}
+                  multiline
+                />
+
+                <Text style={styles.inputLabel}>Date *</Text>
+                <TouchableOpacity
+                  style={styles.inputWithIcon}
+                  onPress={() => setShowDatePicker(true)}
+                >
+                  <Text
+                    style={{
+                      flex: 1,
+                      color: formattedDate ? "#333" : "#BDC3C7",
+                    }}
+                  >
+                    {formattedDate || "Select date"}
+                  </Text>
+                  <Ionicons name="calendar-outline" size={20} color="#2F459B" />
+                </TouchableOpacity>
+
+                <Text style={styles.inputLabel}>Time *</Text>
+                <TouchableOpacity
+                  style={styles.inputWithIcon}
+                  onPress={() => setShowTimePicker(true)}
+                >
+                  <Text
+                    style={{
+                      flex: 1,
+                      color: formattedTime ? "#333" : "#BDC3C7",
+                    }}
+                  >
+                    {formattedTime || "Select time"}
+                  </Text>
+                  <Ionicons name="time-outline" size={20} color="#2F459B" />
+                </TouchableOpacity>
+
+                {showDatePicker && (
+                  <DateTimePicker
+                    value={newDate ?? new Date()}
+                    mode="date"
+                    display={Platform.OS === "ios" ? "spinner" : "default"}
+                    onChange={(event, date) => {
+                      setShowDatePicker(false);
+                      if (date) {
+                        const updated = newDate
+                          ? new Date(newDate)
+                          : new Date();
+                        updated.setFullYear(
+                          date.getFullYear(),
+                          date.getMonth(),
+                          date.getDate(),
+                        );
+                        setNewDate(updated);
+                      }
+                    }}
+                  />
                 )}
-              </TouchableOpacity>
-            </ScrollView>
+
+                {showTimePicker && (
+                  <DateTimePicker
+                    value={newDate ?? new Date()}
+                    mode="time"
+                    display={Platform.OS === "ios" ? "spinner" : "default"}
+                    onChange={(event, date) => {
+                      setShowTimePicker(false);
+                      if (date) {
+                        const updated = newDate
+                          ? new Date(newDate)
+                          : new Date();
+                        updated.setHours(date.getHours(), date.getMinutes());
+                        setNewDate(updated);
+                      }
+                    }}
+                  />
+                )}
+
+                <TouchableOpacity
+                  style={[styles.saveBtn, saving && { opacity: 0.7 }]}
+                  onPress={handleAdd}
+                  disabled={saving}
+                >
+                  {saving ? (
+                    <ActivityIndicator color="white" size="small" />
+                  ) : (
+                    <Text style={styles.saveBtnText}>Add Session</Text>
+                  )}
+                </TouchableOpacity>
+              </ScrollView>
+            </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );

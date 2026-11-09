@@ -368,10 +368,10 @@ export default function RegistrantDetails() {
 
     setSavingPhoto(true);
     try {
-      let MediaLibrary: typeof import("expo-media-library");
+      let MediaLibrary: typeof import("expo-media-library/legacy");
       let granted = false;
       try {
-        MediaLibrary = await import("expo-media-library");
+        MediaLibrary = await import("expo-media-library/legacy");
         ({ granted } = await MediaLibrary.requestPermissionsAsync(true, [
           "photo",
         ]));
