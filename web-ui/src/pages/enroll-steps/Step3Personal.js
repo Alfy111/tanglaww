@@ -1,5 +1,5 @@
 import { PlusCircle } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import ContinueButton from "../../components/ContinueButton";
 import FormField from "../../components/FormField";
 import StepBanner from "../../components/StepBanner";
@@ -34,6 +34,7 @@ const newExtraPayment = () => ({
   referenceNumber: "",
   proofOfPayment: null,
 });
+// Payment details are optional; only an amount that was typed must be valid
 const extraPaymentMissing = (p) => ({
   amount: !!p.amount?.trim() && !(parseFloat(p.amount) > 0),
 });
@@ -49,6 +50,122 @@ const noteStyle = {
   fontSize: "12px",
   lineHeight: "1.5",
 };
+
+// Copies the picked file into memory right away. On phones, a photo
+// picked from the gallery or cloud can become unreadable a few minutes
+// later, which made some receipts upload as nothing.
+async function keepFile(file) {
+  if (!file) return null;
+  const bytes = await file.arrayBuffer();
+  if (!bytes.byteLength)
+    throw new Error("This file is empty. Please choose it again.");
+  return new File([bytes], file.name, {
+    type: file.type,
+    lastModified: file.lastModified,
+  });
+}
+
+// File picker that always shows the chosen file in the box. Cancelling
+// the file window keeps the file that was already chosen.
+function FileField({ file, accept, onChange, hasError }) {
+  const inputRef = useRef(null);
+  const [reading, setReading] = useState(false);
+  const [problem, setProblem] = useState("");
+
+  const pick = async (e) => {
+    const chosen = e.target.files?.[0];
+    e.target.value = "";
+    if (!chosen) return; // cancelled: keep the current file
+    setReading(true);
+    setProblem("");
+    try {
+      onChange(await keepFile(chosen));
+    } catch (err) {
+      setProblem(
+        err.message || "Could not read this file. Please choose it again.",
+      );
+    } finally {
+      setReading(false);
+    }
+  };
+
+  return (
+    <>
+      <div
+        className={`field-input ${hasError || problem ? "error" : ""}`}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "10px",
+          padding: "8px",
+        }}
+      >
+        <button
+          type="button"
+          onClick={() => inputRef.current?.click()}
+          disabled={reading}
+          style={{
+            flexShrink: 0,
+            padding: "6px 12px",
+            borderRadius: "6px",
+            border: "1px solid #2F459B",
+            background: "#fff",
+            color: "#2F459B",
+            fontWeight: 600,
+            fontSize: "13px",
+            cursor: "pointer",
+            fontFamily: "inherit",
+          }}
+        >
+          {file ? "Change file" : "Choose file"}
+        </button>
+        <span
+          style={{
+            flex: 1,
+            minWidth: 0,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+            fontSize: "13px",
+            color: file ? "#2F459B" : "#888",
+          }}
+        >
+          {reading
+            ? "Reading file..."
+            : file
+              ? `✓ ${file.name}`
+              : "No file chosen"}
+        </span>
+        {file && !reading && (
+          <button
+            type="button"
+            onClick={() => onChange(null)}
+            style={{
+              flexShrink: 0,
+              border: 0,
+              background: "none",
+              color: "#e53935",
+              fontWeight: 600,
+              fontSize: "12px",
+              cursor: "pointer",
+              fontFamily: "inherit",
+            }}
+          >
+            Remove
+          </button>
+        )}
+        <input
+          ref={inputRef}
+          type="file"
+          accept={accept}
+          onChange={pick}
+          style={{ display: "none" }}
+        />
+      </div>
+      {problem && <p className="field-error">{problem}</p>}
+    </>
+  );
+}
 
 export default function Step3Personal({
   data,
@@ -72,7 +189,7 @@ export default function Step3Personal({
 
   const clearError = (key) => setErrors((e) => ({ ...e, [key]: null }));
   const set = (key, value) => {
-    setData({ ...data, [key]: value });
+    setData((prev) => ({ ...prev, [key]: value }));
     clearError(key);
   };
   // "Same school" box: keep the TCP fields equal to the college fields
@@ -143,6 +260,8 @@ export default function Step3Personal({
 
   const validatePromotionsAndPayment = () => {
     const e = {};
+    // Date, method, amount and reference number are optional
+    if (!data.paymentType) e.paymentType = "Required.";
     if (data.amount?.trim() && !(parseFloat(data.amount) > 0))
       e.amount = "Please enter a valid amount.";
     if (
@@ -150,7 +269,7 @@ export default function Step3Personal({
         Object.values(extraPaymentMissing(p)).some(Boolean),
       )
     )
-      e.extraPayments = "Please complete every added payment, or remove it.";
+      e.extraPayments = "Please enter a valid amount, or leave it blank.";
     if (!data.paymentNoticeAgreement)
       e.paymentNoticeAgreement = "Kindly confirm before proceeding.";
     if (Object.keys(e).length) {
@@ -191,12 +310,12 @@ export default function Step3Personal({
     setData({ ...data, extraPayments: [...extraPayments, newExtraPayment()] });
   };
   const updateExtraPayment = (key, changes) => {
-    setData({
-      ...data,
-      extraPayments: extraPayments.map((p) =>
+    setData((prev) => ({
+      ...prev,
+      extraPayments: (prev.extraPayments || []).map((p) =>
         p.key === key ? { ...p, ...changes } : p,
       ),
-    });
+    }));
     clearError("extraPayments");
   };
   const removeExtraPayment = (key) => {
@@ -206,13 +325,6 @@ export default function Step3Personal({
     });
     clearError("extraPayments");
   };
-
-  const picked = (key) =>
-    data[key] && (
-      <p style={{ margin: "4px 0 0", fontSize: "12px", color: "#2F459B" }}>
-        ✓ {data[key].name}
-      </p>
-    );
 
   const details = channelDetails(data.paymentChannel);
 
@@ -273,6 +385,7 @@ export default function Step3Personal({
               label="Facebook Link:"
               fieldKey="facebookLink"
               placeholder="E.g.: https://www.facebook.com/your.name (optional)"
+              hint="Open your Facebook profile, copy the link from the address bar, and paste it here."
               value={data.facebookLink ?? ""}
               onChange={handleChange}
               errors={errors}
@@ -300,7 +413,7 @@ export default function Step3Personal({
             {data.tcpSameAsCollege ? (
               <p
                 style={{
-                  margin: "4px 0 18px 10px",
+                  margin: "-6px 0 14px",
                   fontSize: "12px",
                   color: "#777",
                 }}
@@ -360,32 +473,19 @@ export default function Step3Personal({
               <span className="field-label">
                 Upload Graduation or Formal Photo: (optional)
               </span>
-              <input
-                type="file"
+              <FileField
                 accept="image/*"
-                className="field-input"
-                style={{ padding: "8px" }}
-                onChange={(e) =>
-                  setData({
-                    ...data,
-                    graduationPhoto: e.target.files[0] || null,
-                  })
-                }
+                file={data.graduationPhoto}
+                onChange={(f) => set("graduationPhoto", f)}
               />
-              {picked("graduationPhoto")}
             </div>
             <div className="field-group">
               <span className="field-label">Upload Valid ID: (optional)</span>
-              <input
-                type="file"
+              <FileField
                 accept="image/*,.pdf"
-                className="field-input"
-                style={{ padding: "8px" }}
-                onChange={(e) =>
-                  setData({ ...data, validId: e.target.files[0] || null })
-                }
+                file={data.validId}
+                onChange={(f) => set("validId", f)}
               />
-              {picked("validId")}
             </div>
             {(data.graduationPhoto || data.validId) &&
               checkbox(
@@ -514,7 +614,7 @@ export default function Step3Personal({
               )}
             </div>
             <div className="field-group">
-              {label("paymentType", "Payment Type:")}
+              {label("paymentType", "Payment Type:*")}
               <select
                 className={`field-input ${errors.paymentType ? "error" : ""}`}
                 value={data.paymentType || ""}
@@ -562,16 +662,12 @@ export default function Step3Personal({
             </div>
             <div className="field-group">
               {label("proofOfPayment", "Verification/Receipt:")}
-              <input
-                type="file"
+              <FileField
                 accept="image/*,.pdf"
-                className={`field-input ${errors.proofOfPayment ? "error" : ""}`}
-                style={{ padding: "8px" }}
-                onChange={(e) =>
-                  set("proofOfPayment", e.target.files[0] || null)
-                }
+                file={data.proofOfPayment}
+                hasError={!!errors.proofOfPayment}
+                onChange={(f) => set("proofOfPayment", f)}
               />
-              {picked("proofOfPayment")}
               {error("proofOfPayment")}
             </div>
 
@@ -620,7 +716,7 @@ export default function Step3Personal({
                     </button>
                   </div>
                   <div className="field-group">
-                    {fieldLabel("paymentDate", "Date of Transaction:*")}
+                    {fieldLabel("paymentDate", "Date of Transaction:")}
                     <input
                       type="date"
                       max={today()}
@@ -634,7 +730,7 @@ export default function Step3Personal({
                     />
                   </div>
                   <div className="field-group">
-                    {fieldLabel("paymentChannel", "Payment Method:*")}
+                    {fieldLabel("paymentChannel", "Payment Method:")}
                     <select
                       className={`field-input ${bad("paymentChannel") ? "error" : ""}`}
                       value={p.paymentChannelId ?? ""}
@@ -657,7 +753,7 @@ export default function Step3Personal({
                     </select>
                   </div>
                   <div className="field-group">
-                    {fieldLabel("amount", "Amount Transferred:*")}
+                    {fieldLabel("amount", "Amount Transferred:")}
                     <input
                       inputMode="decimal"
                       className={`field-input ${bad("amount") ? "error" : ""}`}
@@ -671,7 +767,7 @@ export default function Step3Personal({
                     />
                   </div>
                   <div className="field-group">
-                    {fieldLabel("referenceNumber", "Reference Number:*")}
+                    {fieldLabel("referenceNumber", "Reference Number:")}
                     <input
                       inputMode="numeric"
                       className={`field-input ${bad("referenceNumber") ? "error" : ""}`}
@@ -686,28 +782,13 @@ export default function Step3Personal({
                   </div>
                   <div className="field-group" style={{ marginBottom: 0 }}>
                     {fieldLabel("proofOfPayment", "Verification/Receipt:")}
-                    <input
-                      type="file"
+                    <FileField
                       accept="image/*,.pdf"
-                      className="field-input"
-                      style={{ padding: "8px" }}
-                      onChange={(e) =>
-                        updateExtraPayment(p.key, {
-                          proofOfPayment: e.target.files[0] || null,
-                        })
+                      file={p.proofOfPayment}
+                      onChange={(f) =>
+                        updateExtraPayment(p.key, { proofOfPayment: f })
                       }
                     />
-                    {p.proofOfPayment && (
-                      <p
-                        style={{
-                          margin: "4px 0 0",
-                          fontSize: "12px",
-                          color: "#2F459B",
-                        }}
-                      >
-                        ✓ {p.proofOfPayment.name}
-                      </p>
-                    )}
                   </div>
                 </div>
               );

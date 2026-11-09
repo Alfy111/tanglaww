@@ -8,7 +8,9 @@ import {
   AppState,
   Dimensions,
   FlatList,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -143,80 +145,85 @@ function AddSessionModal({
       transparent
       onRequestClose={close}
     >
-      <View style={modal.overlay}>
-        <View style={modal.sheet}>
-          <View style={modal.header}>
-            <Text style={modal.headerText}>Add Recorded Session</Text>
-            <TouchableOpacity onPress={close}>
-              <Ionicons name="close" size={24} color="#333" />
-            </TouchableOpacity>
-          </View>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
+        <View style={modal.overlay}>
+          <View style={modal.sheet}>
+            <View style={modal.header}>
+              <Text style={modal.headerText}>Add Recorded Session</Text>
+              <TouchableOpacity onPress={close}>
+                <Ionicons name="close" size={24} color="#333" />
+              </TouchableOpacity>
+            </View>
 
-          <ScrollView keyboardShouldPersistTaps="handled">
-            {addedCount > 0 && (
-              <Text style={modal.addedNote}>
-                {addedCount} session{addedCount > 1 ? "s" : ""} added. Enter the
-                next one, or tap Done.
-              </Text>
-            )}
-            <Text style={modal.label}>Session Title: *</Text>
-            <TextInput
-              style={modal.input}
-              placeholder="e.g. Week 1 – Introduction"
-              placeholderTextColor="#BDC3C7"
-              value={title}
-              onChangeText={setTitle}
-            />
-            <Text style={modal.label}>YouTube URL: *</Text>
-            <TextInput
-              style={[modal.input, urlError ? modal.inputError : null]}
-              placeholder="https://youtu.be/VIDEO_ID"
-              placeholderTextColor="#BDC3C7"
-              value={url}
-              onChangeText={(t) => {
-                setUrl(t);
-                setUrlError("");
-              }}
-              autoCapitalize="none"
-              keyboardType="url"
-            />
-            {urlError ? (
-              <Text style={modal.errorText}>{urlError}</Text>
-            ) : (
-              <Text style={modal.hint}>Paste an unlisted YouTube link.</Text>
-            )}
-          </ScrollView>
-
-          <View style={modal.btnRow}>
-            <TouchableOpacity
-              style={[modal.secondaryBtn, saving && { opacity: 0.7 }]}
-              onPress={() => handleSave(true)}
-              disabled={saving}
-            >
-              <Text style={modal.secondaryBtnText}>Save & Add Another</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[modal.saveBtn, saving && { opacity: 0.7 }]}
-              onPress={() =>
-                addedCount > 0 && !title.trim() && !url.trim()
-                  ? close()
-                  : handleSave(false)
-              }
-              disabled={saving}
-            >
-              {saving ? (
-                <ActivityIndicator color="white" />
-              ) : (
-                <Text style={modal.saveBtnText}>
-                  {addedCount > 0 && !title.trim() && !url.trim()
-                    ? "Done"
-                    : "Save Session"}
+            <ScrollView keyboardShouldPersistTaps="handled">
+              {addedCount > 0 && (
+                <Text style={modal.addedNote}>
+                  {addedCount} session{addedCount > 1 ? "s" : ""} added. Enter
+                  the next one, or tap Done.
                 </Text>
               )}
-            </TouchableOpacity>
+              <Text style={modal.label}>Session Title: *</Text>
+              <TextInput
+                style={modal.input}
+                placeholder="e.g. Week 1 – Introduction"
+                placeholderTextColor="#BDC3C7"
+                value={title}
+                onChangeText={setTitle}
+              />
+              <Text style={modal.label}>YouTube URL: *</Text>
+              <TextInput
+                style={[modal.input, urlError ? modal.inputError : null]}
+                placeholder="https://youtu.be/VIDEO_ID"
+                placeholderTextColor="#BDC3C7"
+                value={url}
+                onChangeText={(t) => {
+                  setUrl(t);
+                  setUrlError("");
+                }}
+                autoCapitalize="none"
+                keyboardType="url"
+              />
+              {urlError ? (
+                <Text style={modal.errorText}>{urlError}</Text>
+              ) : (
+                <Text style={modal.hint}>Paste an unlisted YouTube link.</Text>
+              )}
+            </ScrollView>
+
+            <View style={modal.btnRow}>
+              <TouchableOpacity
+                style={[modal.secondaryBtn, saving && { opacity: 0.7 }]}
+                onPress={() => handleSave(true)}
+                disabled={saving}
+              >
+                <Text style={modal.secondaryBtnText}>Save & Add Another</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[modal.saveBtn, saving && { opacity: 0.7 }]}
+                onPress={() =>
+                  addedCount > 0 && !title.trim() && !url.trim()
+                    ? close()
+                    : handleSave(false)
+                }
+                disabled={saving}
+              >
+                {saving ? (
+                  <ActivityIndicator color="white" />
+                ) : (
+                  <Text style={modal.saveBtnText}>
+                    {addedCount > 0 && !title.trim() && !url.trim()
+                      ? "Done"
+                      : "Save Session"}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

@@ -142,6 +142,10 @@ export async function getPaymentChannels() {
 
 async function uploadFile(file, folder, label) {
   if (!file) return null;
+  if (!file.size)
+    throw new Error(
+      `Your ${label} file is empty. Please go back and choose it again.`,
+    );
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
   const path = `${folder}/${Date.now()}_${safeName}`;
 
@@ -151,7 +155,11 @@ async function uploadFile(file, folder, label) {
   if (error)
     throw new Error(`Could not upload your ${label}: ${error.message}`);
 
-  return supabase.storage.from("receipts").getPublicUrl(path).data.publicUrl;
+  const url = supabase.storage.from("receipts").getPublicUrl(path)
+    .data.publicUrl;
+  if (!url)
+    throw new Error(`Could not upload your ${label}. Please try again.`);
+  return url;
 }
 
 const withHttps = (v) => {
@@ -198,14 +206,25 @@ export async function submitEnrollment(data) {
         uploadFile(p.proofOfPayment, "payments", `payment ${i + 2} receipt`),
       ),
     ]);
-  const additionalPayments = (data.extraPayments || []).map((p, i) => ({
-    paymentChannel_id: p.paymentChannelId,
-    paymentChannelName: p.paymentChannel,
-    dateOfPayment: new Date(p.paymentDate).toISOString(),
-    amountTransferred: parseFloat(p.amount),
-    referenceNumber: p.referenceNumber.trim(),
-    proofUrl: extraProofUrls[i],
-  }));
+  const additionalPayments = (data.extraPayments || [])
+    .map((p, i) => ({
+      empty:
+        !p.paymentChannelId &&
+        !p.paymentDate &&
+        !p.amount?.trim() &&
+        !p.referenceNumber?.trim() &&
+        !p.proofOfPayment,
+      paymentChannel_id: p.paymentChannelId ?? null,
+      paymentChannelName: p.paymentChannel,
+      dateOfPayment: p.paymentDate
+        ? new Date(p.paymentDate).toISOString()
+        : null,
+      amountTransferred: parseFloat(p.amount) > 0 ? parseFloat(p.amount) : null,
+      referenceNumber: p.referenceNumber?.trim() || null,
+      proofUrl: extraProofUrls[i],
+    }))
+    .filter((p) => !p.empty)
+    .map(({ empty, ...p }) => p);
 
   const now = new Date().toISOString();
   const studentFields = {
