@@ -15,8 +15,10 @@ import logo from "../assets/logo.png";
 import Navbar from "../components/Navbar";
 import "./Home.css";
 
-const androidApkUrl =
-  "https://github.com/Alfy111/tanglaww/releases/download/android-apk/Tanglaw.apk";
+const androidReleaseApiUrl =
+  "https://api.github.com/repos/Alfy111/tanglaww/releases/tags/android-apk";
+const androidReleaseUrl =
+  "https://github.com/Alfy111/tanglaww/releases/tag/android-apk";
 
 const programs = [
   { title: "General Education", icon: Globe },
@@ -186,6 +188,7 @@ function Home() {
   const navigate = useNavigate();
   const [openFaq, setOpenFaq] = useState(0);
   const [activeSection, setActiveSection] = useState("home");
+  const [downloading, setDownloading] = useState(false);
   const [journeyVisible, setJourneyVisible] = useState(false);
   const [coursesVisible, setCoursesVisible] = useState(false);
   const [aboutVisible, setAboutVisible] = useState(false);
@@ -370,6 +373,50 @@ function Home() {
       window.removeEventListener("resize", updateActiveSection);
     };
   }, []);
+
+  const downloadAndroidApk = async (event) => {
+    event.preventDefault();
+
+    if (downloading) return;
+
+    setDownloading(true);
+
+    try {
+      const response = await fetch(androidReleaseApiUrl, {
+        headers: { Accept: "application/vnd.github+json" },
+        cache: "no-store",
+      });
+
+      if (!response.ok) {
+        throw new Error("Unable to retrieve the latest Android release.");
+      }
+
+      const release = await response.json();
+      const apkAsset = release.assets?.find(
+        (asset) =>
+          asset.state === "uploaded" &&
+          (asset.name.toLowerCase().endsWith(".apk") ||
+            asset.content_type === "application/vnd.android.package-archive"),
+      );
+
+      if (!apkAsset?.browser_download_url) {
+        throw new Error("The latest Android release has no APK asset.");
+      }
+
+      const downloadLink = document.createElement("a");
+      downloadLink.href = apkAsset.browser_download_url;
+      downloadLink.download = apkAsset.name;
+      downloadLink.rel = "noopener";
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      downloadLink.remove();
+    } catch (error) {
+      console.error(error);
+      window.location.assign(androidReleaseUrl);
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   return (
     <div className="landing-home">
@@ -744,10 +791,12 @@ function Home() {
               </p>
               <a
                 className="landing-button button-navy"
-                href={androidApkUrl}
-                download="Tanglaw.apk"
+                href={androidReleaseUrl}
+                onClick={downloadAndroidApk}
+                aria-disabled={downloading}
               >
-                <Smartphone size={16} /> Download for Android
+                <Smartphone size={16} />{" "}
+                {downloading ? "Preparing download..." : "Download for Android"}
               </a>
             </div>
           </div>

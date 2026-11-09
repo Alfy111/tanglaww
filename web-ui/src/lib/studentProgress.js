@@ -4,15 +4,27 @@ export const SEGMENT_SECONDS = 5;
 export const VIDEO_COMPLETION_THRESHOLD = 0.7;
 export const MAX_SESSION_SECONDS = 30 * 60;
 
-const MIN_VIEW_SECONDS = 60;
+const MIN_VIEW_SECONDS = 240;
 const MAX_REQUIRED_VIEW_SECONDS = 300;
-const SECONDS_PER_MB = 30;
+const SECONDS_PER_MB = 15;
 
 export function requiredViewSeconds(fileSizeBytes) {
   const mb = (fileSizeBytes ?? 0) / (1024 * 1024);
   return Math.round(
     Math.min(MAX_REQUIRED_VIEW_SECONDS, MIN_VIEW_SECONDS + mb * SECONDS_PER_MB),
   );
+}
+
+export function estimatePdfReadingSeconds(pageCount, wordCount) {
+  const pages = Math.max(1, Number(pageCount) || 0);
+  const words = Math.max(0, Number(wordCount) || 0);
+  const wordsPerPage = words / pages;
+  const textEstimate = words > 0 ? Math.round((words / 200) * 60) : pages * 60;
+  const estimated = words > 0
+    ? Math.max(pages * 60, textEstimate)
+    : pages * 60;
+
+  return Math.max(pages * 60, Math.min(pages * 120, estimated + (wordsPerPage > 300 ? 30 : 0)));
 }
 
 export function videoCoverage(watchedSegments, mediaDurationSeconds) {
@@ -28,10 +40,9 @@ export function videoCoverage(watchedSegments, mediaDurationSeconds) {
 export async function getCompletedMaterialIds(studentId, materialIds) {
   if (!studentId || materialIds.length === 0) return new Set();
   const { data, error } = await supabase
-    .from("material_progress")
+    .from("student_material_progress")
     .select("material_id")
     .eq("student_id", studentId)
-    .eq("isCompleted", true)
     .in("material_id", materialIds);
   if (error) throw new Error(error.message);
   return new Set((data ?? []).map((row) => Number(row.material_id)));
@@ -90,7 +101,7 @@ export async function recordMaterialView(
         ? Math.round(video.mediaDurationSeconds)
         : null,
     });
-    if (error) throw new Error(error.message);
+    if (error) console.warn("[progress] saving view duration failed", error.message);
   }
 
   const { error: openError } = await supabase.rpc("mark_material_opened", {
@@ -102,15 +113,30 @@ export async function recordMaterialView(
       openError.message,
     );
 
-  return getTotalViewSeconds(studentId, materialId);
+  return getTotalViewSeconds(studentId, materialId).catch((error) => {
+    console.warn("[progress] loading view duration failed", error.message);
+    return 0;
+  });
 }
 
-export async function markMaterialCompleted(materialId, source, viewSeconds) {
-  const { error } = await supabase.rpc("mark_material_completed", {
-    p_material_id: materialId,
-    p_source: source,
-    p_view_seconds: viewSeconds ?? null,
-  });
+export async function markMaterialCompleted(
+  studentId,
+  materialId,
+  source,
+  viewSeconds,
+) {
+  if (!studentId) throw new Error("Could not identify the student.");
+
+  const { error } = await supabase
+    .from("student_material_progress")
+    .upsert(
+      {
+        student_id: studentId,
+        material_id: materialId,
+        completed_at: new Date().toISOString(),
+      },
+      { onConflict: "student_id,material_id" },
+    );
   if (error) throw new Error(error.message);
 }
 
