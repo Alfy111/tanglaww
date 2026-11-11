@@ -937,6 +937,7 @@ export default function AdminQuizEditor() {
   const [modules, setModules] = useState([]);
   const [topics, setTopics] = useState([]);
   const [hasAttempts, setHasAttempts] = useState(false);
+  const [attemptCount, setAttemptCount] = useState(0);
   const [editing, setEditing] = useState(null);
 
   // Remedial quiz: only the chosen reviewees see it
@@ -1195,6 +1196,7 @@ export default function AdminQuizEditor() {
             .sort((x, y) => x.position - y.position)
             .map((q) => ({
               key: newKey(),
+              questionId: q.question_id,
               questionType: q.questionType,
               questionText: q.questionText,
               points: String(q.points),
@@ -1204,6 +1206,7 @@ export default function AdminQuizEditor() {
                 .sort((x, y) => x.choice_id - y.choice_id)
                 .map((c) => ({
                   key: newKey(),
+                  choiceId: c.choice_id,
                   choiceText: c.choiceText ?? "",
                   imageUrl: c.image_url ?? null,
                   isCorrect: c.isCorrect,
@@ -1211,11 +1214,14 @@ export default function AdminQuizEditor() {
               answers: (q.assessment_identification_answer ?? []).map(
                 (ans) => ({ key: newKey(), answerText: ans.answerText }),
               ),
-              pairs: (q.assessment_matching_pair ?? []).map((p) => ({
-                key: newKey(),
-                leftText: p.leftText,
-                rightText: p.rightText,
-              })),
+              pairs: [...(q.assessment_matching_pair ?? [])]
+                .sort((x, y) => x.pair_id - y.pair_id)
+                .map((p) => ({
+                  key: newKey(),
+                  pairId: p.pair_id,
+                  leftText: p.leftText,
+                  rightText: p.rightText,
+                })),
             })),
         );
 
@@ -1224,6 +1230,7 @@ export default function AdminQuizEditor() {
           .select("attempt_id", { count: "exact", head: true })
           .eq("assessment_id", assessmentId);
         setHasAttempts((count ?? 0) > 0);
+        setAttemptCount(count ?? 0);
 
         if (!isDiagnostic) {
           const { data: remedial } = await supabase.rpc("get_remedial", {
@@ -1325,6 +1332,14 @@ export default function AdminQuizEditor() {
       setError(problem);
       return;
     }
+    if (
+      hasAttempts &&
+      !window.confirm(
+        `Reviewees already took this quiz (${attemptCount} ${attemptCount === 1 ? "attempt" : "attempts"}). Saving will regrade all of them with the current questions and answers. Continue?`,
+      )
+    ) {
+      return;
+    }
     setError("");
     setSaving(true);
     const { data: userData } = await supabase.auth.getUser();
@@ -1352,7 +1367,11 @@ export default function AdminQuizEditor() {
       isPublished: isRemedial && !isPublished ? false : publish,
       module_id: moduleId,
       admin_id: adminId,
+      // A quiz that reviewees already took is updated question by question
+      // (by id) and their attempts are regraded with the new answer key
+      editAnswered: hasAttempts,
       questions: questions.map((q) => ({
+        question_id: q.questionId ?? null,
         questionType: q.questionType,
         questionText: q.questionText,
         points: Number(q.points),
@@ -1361,6 +1380,7 @@ export default function AdminQuizEditor() {
         choices:
           q.questionType === "mcq"
             ? q.choices.map((c) => ({
+                choice_id: c.choiceId ?? null,
                 choiceText: c.choiceText,
                 image_url: c.imageUrl ?? null,
                 isCorrect: c.isCorrect,
@@ -1373,6 +1393,7 @@ export default function AdminQuizEditor() {
         pairs:
           q.questionType === "matching"
             ? q.pairs.map((p) => ({
+                pair_id: p.pairId ?? null,
                 leftText: p.leftText,
                 rightText: p.rightText,
               }))
@@ -1729,9 +1750,12 @@ export default function AdminQuizEditor() {
                     <span
                       style={{ fontSize: "12px", color: COLORS.warningText }}
                     >
-                      Students have already taken this quiz, so the questions
-                      are locked to keep their results accurate. You can still
-                      change the settings above.
+                      Reviewees have already taken this quiz ({attemptCount}{" "}
+                      {attemptCount === 1 ? "attempt" : "attempts"}). You can
+                      still edit the questions and answers. When you save, every
+                      attempt is regraded with the new answer key. Removed
+                      questions or choices are removed from their answers; new
+                      questions count as unanswered for past attempts.
                     </span>
                   </div>
                 )}
@@ -1753,27 +1777,25 @@ export default function AdminQuizEditor() {
                   >
                     Questions ({questions.length})
                   </span>
-                  {!hasAttempts && (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setEditing({ index: null, draft: emptyQuestion() })
-                      }
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "6px",
-                        border: 0,
-                        background: "none",
-                        cursor: "pointer",
-                        fontSize: "14px",
-                        color: COLORS.text,
-                        fontFamily: "inherit",
-                      }}
-                    >
-                      Add question <Plus size={20} />
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setEditing({ index: null, draft: emptyQuestion() })
+                    }
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      border: 0,
+                      background: "none",
+                      cursor: "pointer",
+                      fontSize: "14px",
+                      color: COLORS.text,
+                      fontFamily: "inherit",
+                    }}
+                  >
+                    Add question <Plus size={20} />
+                  </button>
                 </div>
 
                 {questions.length === 0 && (
@@ -1795,7 +1817,6 @@ export default function AdminQuizEditor() {
                   >
                     <button
                       type="button"
-                      disabled={hasAttempts}
                       onClick={() => setEditing({ index, draft: { ...q } })}
                       style={{
                         flex: 1,
@@ -1804,7 +1825,7 @@ export default function AdminQuizEditor() {
                         border: 0,
                         background: "none",
                         padding: 0,
-                        cursor: hasAttempts ? "default" : "pointer",
+                        cursor: "pointer",
                         fontFamily: "inherit",
                       }}
                     >
@@ -1870,52 +1891,50 @@ export default function AdminQuizEditor() {
                           </div>
                         )}
                     </button>
-                    {!hasAttempts && (
-                      <div
-                        style={{
-                          display: "flex",
-                          flexDirection: "column",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                          marginLeft: "10px",
-                        }}
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        marginLeft: "10px",
+                      }}
+                    >
+                      <button
+                        type="button"
+                        aria-label="Move up"
+                        style={s.iconBtn}
+                        onClick={() => moveQuestion(index, -1)}
                       >
-                        <button
-                          type="button"
-                          aria-label="Move up"
-                          style={s.iconBtn}
-                          onClick={() => moveQuestion(index, -1)}
-                        >
-                          <ChevronUp
-                            size={20}
-                            color={index === 0 ? "#C8CCD4" : COLORS.accent}
-                          />
-                        </button>
-                        <button
-                          type="button"
-                          aria-label="Move down"
-                          style={s.iconBtn}
-                          onClick={() => moveQuestion(index, 1)}
-                        >
-                          <ChevronDown
-                            size={20}
-                            color={
-                              index === questions.length - 1
-                                ? "#C8CCD4"
-                                : COLORS.accent
-                            }
-                          />
-                        </button>
-                        <button
-                          type="button"
-                          aria-label="Remove question"
-                          style={s.iconBtn}
-                          onClick={() => removeQuestion(index)}
-                        >
-                          <Trash2 size={18} color={COLORS.danger} />
-                        </button>
-                      </div>
-                    )}
+                        <ChevronUp
+                          size={20}
+                          color={index === 0 ? "#C8CCD4" : COLORS.accent}
+                        />
+                      </button>
+                      <button
+                        type="button"
+                        aria-label="Move down"
+                        style={s.iconBtn}
+                        onClick={() => moveQuestion(index, 1)}
+                      >
+                        <ChevronDown
+                          size={20}
+                          color={
+                            index === questions.length - 1
+                              ? "#C8CCD4"
+                              : COLORS.accent
+                          }
+                        />
+                      </button>
+                      <button
+                        type="button"
+                        aria-label="Remove question"
+                        style={s.iconBtn}
+                        onClick={() => removeQuestion(index)}
+                      >
+                        <Trash2 size={18} color={COLORS.danger} />
+                      </button>
+                    </div>
                   </div>
                 ))}
 
